@@ -7,10 +7,13 @@ import {
   Award,
   BookOpen,
   Brain,
+  ClipboardCheck,
   Clock,
+  FileText,
   Folders,
   GraduationCap,
   Lightbulb,
+  Route,
   Shield,
   TrendingUp,
   Users,
@@ -22,43 +25,75 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
-import { departments, leaderboard } from "@/data/mock";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAnalytics, useDepartmentsLive, useLeaderboardLive } from "@/hooks/use-operations";
 import { DEPARTMENT_LABELS } from "@/constants/navigation";
 import { formatNumber } from "@/lib/utils";
 
 const fade = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
 
-const totalEmployees = departments.reduce((s, d) => s + d.employeeCount, 0);
-const totalCourses = departments.reduce((s, d) => s + d.courseCount, 0);
-const avgCompletion = Math.round(
-  departments.reduce((s, d) => s + d.avgCompletion, 0) / departments.length
-);
-const totalHours = Math.round(totalEmployees * 42.5);
-
-const aiInsights = [
-  {
-    title: "DevOps needs support",
-    description: "DevOps completion rate (66%) is below org average. Schedule mentorship sessions.",
-    priority: "high",
-  },
-  {
-    title: "HR leads adoption",
-    description: "Human Resources at 81% completion — share their onboarding playbook with other departments.",
-    priority: "medium",
-  },
-  {
-    title: "Course demand spike",
-    description: "System Design and CI/CD paths saw 34% enrollment increase this month.",
-    priority: "low",
-  },
-];
-
 const quickLinks = [
+  { title: "Promotions", description: "See who is eligible and approve level advances", href: "/dashboard/admin/promotions", icon: TrendingUp },
   { title: "Course Management", description: "Create, publish, and archive department courses", href: "/dashboard/admin/courses", icon: Folders },
   { title: "User Management", description: "Invite users, assign roles, and manage access", href: "/dashboard/admin/users", icon: Users },
+  { title: "Assessments", description: "Build and publish quizzes and exams", href: "/dashboard/admin/assessments", icon: ClipboardCheck },
+  { title: "Learning Paths", description: "Design multi-course learning journeys", href: "/dashboard/admin/paths", icon: Route },
+  { title: "Assignments", description: "Create graded assignments and review submissions", href: "/dashboard/admin/assignments", icon: FileText },
+  { title: "Certificates", description: "Issue, revoke, and reissue credentials", href: "/dashboard/admin/certificates", icon: Award },
 ];
 
 export default function AdminPage() {
+  const { data: analytics, isLoading: analyticsLoading } = useAnalytics();
+  const { data: departments = [], isLoading: deptsLoading } = useDepartmentsLive();
+  const { data: leaderboard = [], isLoading: lbLoading } = useLeaderboardLive();
+
+  if (analyticsLoading || deptsLoading || lbLoading || !analytics) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Admin Overview" description="Loading organization analytics…" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  const { snapshot } = analytics;
+  const avgCompletion =
+    snapshot.departments.length === 0
+      ? 0
+      : Math.round(
+          snapshot.departments.reduce((s, d) => s + d.avgCompletion, 0) / snapshot.departments.length
+        );
+
+  const sortedByCompletion = [...snapshot.departments].sort(
+    (a, b) => a.avgCompletion - b.avgCompletion
+  );
+  const lowest = sortedByCompletion[0];
+  const highest = sortedByCompletion[sortedByCompletion.length - 1];
+
+  const aiInsights = [
+    lowest
+      ? {
+          title: `${lowest.name} needs support`,
+          description: `${lowest.name} completion rate (${lowest.avgCompletion}%) is below org average (${avgCompletion}%). Schedule mentorship sessions.`,
+          priority: "high" as const,
+        }
+      : null,
+    highest
+      ? {
+          title: `${highest.name} leads adoption`,
+          description: `${highest.name} at ${highest.avgCompletion}% completion — share their onboarding playbook with other departments.`,
+          priority: "medium" as const,
+        }
+      : null,
+    {
+      title: "Assessment activity",
+      description: `${snapshot.assessmentsTaken} assessments taken with ${snapshot.avgAssessmentScore}% average score across the organization.`,
+      priority: "low" as const,
+    },
+  ].filter(Boolean) as { title: string; description: string; priority: "high" | "medium" | "low" }[];
+
+  const displayDepartments = departments.length > 0 ? departments : snapshot.departments;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -75,10 +110,34 @@ export default function AdminPage() {
         transition={{ duration: 0.4 }}
         className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
-        <StatCard title="Total Employees" value={formatNumber(totalEmployees)} icon={Users} subtitle="Across 7 departments" accent="#0D9488" />
-        <StatCard title="Active Courses" value={totalCourses} icon={BookOpen} trend="+6 new" accent="#0284C7" />
-        <StatCard title="Learning Hours" value={formatNumber(totalHours)} icon={Clock} subtitle="Org-wide YTD" accent="#059669" />
-        <StatCard title="Completion Rate" value={`${avgCompletion}%`} icon={GraduationCap} trend="+4%" accent="#CA8A04" />
+        <StatCard
+          title="Total Employees"
+          value={formatNumber(snapshot.totalUsers)}
+          icon={Users}
+          subtitle={`${snapshot.activeUsers} active · ${snapshot.departments.length} departments`}
+          accent="#0D9488"
+        />
+        <StatCard
+          title="Active Courses"
+          value={snapshot.publishedCourses}
+          icon={BookOpen}
+          subtitle={`${snapshot.publishedAssessments} assessments`}
+          accent="#0284C7"
+        />
+        <StatCard
+          title="Learning Hours"
+          value={formatNumber(Math.round(snapshot.completedLessons * 0.5))}
+          icon={Clock}
+          subtitle={`${formatNumber(snapshot.completedLessons)} lessons completed`}
+          accent="#059669"
+        />
+        <StatCard
+          title="Completion Rate"
+          value={`${avgCompletion}%`}
+          icon={GraduationCap}
+          subtitle={`${formatNumber(snapshot.certificatesEarned)} certificates`}
+          accent="#CA8A04"
+        />
       </motion.section>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -187,7 +246,7 @@ export default function AdminPage() {
             <CardDescription>Average course completion by department</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {departments.slice(0, 6).map((dept) => (
+            {displayDepartments.slice(0, 6).map((dept) => (
               <div key={dept.id}>
                 <div className="mb-1.5 flex items-center justify-between text-sm">
                   <span className="font-medium">{dept.name}</span>

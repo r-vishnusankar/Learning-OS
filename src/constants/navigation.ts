@@ -49,12 +49,19 @@ export const SIDEBAR_NAV: NavItem[] = [
   { title: "Reports", href: "/dashboard/analytics", icon: "BarChart3" },
   { title: "Calendar", href: "/dashboard/calendar", icon: "Calendar" },
   { title: "AI Mentor", href: "/dashboard/ai-mentor", icon: "Sparkles" },
-  { title: "Notifications", href: "/dashboard/notifications", icon: "Bell", badge: 5 },
+  { title: "Notifications", href: "/dashboard/notifications", icon: "Bell" },
   { title: "Settings", href: "/dashboard/settings", icon: "Settings" },
 ];
 
 export const ADMIN_NAV: NavItem[] = [
   { title: "Admin Overview", href: "/dashboard/admin", icon: "Shield" },
+  { title: "Promotions", href: "/dashboard/admin/promotions", icon: "Award" },
   { title: "Course Management", href: "/dashboard/admin/courses", icon: "Folders" },
+  { title: "Course Assignments", href: "/dashboard/admin/course-assignments", icon: "Users" },
+  { title: "Assessments", href: "/dashboard/admin/assessments", icon: "ClipboardCheck" },
+  { title: "Learning Paths", href: "/dashboard/admin/paths", icon: "Route" },
+  { title: "Assignments", href: "/dashboard/admin/assignments", icon: "FileText" },
+  { title: "Certificates", href: "/dashboard/admin/certificates", icon: "Award" },
+  { title: "Media Library", href: "/dashboard/admin/media", icon: "Image" },
   { title: "User Management", href: "/dashboard/admin/users", icon: "Users" },
 ];
