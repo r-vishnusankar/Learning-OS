@@ -1,26 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { motion } from "framer-motion";
-import {
-  Archive,
-  Edit,
-  Filter,
-  MoreHorizontal,
-  Plus,
-  Search,
-  Send,
-} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Edit, MoreHorizontal, Plus, Search, X } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/shared/status-badge";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -30,280 +23,355 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { courses as initialCourses, departments } from "@/data/mock";
-import { DEPARTMENT_LABELS, LEVEL_LABELS, LEVELS } from "@/constants/navigation";
-import type { Course, CourseStatus, DepartmentId, LearningLevel } from "@/types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS, LEVELS } from "@/constants/navigation";
+import {
+  useAdminCourses,
+  useArchiveCourse,
+  useCreateCourse,
+  useDeleteCourse,
+  usePublishCourse,
+} from "@/hooks/use-courses";
+import type { DepartmentId, Difficulty, LearningCategory, LearningLevel } from "@/types";
+import type { PublishStatus } from "@/db/schema/courses";
 
-type AdminCourse = Course & { publishStatus: "draft" | "published" | "archived" };
+const selectClass =
+  "h-11 w-full rounded-2xl border border-input bg-card px-4 text-sm sm:w-auto sm:min-w-[10.5rem]";
 
-const fade = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
+const DIFFICULTIES: { value: Difficulty | "all"; label: string }[] = [
+  { value: "all", label: "All difficulties" },
+  { value: "beginner", label: "Beginner" },
+  { value: "intermediate", label: "Intermediate" },
+  { value: "advanced", label: "Advanced" },
+  { value: "expert", label: "Expert" },
+];
 
-function toAdminCourse(c: Course): AdminCourse {
-  const publishStatus =
-    c.status === "archived" ? "archived" : c.progress > 0 || c.enrolledCount > 1000 ? "published" : "draft";
-  return { ...c, publishStatus };
-}
+const STATUSES: { value: PublishStatus | "all"; label: string }[] = [
+  { value: "all", label: "All statuses" },
+  { value: "draft", label: "Draft" },
+  { value: "review", label: "In review" },
+  { value: "published", label: "Published" },
+  { value: "archived", label: "Archived" },
+];
 
 export default function AdminCoursesPage() {
-  const [courseList, setCourseList] = React.useState<AdminCourse[]>(() =>
-    initialCourses.map(toAdminCourse)
-  );
+  const router = useRouter();
   const [search, setSearch] = React.useState("");
-  const [deptFilter, setDeptFilter] = React.useState<DepartmentId | "all">("all");
-  const [statusFilter, setStatusFilter] = React.useState<"all" | "draft" | "published" | "archived">("all");
+  const [departmentFilter, setDepartmentFilter] = React.useState<DepartmentId | "all">("all");
+  const [levelFilter, setLevelFilter] = React.useState<LearningLevel | "all">("all");
+  const [statusFilter, setStatusFilter] = React.useState<PublishStatus | "all">("all");
+  const [difficultyFilter, setDifficultyFilter] = React.useState<Difficulty | "all">("all");
+  const [learningCategoryFilter, setLearningCategoryFilter] = React.useState<
+    LearningCategory | "all"
+  >("all");
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [form, setForm] = React.useState({
     title: "",
-    department: "development" as DepartmentId,
-    level: "intermediate" as LearningLevel,
     description: "",
+    departmentId: "development" as DepartmentId,
+    learningCategory: "role" as LearningCategory,
   });
 
-  const filtered = courseList.filter((c) => {
-    const matchesSearch =
-      c.title.toLowerCase().includes(search.toLowerCase()) ||
-      c.description.toLowerCase().includes(search.toLowerCase());
-    const matchesDept = deptFilter === "all" || c.department === deptFilter;
-    const matchesStatus = statusFilter === "all" || c.publishStatus === statusFilter;
-    return matchesSearch && matchesDept && matchesStatus;
+  const { data: courses = [], isLoading } = useAdminCourses({
+    search: search || undefined,
+    departmentId: departmentFilter === "all" ? undefined : departmentFilter,
+    level: levelFilter === "all" ? undefined : levelFilter,
+    publishStatus: statusFilter === "all" ? undefined : statusFilter,
+    difficulty: difficultyFilter === "all" ? undefined : difficultyFilter,
+    learningCategory: learningCategoryFilter === "all" ? undefined : learningCategoryFilter,
   });
+  const createCourse = useCreateCourse();
+  const deleteCourse = useDeleteCourse();
+  const publishCourse = usePublishCourse();
+  const archiveCourse = useArchiveCourse();
 
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.title.trim()) {
-      toast.error("Course title is required");
-      return;
+  const hasFilters =
+    Boolean(search.trim()) ||
+    departmentFilter !== "all" ||
+    levelFilter !== "all" ||
+    statusFilter !== "all" ||
+    difficultyFilter !== "all" ||
+    learningCategoryFilter !== "all";
+
+  const clearFilters = () => {
+    setSearch("");
+    setDepartmentFilter("all");
+    setLevelFilter("all");
+    setStatusFilter("all");
+    setDifficultyFilter("all");
+    setLearningCategoryFilter("all");
+  };
+
+  const handleCreate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    try {
+      const created = await createCourse.mutateAsync({
+        title: form.title,
+        description: form.description || "Course description pending.",
+        departmentId: form.departmentId,
+        learningCategory: form.learningCategory,
+      });
+      toast.success("Course created");
+      setDialogOpen(false);
+      setForm({
+        title: "",
+        description: "",
+        departmentId: "development",
+        learningCategory: "role",
+      });
+      router.push(`/dashboard/admin/courses/${created.id}`);
+    } catch {
+      toast.error("Failed to create course");
     }
-    const newCourse: AdminCourse = {
-      id: `c${Date.now()}`,
-      title: form.title,
-      description: form.description || "No description provided.",
-      thumbnail: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&q=80",
-      department: form.department,
-      level: form.level,
-      difficulty: "intermediate",
-      instructor: initialCourses[0].instructor,
-      durationHours: 8,
-      lessonsCount: 10,
-      enrolledCount: 0,
-      rating: 0,
-      progress: 0,
-      status: "not_started" as CourseStatus,
-      tags: [],
-      category: "General",
-      xpReward: 400,
-      isSaved: false,
-      isTrending: false,
-      modules: [],
-      publishStatus: "draft",
-    };
-    setCourseList((prev) => [newCourse, ...prev]);
-    setForm({ title: "", department: "development", level: "intermediate", description: "" });
-    setDialogOpen(false);
-    toast.success("Course created successfully", {
-      description: `"${newCourse.title}" saved as draft.`,
-    });
-  };
-
-  const updateStatus = (id: string, publishStatus: AdminCourse["publishStatus"]) => {
-    setCourseList((prev) =>
-      prev.map((c) =>
-        c.id === id
-          ? {
-              ...c,
-              publishStatus,
-              status: publishStatus === "archived" ? ("archived" as CourseStatus) : c.status,
-            }
-          : c
-      )
-    );
-    const action = publishStatus === "published" ? "published" : publishStatus === "archived" ? "archived" : "updated";
-    toast.success(`Course ${action}`, {
-      description: `Changes applied to course.`,
-    });
-  };
-
-  const statusBadge = (status: AdminCourse["publishStatus"]) => {
-    const variants = { draft: "secondary", published: "success", archived: "outline" } as const;
-    return <Badge variant={variants[status]} className="capitalize">{status}</Badge>;
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Course Management"
-        description="Create, publish, and manage courses for your department."
-      >
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" /> Create course
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Create new course</DialogTitle>
-              <DialogDescription>Add a course for your department. It will be saved as a draft.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Title</label>
-                <Input
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="e.g. Advanced API Design"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Department</label>
+        title="Course Builder"
+        description="Create, publish, and manage enterprise courses."
+        children={
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4" /> New Course
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <form onSubmit={handleCreate}>
+                <DialogHeader>
+                  <DialogTitle>Create course</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3 py-4">
+                  <Input
+                    placeholder="Course title"
+                    value={form.title}
+                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                    required
+                  />
+                  <Input
+                    placeholder="Description"
+                    value={form.description}
+                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  />
                   <select
-                    value={form.department}
-                    onChange={(e) => setForm((f) => ({ ...f, department: e.target.value as DepartmentId }))}
-                    className="flex h-10 w-full rounded-lg border border-input bg-card px-3 text-sm"
+                    className="h-11 w-full rounded-2xl border border-input bg-card px-4 text-sm"
+                    value={form.departmentId}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, departmentId: e.target.value as DepartmentId }))
+                    }
                   >
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
+                    {Object.entries(DEPARTMENT_LABELS).map(([id, label]) => (
+                      <option key={id} value={id}>
+                        {label}
+                      </option>
                     ))}
                   </select>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Learning category</p>
+                    <div className="flex gap-2">
+                      {(["role", "goal"] as const).map((value) => (
+                        <Button
+                          key={value}
+                          type="button"
+                          size="sm"
+                          variant={form.learningCategory === value ? "default" : "outline"}
+                          onClick={() => setForm((f) => ({ ...f, learningCategory: value }))}
+                        >
+                          {LEARNING_CATEGORY_LABELS[value]}
+                        </Button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Role-based = career track · Goal-based = skill or objective learning
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Level</label>
-                  <select
-                    value={form.level}
-                    onChange={(e) => setForm((f) => ({ ...f, level: e.target.value as LearningLevel }))}
-                    className="flex h-10 w-full rounded-lg border border-input bg-card px-3 text-sm"
-                  >
-                    {LEVELS.map((l) => (
-                      <option key={l} value={l}>{LEVEL_LABELS[l]}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Description</label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="Brief course overview…"
-                  rows={3}
-                  className="flex w-full rounded-lg border border-input bg-card px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                <Button type="submit">Create course</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </PageHeader>
+                <DialogFooter>
+                  <Button type="submit" disabled={createCourse.isPending}>
+                    Create draft
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
-      <motion.section {...fade} transition={{ duration: 0.4 }}>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search courses…"
-                  className="pl-9"
-                />
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <select
-                  value={deptFilter}
-                  onChange={(e) => setDeptFilter(e.target.value as DepartmentId | "all")}
-                  className="h-9 rounded-lg border border-input bg-card px-3 text-sm"
-                >
-                  <option value="all">All departments</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                  className="h-9 rounded-lg border border-input bg-card px-3 text-sm"
-                >
-                  <option value="all">All statuses</option>
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="archived">Archived</option>
-                </select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.section>
-
-      <motion.section {...fade} transition={{ delay: 0.05, duration: 0.4 }}>
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="px-5 py-3 font-medium">Course</th>
-                  <th className="px-5 py-3 font-medium">Department</th>
-                  <th className="px-5 py-3 font-medium">Level</th>
-                  <th className="px-5 py-3 font-medium">Enrolled</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((course) => (
-                  <tr key={course.id} className="border-b border-border/60 transition hover:bg-muted/30">
-                    <td className="px-5 py-4">
-                      <p className="font-medium">{course.title}</p>
-                      <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{course.description}</p>
-                    </td>
-                    <td className="px-5 py-4 text-muted-foreground">{DEPARTMENT_LABELS[course.department]}</td>
-                    <td className="px-5 py-4">
-                      <Badge variant="outline">{LEVEL_LABELS[course.level]}</Badge>
-                    </td>
-                    <td className="px-5 py-4 text-muted-foreground">{course.enrolledCount.toLocaleString()}</td>
-                    <td className="px-5 py-4">{statusBadge(course.publishStatus)}</td>
-                    <td className="px-5 py-4 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon-sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => toast.info("Edit course", { description: `Opening editor for "${course.title}"` })}>
-                            <Edit className="h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => updateStatus(course.id, "published")}>
-                            <Send className="h-4 w-4" /> Publish
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => updateStatus(course.id, "archived")}
-                          >
-                            <Archive className="h-4 w-4" /> Archive
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {filtered.length === 0 && (
-              <p className="py-12 text-center text-sm text-muted-foreground">No courses match your filters.</p>
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="Search title, description, slug, or tags…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <select
+              className={selectClass}
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value as DepartmentId | "all")}
+              aria-label="Filter by department"
+            >
+              <option value="all">All departments</option>
+              {Object.entries(DEPARTMENT_LABELS).map(([id, label]) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <select
+              className={selectClass}
+              value={levelFilter}
+              onChange={(e) => setLevelFilter(e.target.value as LearningLevel | "all")}
+              aria-label="Filter by learning level"
+            >
+              <option value="all">All levels</option>
+              {LEVELS.map((level) => (
+                <option key={level} value={level}>
+                  {LEVEL_LABELS[level]}
+                </option>
+              ))}
+            </select>
+            <select
+              className={selectClass}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as PublishStatus | "all")}
+              aria-label="Filter by publish status"
+            >
+              {STATUSES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className={selectClass}
+              value={difficultyFilter}
+              onChange={(e) => setDifficultyFilter(e.target.value as Difficulty | "all")}
+              aria-label="Filter by difficulty"
+            >
+              {DIFFICULTIES.map((d) => (
+                <option key={d.value} value={d.value}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className={selectClass}
+              value={learningCategoryFilter}
+              onChange={(e) =>
+                setLearningCategoryFilter(e.target.value as LearningCategory | "all")
+              }
+              aria-label="Filter by learning category"
+            >
+              <option value="all">All categories</option>
+              <option value="role">{LEARNING_CATEGORY_LABELS.role}</option>
+              <option value="goal">{LEARNING_CATEGORY_LABELS.goal}</option>
+            </select>
+            {hasFilters && (
+              <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>
+                <X className="h-4 w-4" /> Clear filters
+              </Button>
             )}
           </div>
+          {!isLoading && (
+            <p className="text-sm text-muted-foreground">
+              Showing <span className="font-medium text-foreground">{courses.length}</span> course
+              {courses.length === 1 ? "" : "s"}
+              {hasFilters ? " matching filters" : ""}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-2xl" />
+          ))}
+        </div>
+      ) : courses.length === 0 ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+            No courses match your filters.{" "}
+            {hasFilters ? (
+              <button type="button" className="text-primary underline" onClick={clearFilters}>
+                Clear filters
+              </button>
+            ) : (
+              "Create a new course to get started."
+            )}
+          </CardContent>
         </Card>
-      </motion.section>
+      ) : (
+        <div className="space-y-3">
+          {courses.map((course) => (
+            <Card key={course.id}>
+              <CardContent className="flex items-center gap-4 py-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold">{course.title}</p>
+                    <StatusBadge status={course.publishStatus} />
+                    <Badge variant="secondary">{LEVEL_LABELS[course.level] ?? course.level}</Badge>
+                    <Badge variant="outline" className="capitalize">
+                      {course.difficulty}
+                    </Badge>
+                    <Badge
+                      variant={
+                        course.learningCategory === "goal" ? "goal" : "role"
+                      }
+                    >
+                      {LEARNING_CATEGORY_LABELS[course.learningCategory] ??
+                        course.learningCategory}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {DEPARTMENT_LABELS[course.departmentId as DepartmentId]} · {course.lessonsCount}{" "}
+                    lessons
+                    {course.slug ? ` · ${course.slug}` : ""}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/dashboard/admin/courses/${course.id}`}>
+                    <Edit className="h-4 w-4" /> Builder
+                  </Link>
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon-sm">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {course.publishStatus !== "published" && (
+                      <DropdownMenuItem onClick={() => publishCourse.mutate(course.id)}>
+                        Publish
+                      </DropdownMenuItem>
+                    )}
+                    {course.publishStatus === "published" && (
+                      <DropdownMenuItem onClick={() => archiveCourse.mutate(course.id)}>
+                        Archive
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => deleteCourse.mutate(course.id)}
+                    >
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
@@ -22,53 +23,30 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { certificates, currentUser } from "@/data/mock";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CertificateQr } from "@/components/certificates/qr-code";
 import { APP_NAME, DEPARTMENT_LABELS, LEVEL_LABELS } from "@/constants/navigation";
+import { useCertificateDetail } from "@/hooks/use-certification";
+import { useCurrentUser } from "@/hooks/use-me";
+import { openCertificatePrintWindow } from "@/lib/certificate-pdf";
 import { cn } from "@/lib/utils";
-
-function QrCodeLarge() {
-  const pattern = [
-    [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1],
-    [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1],
-    [1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1],
-    [1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1],
-    [1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1],
-    [1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1],
-    [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-    [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1],
-    [0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0],
-    [1, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1],
-    [0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1],
-    [1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1],
-    [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0],
-    [1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1],
-    [1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0],
-    [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1],
-    [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
-    [1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1],
-  ];
-
-  return (
-    <svg viewBox="0 0 190 190" className="h-28 w-28 text-foreground" aria-hidden>
-      {pattern.map((row, y) =>
-        row.map((cell, x) =>
-          cell ? <rect key={`${x}-${y}`} x={x * 10} y={y * 10} width={10} height={10} fill="currentColor" /> : null
-        )
-      )}
-    </svg>
-  );
-}
 
 export default function CertificateDetailPage() {
   const params = useParams();
   const id = params.id as string;
-  const cert = certificates.find((c) => c.id === id);
+  const { data, isLoading } = useCertificateDetail(id);
+  const { data: user } = useCurrentUser();
+  const [qrDataUrl, setQrDataUrl] = React.useState<string>();
 
-  if (!cert) {
+  if (isLoading) return <Skeleton className="h-96 w-full" />;
+
+  if (!data) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Certificate not found" description="This credential may have been revoked or archived." />
+        <PageHeader
+          title="Certificate not found"
+          description="This credential may have been revoked or archived."
+        />
         <Button asChild variant="outline">
           <Link href="/dashboard/certificates">
             <ArrowLeft className="h-4 w-4" /> Back to certificates
@@ -78,42 +56,28 @@ export default function CertificateDetailPage() {
     );
   }
 
+  const cert = data.certificate;
   const isEarned = cert.status === "earned";
-  const verifyUrl = `https://verify.nexuscorp.com/credential/${cert.credentialId}`;
-
-  const completionHistory = isEarned
-    ? [
-        { event: "Assessment completed", date: cert.issuedAt ?? "—", detail: `Score: ${cert.score}%` },
-        { event: "Certificate issued", date: cert.issuedAt ?? "—", detail: cert.credentialId },
-        { event: "Added to profile", date: cert.issuedAt ?? "—", detail: "Visible on Nexus learner profile" },
-      ]
-    : cert.status === "pending"
-      ? [
-          { event: "Assessment submitted", date: "2026-07-10", detail: "Awaiting final review" },
-          { event: "Certificate queued", date: "2026-07-11", detail: "Estimated issue: 3–5 business days" },
-        ]
-      : [
-          { event: "Prerequisite: Complete assessment", date: "—", detail: "System Design Certification Exam" },
-          { event: "Prerequisite: Course completion", date: "—", detail: "System Design Mastery (64% complete)" },
-        ];
-
-  const copyCredentialId = () => {
-    navigator.clipboard.writeText(cert.credentialId);
-    toast.success("Credential ID copied");
-  };
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const verifyUrl = data.verifyUrl
+    ? `${origin}${data.verifyUrl}`
+    : `${origin}/verify/${cert.credentialId}`;
+  const holderName = user?.name ?? data.holderName ?? "Learner";
 
   const handleDownload = () => {
-    toast.success("Certificate PDF downloaded", { description: cert.title });
-  };
-
-  const handleVerify = () => {
-    toast.info("Credential verified", {
-      description: `${cert.credentialId} is ${isEarned ? "valid and active" : "not yet issued"}.`,
+    const ok = openCertificatePrintWindow({
+      title: cert.title,
+      holderName,
+      credentialId: cert.credentialId,
+      department: DEPARTMENT_LABELS[cert.department] ?? cert.department,
+      level: LEVEL_LABELS[cert.level] ?? cert.level,
+      score: cert.score,
+      issuedAt: cert.issuedAt,
+      verifyUrl,
+      qrDataUrl,
     });
-  };
-
-  const handleShare = () => {
-    toast.success("Share link copied", { description: "Paste on LinkedIn or email to showcase your credential." });
+    if (ok) toast.success("Print dialog opened — save as PDF");
+    else toast.error("Allow pop-ups to download the certificate PDF");
   };
 
   return (
@@ -124,17 +88,30 @@ export default function CertificateDetailPage() {
         </Link>
       </Button>
 
-      <PageHeader title={cert.title} description={`${DEPARTMENT_LABELS[cert.department]} · ${LEVEL_LABELS[cert.level]}`}>
+      <PageHeader
+        title={cert.title}
+        description={`${DEPARTMENT_LABELS[cert.department]} · ${LEVEL_LABELS[cert.level]}`}
+      >
         {isEarned && (
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" className="gap-1.5" onClick={handleDownload}>
               <Download className="h-3.5 w-3.5" /> Download PDF
             </Button>
-            <Button size="sm" variant="outline" className="gap-1.5" onClick={handleShare}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => {
+                navigator.clipboard.writeText(verifyUrl);
+                toast.success("Share link copied");
+              }}
+            >
               <Share2 className="h-3.5 w-3.5" /> Share
             </Button>
-            <Button size="sm" className="gap-1.5" onClick={handleShare}>
-              <ExternalLink className="h-3.5 w-3.5" /> LinkedIn
+            <Button asChild size="sm" className="gap-1.5">
+              <Link href={`/verify/${cert.credentialId}`}>
+                <ExternalLink className="h-3.5 w-3.5" /> Verify
+              </Link>
             </Button>
           </div>
         )}
@@ -151,17 +128,13 @@ export default function CertificateDetailPage() {
             )}
           >
             <div className="pointer-events-none absolute inset-4 rounded-xl border-2 border-dashed border-warning/25" />
-            <div className="pointer-events-none absolute left-1/2 top-8 h-24 w-24 -translate-x-1/2 rounded-full border-4 border-warning/20 bg-warning/5" />
-            <div className="pointer-events-none absolute left-1/2 top-12 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full bg-warning/10">
-              <Award className="h-8 w-8 text-warning" />
-            </div>
-
-            <CardContent className="relative px-8 pb-10 pt-28 text-center">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-muted-foreground">
+            <CardContent className="relative px-8 pb-10 pt-16 text-center">
+              <Award className="mx-auto h-10 w-10 text-warning" />
+              <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-muted-foreground">
                 Certificate of Achievement
               </p>
               <p className="mt-2 text-sm text-muted-foreground">This certifies that</p>
-              <h2 className="mt-2 font-display text-3xl font-semibold tracking-tight">{currentUser.name}</h2>
+              <h2 className="mt-2 font-display text-3xl font-semibold tracking-tight">{holderName}</h2>
               <p className="mt-4 text-sm text-muted-foreground">has successfully demonstrated proficiency in</p>
               <h3 className="mt-2 font-display text-xl font-semibold text-primary">{cert.title}</h3>
 
@@ -190,9 +163,11 @@ export default function CertificateDetailPage() {
                     </p>
                   )}
                 </div>
-                <div className="rounded-lg border border-border bg-card p-2">
-                  <QrCodeLarge />
-                </div>
+                {isEarned && cert.credentialId !== "PENDING" ? (
+                  <div className="rounded-lg border border-border bg-card p-2">
+                    <CertificateQr value={verifyUrl} size={112} onReady={setQrDataUrl} />
+                  </div>
+                ) : null}
               </div>
 
               {!isEarned && (
@@ -202,7 +177,7 @@ export default function CertificateDetailPage() {
                       <>
                         <Lock className="mx-auto h-8 w-8 text-muted-foreground" />
                         <p className="mt-2 font-semibold">Certificate Locked</p>
-                        <p className="text-sm text-muted-foreground">Complete prerequisites to unlock</p>
+                        <p className="text-sm text-muted-foreground">Complete the path to unlock</p>
                       </>
                     ) : (
                       <>
@@ -233,8 +208,15 @@ export default function CertificateDetailPage() {
                   Credential ID
                 </p>
                 <div className="mt-1 flex items-center justify-between gap-2">
-                  <p className="font-mono text-sm font-medium">{cert.credentialId}</p>
-                  <Button variant="ghost" size="icon-sm" onClick={copyCredentialId}>
+                  <p className="font-code text-sm">{cert.credentialId}</p>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(cert.credentialId);
+                      toast.success("Credential ID copied");
+                    }}
+                  >
                     <Copy className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -252,24 +234,23 @@ export default function CertificateDetailPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Issuer</span>
-                  <span className="font-medium">{APP_NAME} Corp</span>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <span className="shrink-0 text-muted-foreground">Verify URL</span>
-                  <span className="truncate font-mono text-xs">{verifyUrl}</span>
+                  <span className="font-medium">{APP_NAME}</span>
                 </div>
               </div>
 
-              <Button variant="outline" className="w-full gap-2" onClick={handleVerify}>
-                <ShieldCheck className="h-4 w-4" /> Verify on Nexus Registry
-              </Button>
+              {isEarned && (
+                <Button asChild variant="outline" className="w-full gap-2">
+                  <Link href={`/verify/${cert.credentialId}`}>
+                    <ShieldCheck className="h-4 w-4" /> Open public verify page
+                  </Link>
+                </Button>
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
               <CardTitle>Skills Validated</CardTitle>
-              <CardDescription>Competencies covered by this credential</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
@@ -282,32 +263,24 @@ export default function CertificateDetailPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Completion History</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-0">
-              {completionHistory.map((item, i) => (
-                <div key={item.event}>
-                  <div className="flex gap-3 py-3">
-                    <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      {isEarned && i === completionHistory.length - 1 ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-                      ) : (
-                        <span className="h-2 w-2 rounded-full bg-primary/60" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">{item.event}</p>
-                      <p className="text-xs text-muted-foreground">{item.detail}</p>
-                    </div>
-                    <span className="shrink-0 text-xs text-muted-foreground">{item.date}</span>
+          {isEarned && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Completion History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-3 py-2">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">Certificate issued</p>
+                    <p className="text-xs text-muted-foreground">{cert.credentialId}</p>
                   </div>
-                  {i < completionHistory.length - 1 && <Separator />}
+                  <span className="ml-auto text-xs text-muted-foreground">{cert.issuedAt}</span>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
+                <Separator />
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

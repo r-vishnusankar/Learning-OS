@@ -18,7 +18,8 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { departments } from "@/data/mock";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useDepartmentsLive } from "@/hooks/use-operations";
 import { cn } from "@/lib/utils";
 
 const fade = {
@@ -37,11 +38,23 @@ const deptIcons: Record<string, LucideIcon> = {
 };
 
 export default function DepartmentsPage() {
+  const { data: departments = [], isLoading } = useDepartmentsLive();
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Departments" description="Loading departments…" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
   const totalEmployees = departments.reduce((sum, d) => sum + d.employeeCount, 0);
   const totalCourses = departments.reduce((sum, d) => sum + d.courseCount, 0);
-  const avgCompletion = Math.round(
-    departments.reduce((sum, d) => sum + d.avgCompletion, 0) / departments.length
-  );
+  const avgCompletion =
+    departments.length === 0
+      ? 0
+      : Math.round(departments.reduce((sum, d) => sum + d.avgCompletion, 0) / departments.length);
 
   return (
     <div className="space-y-6">

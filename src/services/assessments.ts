@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
 import {
@@ -16,6 +16,7 @@ import {
 import { assessmentAttempts, assessments, questions } from "@/db/schema";
 import { requireAdminOrInstructor, requireUserId } from "@/lib/auth-utils";
 import type { Assessment, AssessmentStatus } from "@/types";
+import type { CodingCheck } from "@/types/coding";
 import {
   createAssessmentSchema,
   createQuestionSchema,
@@ -177,7 +178,17 @@ export async function createQuestionAction(input: unknown) {
   const [created] = await db
     .insert(questions)
     .values({
-      ...data,
+      assessmentId: data.assessmentId,
+      prompt: data.prompt,
+      type: data.type,
+      options: data.options,
+      correctAnswers: data.correctAnswers,
+      points: data.points,
+      difficulty: data.difficulty,
+      skillTags: data.skillTags,
+      bloomLevel: data.bloomLevel,
+      timeEstimateSeconds: data.timeEstimateSeconds,
+      meta: data.meta ?? {},
       orderIndex: existing.length,
     })
     .returning();
@@ -200,9 +211,13 @@ export async function updateQuestionAction(input: unknown) {
       ...(data.difficulty !== undefined ? { difficulty: data.difficulty } : {}),
       ...(data.skillTags !== undefined ? { skillTags: data.skillTags } : {}),
       ...(data.bloomLevel !== undefined ? { bloomLevel: data.bloomLevel } : {}),
+      ...(data.meta !== undefined ? { meta: data.meta } : {}),
     })
     .where(eq(questions.id, data.id))
     .returning();
+  if (updated) {
+    revalidatePath(`/dashboard/admin/assessments/${updated.assessmentId}`);
+  }
   return updated;
 }
 
@@ -270,6 +285,21 @@ export async function fetchAttemptSessionAction(attemptId: string) {
     options: q.options,
     points: q.points,
     timeEstimateSeconds: q.timeEstimateSeconds,
+    meta:
+      q.type === "coding"
+        ? {
+            coding: {
+              language: q.meta?.coding?.language ?? "javascript",
+              starterCode: q.meta?.coding?.starterCode ?? "",
+              checks: (q.meta?.coding?.checks ?? []).map(
+                (check): Pick<CodingCheck, "id" | "label"> => ({
+                  id: check.id,
+                  label: check.label,
+                })
+              ),
+            },
+          }
+        : {},
   }));
 
   return {
@@ -330,8 +360,20 @@ export async function submitAttemptAction(input: unknown) {
       status,
       submittedAt: new Date(),
     })
-    .where(eq(assessmentAttempts.id, data.attemptId))
+    .where(
+      and(eq(assessmentAttempts.id, data.attemptId), eq(assessmentAttempts.status, "in_progress"))
+    )
     .returning();
+
+  if (!updated) {
+    const current = await getAttemptById(data.attemptId);
+    return {
+      attempt: current,
+      percentage: current?.percentage ?? result.percentage,
+      passed: current?.passed ?? null,
+      needsManual: current?.status === "submitted" ? true : result.needsManual,
+    };
+  }
 
   if (!result.needsManual && passed) {
     const { mintCertificateForAssessmentPass } = await import("@/services/certification");

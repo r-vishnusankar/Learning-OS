@@ -21,10 +21,17 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { currentUser } from "@/data/mock";
+import {
+  useCurrentUser,
+  useMyPreferences,
+  useUpdateMyPreferences,
+  useUpdateMyProfile,
+} from "@/hooks/use-me";
 import { DEPARTMENT_LABELS, LEVEL_LABELS } from "@/constants/navigation";
 import { cn } from "@/lib/utils";
+import type { DepartmentId, LearningLevel } from "@/types";
 
 const fade = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
 
@@ -49,7 +56,7 @@ function Toggle({ checked, onChange, label, description }: ToggleProps) {
         onClick={() => onChange(!checked)}
         className={cn(
           "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-          checked ? "bg-primary" : "bg-muted"
+          checked ? "bg-primary-strong" : "bg-muted"
         )}
       >
         <span
@@ -66,16 +73,20 @@ function Toggle({ checked, onChange, label, description }: ToggleProps) {
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
+  const { data: user, isLoading: userLoading } = useCurrentUser();
+  const { data: prefs, isLoading: prefsLoading } = useMyPreferences();
+  const updateProfile = useUpdateMyProfile();
+  const updatePrefs = useUpdateMyPreferences();
 
   React.useEffect(() => setMounted(true), []);
 
   const activeTheme = mounted ? (theme ?? "system") : "light";
   const [profile, setProfile] = React.useState({
-    name: currentUser.name,
-    email: currentUser.email,
-    designation: currentUser.designation,
-    department: currentUser.department,
-    level: currentUser.level,
+    name: "",
+    email: "",
+    designation: "",
+    department: "development" as DepartmentId,
+    level: "intermediate" as LearningLevel,
   });
   const [notifications, setNotifications] = React.useState({
     emailDigest: true,
@@ -99,9 +110,114 @@ export default function SettingsPage() {
     analyticsOptIn: true,
   });
 
-  const save = (section: string) => {
-    toast.success("Settings saved", { description: `${section} preferences updated successfully.` });
+  React.useEffect(() => {
+    if (!user) return;
+    setProfile({
+      name: user.name,
+      email: user.email,
+      designation: user.designation,
+      department: user.department,
+      level: user.level,
+    });
+  }, [user]);
+
+  React.useEffect(() => {
+    if (!prefs) return;
+    setNotifications((n) => ({
+      emailDigest: prefs.emailDigest ?? n.emailDigest,
+      assessmentReminders: prefs.assessmentReminders ?? n.assessmentReminders,
+      streakAlerts: prefs.streakAlerts ?? n.streakAlerts,
+      courseUpdates: prefs.courseUpdates ?? n.courseUpdates,
+      teamActivity: prefs.teamActivity ?? n.teamActivity,
+      marketingEmails: prefs.marketingEmails ?? n.marketingEmails,
+    }));
+    setLearningPrefs((p) => ({
+      dailyGoalMinutes: prefs.dailyGoalMinutes ?? p.dailyGoalMinutes,
+      preferredDifficulty: prefs.preferredDifficulty ?? p.preferredDifficulty,
+      autoEnrollPaths: prefs.autoEnrollPaths ?? p.autoEnrollPaths,
+      showLeaderboard: prefs.showLeaderboard ?? p.showLeaderboard,
+      aiRecommendations: prefs.aiRecommendations ?? p.aiRecommendations,
+    }));
+    setPrivacy((p) => ({
+      profileVisible: prefs.profileVisible ?? p.profileVisible,
+      showProgress: prefs.showProgress ?? p.showProgress,
+      showCertificates: prefs.showCertificates ?? p.showCertificates,
+      analyticsOptIn: prefs.analyticsOptIn ?? p.analyticsOptIn,
+    }));
+  }, [prefs]);
+
+  const saveProfile = async () => {
+    try {
+      await updateProfile.mutateAsync({
+        name: profile.name,
+        designation: profile.designation,
+      });
+      await updatePrefs.mutateAsync({
+        dailyGoalMinutes: learningPrefs.dailyGoalMinutes,
+      });
+      toast.success("Settings saved", { description: "Profile preferences updated successfully." });
+    } catch {
+      toast.error("Could not save profile");
+    }
   };
+
+  const saveNotifications = async () => {
+    try {
+      await updatePrefs.mutateAsync(notifications);
+      toast.success("Settings saved", { description: "Notification preferences updated successfully." });
+    } catch {
+      toast.error("Could not save notifications");
+    }
+  };
+
+  const saveLearning = async () => {
+    try {
+      await updatePrefs.mutateAsync(learningPrefs);
+      toast.success("Settings saved", { description: "Learning preferences updated successfully." });
+    } catch {
+      toast.error("Could not save learning preferences");
+    }
+  };
+
+  const savePrivacy = async () => {
+    try {
+      await updatePrefs.mutateAsync(privacy);
+      toast.success("Settings saved", { description: "Privacy preferences updated successfully." });
+    } catch {
+      toast.error("Could not save privacy settings");
+    }
+  };
+
+  if (userLoading || prefsLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Settings" description="Loading your preferences…" />
+        <Skeleton className="h-72 w-full" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Settings"
+          description="Your session is out of sync with the database (common after a DB region change)."
+        />
+        <Card>
+          <CardContent className="space-y-4 p-6">
+            <p className="text-sm text-muted-foreground">
+              Sign out and sign back in with <span className="font-mono">demo@nexus.local</span> to
+              refresh your session, then reopen Settings.
+            </p>
+            <Button asChild>
+              <a href="/login">Go to login</a>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -139,8 +255,8 @@ export default function SettingsPage() {
               <CardContent className="space-y-6">
                 <div className="flex items-center gap-4">
                   <Avatar className="h-16 w-16">
-                    <AvatarImage src={currentUser.avatar} />
-                    <AvatarFallback>{profile.name[0]}</AvatarFallback>
+                    <AvatarImage src={user.avatar} />
+                    <AvatarFallback>{profile.name[0] ?? "U"}</AvatarFallback>
                   </Avatar>
                   <div>
                     <p className="font-medium">{profile.name}</p>
@@ -162,11 +278,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Email</label>
-                    <Input
-                      type="email"
-                      value={profile.email}
-                      onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))}
-                    />
+                    <Input type="email" value={profile.email} disabled />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Designation</label>
@@ -186,7 +298,11 @@ export default function SettingsPage() {
                     />
                   </div>
                 </div>
-                <Button className="gap-2" onClick={() => save("Profile")}>
+                <Button
+                  className="gap-2"
+                  onClick={() => void saveProfile()}
+                  disabled={updateProfile.isPending || updatePrefs.isPending}
+                >
                   <Save className="h-4 w-4" /> Save profile
                 </Button>
               </CardContent>
@@ -243,7 +359,11 @@ export default function SettingsPage() {
                   label="Product updates"
                   description="Nexus platform news and feature announcements"
                 />
-                <Button className="mt-4 gap-2" onClick={() => save("Notification")}>
+                <Button
+                  className="mt-4 gap-2"
+                  onClick={() => void saveNotifications()}
+                  disabled={updatePrefs.isPending}
+                >
                   <Save className="h-4 w-4" /> Save notifications
                 </Button>
               </CardContent>
@@ -287,7 +407,14 @@ export default function SettingsPage() {
                     </button>
                   ))}
                 </div>
-                <Button className="gap-2" onClick={() => save("Appearance")}>
+                <Button
+                  className="gap-2"
+                  onClick={() =>
+                    toast.success("Settings saved", {
+                      description: "Appearance preferences updated successfully.",
+                    })
+                  }
+                >
                   <Save className="h-4 w-4" /> Save appearance
                 </Button>
               </CardContent>
@@ -337,7 +464,11 @@ export default function SettingsPage() {
                   label="AI-powered recommendations"
                   description="Receive personalized course and skill suggestions"
                 />
-                <Button className="mt-4 gap-2" onClick={() => save("Learning")}>
+                <Button
+                  className="mt-4 gap-2"
+                  onClick={() => void saveLearning()}
+                  disabled={updatePrefs.isPending}
+                >
                   <Save className="h-4 w-4" /> Save learning preferences
                 </Button>
               </CardContent>
@@ -380,7 +511,11 @@ export default function SettingsPage() {
                   label="Learning analytics"
                   description="Help improve Nexus with anonymized usage data"
                 />
-                <Button className="mt-4 gap-2" onClick={() => save("Privacy")}>
+                <Button
+                  className="mt-4 gap-2"
+                  onClick={() => void savePrivacy()}
+                  disabled={updatePrefs.isPending}
+                >
                   <Save className="h-4 w-4" /> Save privacy settings
                 </Button>
               </CardContent>

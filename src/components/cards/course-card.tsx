@@ -1,40 +1,16 @@
+import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Bookmark, Clock, MessageSquare, Paperclip, Star, Users } from "lucide-react";
+import { toast } from "sonner";
+import { Bookmark, BookOpen, Clock, Star, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import type { Course } from "@/types";
 import { cn, formatHours } from "@/lib/utils";
-import { LEVEL_LABELS } from "@/constants/navigation";
-
-const pastelThemes = [
-  {
-    bg: "bg-[#EDE4FF] dark:bg-[#2f2548]",
-    ring: "#8759F2",
-    ringDark: "#a78bfa",
-  },
-  {
-    bg: "bg-[#FFF3C4] dark:bg-[#3d3520]",
-    ring: "#C9A227",
-    ringDark: "#ffe180",
-  },
-  {
-    bg: "bg-[#FFD6E8] dark:bg-[#3d2030]",
-    ring: "#FF3E80",
-    ringDark: "#fb7185",
-  },
-  {
-    bg: "bg-[#DCE9FF] dark:bg-[#1e2a40]",
-    ring: "#3B82F6",
-    ringDark: "#60a5fa",
-  },
-];
-
-function themeFor(id: string) {
-  const n = id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  return pastelThemes[n % pastelThemes.length];
-}
+import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS } from "@/constants/navigation";
+import { learningCategoryToBadgeVariant, levelToBadgeVariant } from "@/lib/status-styles";
+import { useToggleSavedCourse } from "@/hooks/use-me";
 
 interface CourseCardProps {
   course: Course;
@@ -43,23 +19,52 @@ interface CourseCardProps {
 }
 
 export function CourseCard({ course, variant = "default", className }: CourseCardProps) {
-  const theme = themeFor(course.id);
+  const toggleSaved = useToggleSavedCourse();
+  const href = `/dashboard/courses/${course.slug ?? course.id}`;
+  const levelVariant = levelToBadgeVariant(course.level);
+  const category = course.learningCategory ?? "role";
+  const categoryVariant = learningCategoryToBadgeVariant(category);
+  const categoryLabel = LEARNING_CATEGORY_LABELS[category] ?? category;
+  const enrolled = course.progress > 0 || course.status === "in_progress" || course.status === "completed";
+
+  const onToggleSave = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleSaved.mutate(course.id, {
+      onSuccess: (prefs) => {
+        const saved = prefs.savedCourseIds?.includes(course.id);
+        toast.success(saved ? "Saved for later" : "Removed from saved");
+      },
+      onError: () => toast.error("Could not update bookmark"),
+    });
+  };
 
   if (variant === "compact") {
     return (
       <Link
-        href={`/dashboard/courses/${course.id}`}
+        href={href}
         className={cn(
-          "flex gap-3 rounded-2xl bg-card p-3 shadow-(--shadow-sm) transition hover:shadow-(--shadow)",
+          "group flex gap-3 rounded-2xl bg-card p-3 shadow-(--shadow-sm) transition-all duration-200 hover:-translate-y-0.5 hover:shadow-(--shadow)",
           className
         )}
       >
-        <div className={cn("relative h-16 w-24 shrink-0 overflow-hidden rounded-xl", theme.bg)}>
-          <Image src={course.thumbnail} alt={course.title} fill className="object-cover opacity-90" unoptimized />
+        <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-xl bg-muted">
+          <Image
+            src={course.thumbnail}
+            alt={course.title}
+            fill
+            className="object-cover transition duration-200 group-hover:scale-105"
+            unoptimized
+          />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{course.title}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <div className="mb-1">
+            <Badge variant={categoryVariant} className="text-xs">
+              {categoryLabel}
+            </Badge>
+          </div>
+          <p className="truncate text-sm font-semibold text-foreground">{course.title}</p>
+          <p className="mt-1 text-caption">
             {formatHours(course.durationHours)} · {course.lessonsCount} lessons
           </p>
           {course.progress > 0 && (
@@ -72,152 +77,113 @@ export function CourseCard({ course, variant = "default", className }: CourseCar
     );
   }
 
-  if (variant === "pastel") {
-    return (
-      <Link
-        href={`/dashboard/courses/${course.id}`}
-        className={cn(
-          "group flex flex-col overflow-hidden rounded-3xl border-2 border-transparent p-5 shadow-[0_4px_16px_rgba(52,52,52,0.06)] transition-all duration-300 ease-out dark:shadow-[0_4px_16px_rgba(0,0,0,0.35)]",
-          "hover:-translate-y-2 hover:scale-[1.03] hover:border-primary/40 hover:shadow-[0_16px_40px_rgba(135,89,242,0.22)]",
-          "focus-visible:outline-none focus-visible:-translate-y-2 focus-visible:scale-[1.03] focus-visible:border-primary focus-visible:shadow-[0_16px_40px_rgba(135,89,242,0.22)]",
-          theme.bg,
-          className
-        )}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex flex-wrap gap-1.5">
-            <Badge className="rounded-full border-0 bg-white text-[#343434] shadow-sm dark:bg-white/20 dark:text-white">
-              {course.category}
-            </Badge>
-            <Badge className="rounded-full border-0 bg-white/90 text-[#343434] dark:bg-white/15 dark:text-white">
-              {LEVEL_LABELS[course.level]}
-            </Badge>
-          </div>
-          <div className="relative flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm dark:bg-white/15">
-            <svg className="h-12 w-12 -rotate-90" viewBox="0 0 36 36">
-              <circle cx="18" cy="18" r="15" fill="none" className="stroke-black/10 dark:stroke-white/20" strokeWidth="3" />
-              <circle
-                cx="18"
-                cy="18"
-                r="15"
-                fill="none"
-                stroke={theme.ring}
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeDasharray={`${Math.max(course.progress, 4)} 100`}
-              />
-            </svg>
-            <span className="absolute text-[10px] font-bold text-[#343434] dark:text-white">
-              {course.progress}%
-            </span>
-          </div>
-        </div>
-
-        <h3 className="mt-4 font-display text-base font-semibold leading-snug text-[#343434] dark:text-white">
-          {course.title}
-        </h3>
-        <p className="mt-1 line-clamp-2 text-xs text-[#5b6573] dark:text-zinc-300">
-          {course.description}
-        </p>
-
-        <div className="mt-auto flex items-center justify-between pt-5 text-xs text-[#5b6573] dark:text-zinc-300">
-          <div className="flex -space-x-2">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-7 w-7 rounded-full border-2 border-white bg-white shadow-sm dark:border-white/30"
-                style={{
-                  backgroundImage: `url(https://api.dicebear.com/9.x/avataaars/svg?seed=${course.id}${i})`,
-                  backgroundSize: "cover",
-                }}
-              />
-            ))}
-            <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-white text-[9px] font-semibold text-[#343434] shadow-sm dark:border-white/30 dark:bg-white/20 dark:text-white">
-              +{Math.max(1, Math.floor(course.enrolledCount / 100))}
-            </div>
-          </div>
-          <div className="flex items-center gap-2.5">
-            <span className="inline-flex items-center gap-1">
-              <Paperclip className="h-3 w-3" /> {course.lessonsCount}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <MessageSquare className="h-3 w-3" /> 12
-            </span>
-          </div>
-        </div>
-      </Link>
-    );
-  }
+  const ctaLabel =
+    course.status === "completed"
+      ? "Review"
+      : course.status === "in_progress" || course.progress > 0
+        ? "Continue"
+        : "Start course";
 
   return (
-    <Link
-      href={`/dashboard/courses/${course.id}`}
+    <article
       className={cn(
-        "group flex flex-col overflow-hidden rounded-3xl bg-card shadow-(--shadow-sm) transition duration-300 hover:-translate-y-1 hover:shadow-(--shadow-md)",
+        "group flex h-full flex-col overflow-hidden rounded-[28px] bg-card shadow-(--shadow-card) transition-all duration-200 ease-out",
+        "hover:-translate-y-1.5 hover:shadow-(--shadow-card-hover)",
         className
       )}
     >
-      <div className="relative aspect-video overflow-hidden bg-muted">
+      <Link href={href} className="relative block h-[190px] shrink-0 overflow-hidden bg-muted">
         <Image
           src={course.thumbnail}
           alt={course.title}
           fill
-          className="object-cover transition duration-500 group-hover:scale-105"
+          className="object-cover transition duration-200 ease-out group-hover:scale-105"
           unoptimized
         />
-        <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent" />
-        <div className="absolute left-3 top-3 flex gap-1.5">
-          {course.isTrending && (
-            <Badge className="rounded-full border-0 bg-destructive text-white">Trending</Badge>
-          )}
-          <Badge className="rounded-full border-0 bg-white/90 text-[#343434]">
-            {LEVEL_LABELS[course.level]}
+        <div className="absolute inset-0 bg-linear-to-t from-black/35 via-transparent to-transparent" />
+        <div className="absolute left-4 top-4 flex flex-wrap gap-1.5">
+          <Badge variant={levelVariant} className="bg-card/95 shadow-(--shadow-sm) backdrop-blur">
+            {LEVEL_LABELS[course.level] ?? course.level}
+          </Badge>
+          <Badge variant={categoryVariant} className="bg-card/95 shadow-(--shadow-sm) backdrop-blur">
+            {categoryLabel}
           </Badge>
         </div>
         <button
           type="button"
-          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[#343434] backdrop-blur transition hover:bg-white"
-          onClick={(e) => e.preventDefault()}
+          className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-card/95 text-foreground shadow-(--shadow-sm) backdrop-blur transition duration-200 hover:bg-card"
+          onClick={onToggleSave}
+          aria-label={course.isSaved ? "Unsave course" : "Save course"}
         >
-          <Bookmark className={cn("h-4 w-4", course.isSaved && "fill-primary text-primary")} />
+          <Bookmark
+            className={cn(
+              "h-4 w-4 stroke-[1.75] text-foreground",
+              course.isSaved && "fill-primary text-primary"
+            )}
+          />
         </button>
-        {course.progress > 0 && course.progress < 100 && (
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20">
-            <div className="h-full bg-primary" style={{ width: `${course.progress}%` }} />
+      </Link>
+
+      <div className="flex flex-1 flex-col gap-3 p-5">
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-1.5">
+            <Badge variant={categoryVariant}>{categoryLabel}</Badge>
           </div>
-        )}
-      </div>
-      <div className="flex flex-1 flex-col p-4">
-        <p className="line-clamp-2 font-display text-sm font-semibold leading-snug">{course.title}</p>
-        <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">{course.description}</p>
-        <div className="mt-auto flex items-center gap-3 pt-4 text-[11px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <Star className="h-3 w-3 fill-[#FFE180] text-[#c9a227]" /> {course.rating}
+          <Link href={href}>
+            <h3 className="text-card-title line-clamp-2 transition-colors duration-200 group-hover:text-primary">
+              {course.title}
+            </h3>
+          </Link>
+          <p className="line-clamp-2 text-sm leading-relaxed text-description">{course.description}</p>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <div
+            className="h-8 w-8 shrink-0 rounded-full bg-secondary bg-cover bg-center"
+            style={{ backgroundImage: `url(${course.instructor.avatar})` }}
+            aria-hidden
+          />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">{course.instructor.name}</p>
+            <p className="truncate text-caption">{DEPARTMENT_LABELS[course.department]}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-caption">
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="h-3.5 w-3.5 stroke-[1.75]" />
+            {formatHours(course.durationHours)}
           </span>
-          <span className="inline-flex items-center gap-1">
-            <Clock className="h-3 w-3" /> {formatHours(course.durationHours)}
+          <span className="inline-flex items-center gap-1.5">
+            <BookOpen className="h-3.5 w-3.5 stroke-[1.75]" />
+            {course.lessonsCount} lessons
           </span>
-          <span className="inline-flex items-center gap-1">
-            <Users className="h-3 w-3" /> {course.enrolledCount.toLocaleString()}
+          <span className="inline-flex items-center gap-1.5">
+            <Star className="h-3.5 w-3.5 fill-star-fill stroke-star-stroke stroke-[1.75]" />
+            {course.rating.toFixed(1)}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Users className="h-3.5 w-3.5 stroke-[1.75]" />
+            {course.enrolledCount.toLocaleString()}
           </span>
         </div>
-        {course.progress > 0 && (
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <Progress value={course.progress} className="h-1.5 flex-1" />
-            <span className="text-xs font-semibold text-primary">{course.progress}%</span>
+
+        {enrolled && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-caption">
+              <span>Progress</span>
+              <span className="font-data font-semibold text-primary">{course.progress}%</span>
+            </div>
+            <Progress value={course.progress} className="h-1.5" />
           </div>
         )}
-        {course.status === "not_started" && (
-          <Button size="sm" className="mt-3 w-full" variant="outline">
-            Start Course
+
+        <div className="mt-auto pt-1">
+          <Button asChild size="sm" className="w-full" variant={enrolled ? "default" : "secondary"}>
+            <Link href={href}>{ctaLabel}</Link>
           </Button>
-        )}
-        {course.status === "in_progress" && (
-          <Button size="sm" className="mt-3 w-full">
-            Continue
-          </Button>
-        )}
+        </div>
       </div>
-    </Link>
+    </article>
   );
 }

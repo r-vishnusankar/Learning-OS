@@ -144,10 +144,10 @@ export default function AnalyticsPage() {
         transition={{ duration: 0.4 }}
         className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
-        <StatCard title="Total Learners" value={formatNumber(totalEmployees)} icon={Users} trend="+8%" accent="#0D9488" />
-        <StatCard title="Active Courses" value={totalCourses} icon={GraduationCap} subtitle="Across 7 departments" accent="#0284C7" />
-        <StatCard title="Learning Hours" value={formatNumber(totalHours)} icon={Clock} trend="+15% MoM" accent="#059669" />
-        <StatCard title="Avg Completion" value={`${avgCompletion}%`} icon={BarChart3} subtitle="Org-wide rate" accent="#CA8A04" />
+        <StatCard title="Total Learners" value={formatNumber(totalEmployees)} icon={Users} trend="+8%" accent="success" />
+        <StatCard title="Active Courses" value={totalCourses} icon={GraduationCap} subtitle="Across 7 departments" accent="info" />
+        <StatCard title="Learning Hours" value={formatNumber(totalHours)} icon={Clock} trend="+15% MoM" accent="success" />
+        <StatCard title="Avg Completion" value={`${avgCompletion}%`} icon={BarChart3} subtitle="Org-wide rate" accent="warning" />
       </motion.section>
 
       <motion.section {...fade} transition={{ delay: 0.05, duration: 0.4 }}>
@@ -306,9 +306,9 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
           <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard title="Pass Rate" value="87%" icon={Target} trend="+3%" accent="#0D9488" />
-            <StatCard title="Avg Score" value="86%" icon={BarChart3} subtitle="Across all assessments" accent="#0284C7" />
-            <StatCard title="Attempts" value="1,284" icon={GraduationCap} subtitle="This quarter" accent="#059669" />
+            <StatCard title="Pass Rate" value="87%" icon={Target} trend="+3%" accent="success" />
+            <StatCard title="Avg Score" value="86%" icon={BarChart3} subtitle="Across all assessments" accent="info" />
+            <StatCard title="Attempts" value="1,284" icon={GraduationCap} subtitle="This quarter" accent="success" />
           </div>
         </TabsContent>
 
@@ -338,10 +338,10 @@ export default function AnalyticsPage() {
               </CardContent>
             </Card>
             <div className="grid gap-4 sm:grid-cols-2">
-              <StatCard title="DAU" value="412" icon={Users} trend="+6%" accent="#0D9488" />
-              <StatCard title="Session Avg" value="38m" icon={Clock} subtitle="Per active learner" accent="#0284C7" />
-              <StatCard title="Streak Rate" value="64%" icon={Zap} subtitle="7+ day streaks" accent="#CA8A04" />
-              <StatCard title="Return Rate" value="78%" icon={TrendingUp} trend="+2%" accent="#059669" />
+              <StatCard title="DAU" value="412" icon={Users} trend="+6%" accent="success" />
+              <StatCard title="Session Avg" value="38m" icon={Clock} subtitle="Per active learner" accent="info" />
+              <StatCard title="Streak Rate" value="64%" icon={Zap} subtitle="7+ day streaks" accent="warning" />
+              <StatCard title="Return Rate" value="78%" icon={TrendingUp} trend="+2%" accent="success" />
             </div>
           </div>
         </TabsContent>

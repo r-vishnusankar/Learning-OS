@@ -1,32 +1,52 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
+  Bell,
   BookOpen,
+  Calendar,
+  ClipboardCheck,
+  FileText,
+  Folders,
   GraduationCap,
   LayoutDashboard,
+  Radar,
+  Route,
+  Settings,
+  Shield,
   Trophy,
   Award,
-  Sparkles,
-  Settings,
   User,
   Building2,
-  ClipboardCheck,
+  Users,
+  HelpCircle,
+  UserRoundSearch,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useUIStore } from "@/store/ui-store";
-import { cn } from "@/lib/utils";
+import { cn, isExamRoute } from "@/lib/utils";
 
 const commands = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, group: "Navigate" },
   { label: "My Learning", href: "/dashboard/learning", icon: BookOpen, group: "Navigate" },
+  { label: "Learning Paths", href: "/dashboard/paths", icon: Route, group: "Navigate" },
   { label: "Courses", href: "/dashboard/courses", icon: GraduationCap, group: "Navigate" },
   { label: "Assessments", href: "/dashboard/assessments", icon: ClipboardCheck, group: "Navigate" },
+  { label: "Assignments", href: "/dashboard/assignments", icon: FileText, group: "Navigate" },
   { label: "Certificates", href: "/dashboard/certificates", icon: Award, group: "Navigate" },
+  { label: "Skill Matrix", href: "/dashboard/skills", icon: Radar, group: "Navigate" },
   { label: "Leaderboard", href: "/dashboard/leaderboard", icon: Trophy, group: "Navigate" },
+  { label: "Calendar", href: "/dashboard/calendar", icon: Calendar, group: "Navigate" },
   { label: "Departments", href: "/dashboard/departments", icon: Building2, group: "Navigate" },
-  { label: "AI Mentor", href: "/dashboard/ai-mentor", icon: Sparkles, group: "Navigate" },
+  { label: "Help & employee guide", href: "/dashboard/help", icon: HelpCircle, group: "Navigate" },
+  { label: "Notifications", href: "/dashboard/notifications", icon: Bell, group: "Navigate" },
+  { label: "Admin Overview", href: "/dashboard/admin", icon: Shield, group: "Admin" },
+  { label: "Catalog Audit", href: "/dashboard/admin/catalog-audit", icon: ClipboardCheck, group: "Admin" },
+  { label: "Employee Progress", href: "/dashboard/admin/employee-progress", icon: UserRoundSearch, group: "Admin" },
+  { label: "Admin Courses", href: "/dashboard/admin/courses", icon: Folders, group: "Admin" },
+  { label: "Admin Users", href: "/dashboard/admin/users", icon: Users, group: "Admin" },
+  { label: "Admin Promotions", href: "/dashboard/admin/promotions", icon: Award, group: "Admin" },
   { label: "Profile", href: "/dashboard/profile", icon: User, group: "Account" },
   { label: "Settings", href: "/dashboard/settings", icon: Settings, group: "Account" },
 ];
@@ -36,6 +56,7 @@ export function CommandPalette() {
   const [query, setQuery] = React.useState("");
   const [active, setActive] = React.useState(0);
   const router = useRouter();
+  const pathname = usePathname();
 
   const filtered = commands.filter((c) =>
     c.label.toLowerCase().includes(query.toLowerCase())
@@ -64,6 +85,8 @@ export function CommandPalette() {
       run(filtered[active].href);
     }
   };
+
+  if (isExamRoute(pathname)) return null;
 
   return (
     <Dialog open={commandOpen} onOpenChange={setCommandOpen}>
@@ -95,7 +118,7 @@ export function CommandPalette() {
                   onMouseEnter={() => setActive(i)}
                   className={cn(
                     "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition",
-                    i === active ? "bg-accent text-accent-foreground" : "hover:bg-muted"
+                    i === active ? "bg-pastel-purple text-primary" : "hover:bg-muted"
                   )}
                 >
                   <Icon className="h-4 w-4 opacity-70" />

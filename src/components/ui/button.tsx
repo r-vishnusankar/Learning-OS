@@ -3,25 +3,32 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
+/** High emphasis = pill; lower emphasis = --radius-control (18px). */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-semibold transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-60 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer active:scale-[0.98]",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-(--shadow-sm) hover:brightness-110 hover:shadow-(--shadow-md) active:scale-[0.98]",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        outline: "border border-border bg-card hover:bg-muted text-foreground",
-        ghost: "hover:bg-muted text-foreground",
-        destructive: "bg-destructive text-destructive-foreground hover:brightness-110",
-        accent: "bg-accent text-accent-foreground hover:brightness-95",
-        link: "text-primary underline-offset-4 hover:underline",
+        default:
+          "rounded-full bg-primary-strong text-primary-foreground shadow-(--shadow-sm) hover:bg-primary-hover hover:shadow-(--shadow)",
+        secondary:
+          "rounded-[length:var(--radius-control)] bg-secondary text-secondary-foreground shadow-(--shadow-sm) hover:bg-secondary/80",
+        outline:
+          "rounded-[length:var(--radius-control)] border-0 bg-card text-foreground shadow-(--shadow-sm) hover:bg-secondary hover:text-secondary-foreground",
+        ghost:
+          "rounded-[length:var(--radius-control)] bg-transparent text-foreground hover:bg-secondary hover:text-secondary-foreground",
+        destructive:
+          "rounded-full bg-destructive text-destructive-foreground shadow-(--shadow-sm) hover:bg-destructive-hover dark:bg-destructive-tint dark:text-destructive dark:hover:bg-destructive-hover",
+        success:
+          "rounded-full bg-success text-success-foreground shadow-(--shadow-sm) hover:bg-success-hover dark:bg-success-tint dark:text-success dark:hover:bg-success-hover",
+        link: "rounded-[length:var(--radius-control)] text-primary underline-offset-4 hover:underline active:scale-100",
       },
       size: {
-        default: "h-11 px-5 py-2",
-        sm: "h-9 rounded-xl px-3.5 text-xs",
-        lg: "h-12 rounded-2xl px-7",
+        default: "h-12 px-6",
+        sm: "h-10 px-4 text-sm",
+        lg: "h-14 px-8 text-base",
         icon: "h-11 w-11",
-        "icon-sm": "h-9 w-9 rounded-xl",
+        "icon-sm": "h-9 w-9",
       },
     },
     defaultVariants: {

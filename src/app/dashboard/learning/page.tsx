@@ -5,13 +5,13 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   ArrowUpDown,
+  AlertTriangle,
   BookOpen,
   Bookmark,
   ChevronLeft,
   ChevronRight,
   Clock,
   Search,
-  Sparkles,
   TrendingUp,
 } from "lucide-react";
 import { CourseCard } from "@/components/cards/course-card";
@@ -23,11 +23,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
-import { DEPARTMENT_LABELS, LEVEL_LABELS } from "@/constants/navigation";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS } from "@/constants/navigation";
 import { usePublishedCourses } from "@/hooks/use-courses";
 import { useMyCourseAssignments } from "@/hooks/use-course-assignments";
+import { useCurrentUser } from "@/hooks/use-me";
 import { useMyEligibility } from "@/hooks/use-promotions";
-import type { Course, DepartmentId, Difficulty } from "@/types";
+import type { Course, DepartmentId, Difficulty, LearningCategory } from "@/types";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -154,12 +156,14 @@ function CourseRow({
 }
 
 export default function LearningPage() {
-  const { data: courses = [] } = usePublishedCourses();
+  const { data: courses = [], isLoading: coursesLoading, isError: coursesError } = usePublishedCourses();
   const { data: myAssignments = [] } = useMyCourseAssignments();
   const { data: eligibility } = useMyEligibility();
+  const { data: user } = useCurrentUser();
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState<DepartmentId | "all">("all");
   const [difficulty, setDifficulty] = useState<Difficulty | "all">("all");
+  const [learningCategory, setLearningCategory] = useState<LearningCategory | "all">("all");
   const [sort, setSort] = useState<SortOption>("recommended");
 
   const courseCareer = useMemo(() => {
@@ -184,6 +188,9 @@ export default function LearningPage() {
     }
     if (department !== "all") result = result.filter((c) => c.department === department);
     if (difficulty !== "all") result = result.filter((c) => c.difficulty === difficulty);
+    if (learningCategory !== "all") {
+      result = result.filter((c) => c.learningCategory === learningCategory);
+    }
 
     switch (sort) {
       case "rating":
@@ -201,17 +208,35 @@ export default function LearningPage() {
         break;
       default:
         result.sort((a, b) => {
-          const score = (c: Course) =>
-            (c.isTrending ? 2 : 0) + (c.status === "in_progress" ? 3 : 0) + c.rating / 10;
+          const score = (c: Course) => {
+            let s =
+              (c.isTrending ? 2 : 0) +
+              (c.status === "in_progress" ? 3 : 0) +
+              c.rating / 10;
+            if (c.learningCategory === "role" && user?.department === c.department) s += 2;
+            if (c.learningCategory === "goal" && c.status === "not_started") s += 1.5;
+            return s;
+          };
           return score(b) - score(a);
         });
     }
 
     return result;
-  }, [courses, search, department, difficulty, sort]);
+  }, [courses, search, department, difficulty, learningCategory, sort, user?.department]);
 
   const continueLearning = courses.filter((c) => c.status === "in_progress");
-  const recommended = courses.filter((c) => c.status === "not_started" || c.isTrending).slice(0, 6);
+  const recommended = [...courses]
+    .filter((c) => c.status === "not_started" || c.isTrending)
+    .sort((a, b) => {
+      const score = (c: Course) => {
+        let s = (c.isTrending ? 2 : 0) + c.rating / 10;
+        if (c.learningCategory === "role" && user?.department === c.department) s += 3;
+        if (c.learningCategory === "goal") s += 2;
+        return s;
+      };
+      return score(b) - score(a);
+    })
+    .slice(0, 6);
   const trending = courses.filter((c) => c.isTrending);
   const recentlyViewed = courses
     .filter((c) => c.lastAccessed)
@@ -228,27 +253,25 @@ export default function LearningPage() {
     { value: "expert", label: "Expert" },
   ];
 
-  const hasFilters = search || department !== "all" || difficulty !== "all";
+  const hasFilters =
+    Boolean(search) ||
+    department !== "all" ||
+    difficulty !== "all" ||
+    learningCategory !== "all";
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="My Learning"
         description="Your personalized learning hub — pick up where you left off or discover something new."
-      >
-        <Button asChild variant="secondary" className="gap-2">
-          <Link href="/dashboard/ai-mentor">
-            <Sparkles className="h-4 w-4 stroke-[1.75]" /> AI Recommendations
-          </Link>
-        </Button>
-      </PageHeader>
+      />
 
       {eligibility && (
         <motion.div
           {...fade}
           className="rounded-2xl border bg-card p-4 shadow-(--shadow-card)"
         >
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-semibold">
                 {LEVEL_LABELS[eligibility.currentLevel]} track ·{" "}
@@ -261,9 +284,14 @@ export default function LearningPage() {
                   : ""}
               </p>
             </div>
-            {eligibility.status === "eligible" && (
-              <Badge variant="success">Eligible for promotion</Badge>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {eligibility.status === "eligible" && (
+                <Badge variant="success">Eligible for promotion</Badge>
+              )}
+              <Button asChild size="sm" variant="outline">
+                <Link href="/dashboard/help">Employee guide</Link>
+              </Button>
+            </div>
           </div>
         </motion.div>
       )}
@@ -307,6 +335,15 @@ export default function LearningPage() {
             ))}
           </select>
           <select
+            value={learningCategory}
+            onChange={(e) => setLearningCategory(e.target.value as LearningCategory | "all")}
+            className="h-10 rounded-full bg-secondary px-4 text-sm font-medium text-secondary-foreground transition-all duration-200 hover:bg-secondary/80 focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="all">All categories</option>
+            <option value="role">{LEARNING_CATEGORY_LABELS.role}</option>
+            <option value="goal">{LEARNING_CATEGORY_LABELS.goal}</option>
+          </select>
+          <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortOption)}
             className="h-10 rounded-full bg-muted px-4 text-sm font-medium text-foreground transition-all duration-200 hover:bg-muted/80 focus:outline-none focus:ring-2 focus:ring-ring"
@@ -337,6 +374,9 @@ export default function LearningPage() {
               {difficulty}
             </Badge>
           )}
+          {learningCategory !== "all" && (
+            <Badge variant="secondary">{LEARNING_CATEGORY_LABELS[learningCategory]}</Badge>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -344,6 +384,7 @@ export default function LearningPage() {
               setSearch("");
               setDepartment("all");
               setDifficulty("all");
+              setLearningCategory("all");
             }}
           >
             Clear filters
@@ -450,7 +491,16 @@ export default function LearningPage() {
             </motion.section>
           )}
 
-          {continueLearning.length > 0 ? (
+          {coursesLoading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : coursesError ? (
+            <EmptyState
+              icon={<AlertTriangle className="h-6 w-6 stroke-[1.75]" />}
+              title="Couldn't load courses"
+              description="Courses could not be loaded — this list may be incomplete."
+              className="ring-1 ring-warning/25"
+            />
+          ) : continueLearning.length > 0 ? (
             <CourseRow
               title="Continue Learning"
               description="Pick up right where you left off"
@@ -514,7 +564,7 @@ export default function LearningPage() {
         >
           {[
             { label: "In progress", value: continueLearning.length, icon: Clock, color: "text-primary" },
-            { label: "Saved", value: saved.length, icon: Bookmark, color: "text-pending" },
+            { label: "Saved", value: saved.length, icon: Bookmark, color: "text-primary" },
             { label: "Completed", value: completed.length, icon: BookOpen, color: "text-success" },
             { label: "Trending", value: trending.length, icon: TrendingUp, color: "text-info" },
           ].map((stat) => (

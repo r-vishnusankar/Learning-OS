@@ -19,8 +19,10 @@ import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { currentUser } from "@/data/mock";
+import { Skeleton } from "@/components/ui/skeleton";
 import { MarkdownMessage } from "@/components/ai/markdown-message";
+import { usePublishedCourses } from "@/hooks/use-courses";
+import { useCurrentUser } from "@/hooks/use-me";
 import { cn } from "@/lib/utils";
 
 type Msg = { role: "user" | "assistant"; content: string; streaming?: boolean };
@@ -73,15 +75,29 @@ const tips = [
 ];
 
 export default function AiMentorPage() {
+  const { data: user, isLoading: userLoading } = useCurrentUser();
+  const { data: courses = [] } = usePublishedCourses();
+  const firstName = user?.name?.split(" ")[0] ?? "there";
+  const inProgressCount = courses.filter((c) => c.status === "in_progress").length;
+  const streak = user?.streak ?? 0;
+  const skillScore = user?.skillScore ?? 0;
+
   const [input, setInput] = React.useState("");
-  const [messages, setMessages] = React.useState<Msg[]>([
-    {
-      role: "assistant",
-      content: `Hi ${currentUser.name.split(" ")[0]} — I'm your Nexus AI Mentor. I can summarize lessons, explain concepts, generate quizzes, run mock interviews, and analyze your skills. How can I help today?`,
-    },
-  ]);
+  const [messages, setMessages] = React.useState<Msg[]>([]);
+  const [greetingReady, setGreetingReady] = React.useState(false);
   const [isTyping, setIsTyping] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (userLoading || greetingReady) return;
+    setMessages([
+      {
+        role: "assistant",
+        content: `Hi ${firstName} — I'm your Nexus AI Mentor. I can summarize lessons, explain concepts, generate quizzes, run mock interviews, and analyze your skills. How can I help today?`,
+      },
+    ]);
+    setGreetingReady(true);
+  }, [userLoading, firstName, greetingReady]);
 
   React.useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -121,6 +137,15 @@ export default function AiMentorPage() {
       }
     }, 35);
   };
+
+  if (userLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="AI Mentor" description="Loading your mentor context…" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -260,9 +285,9 @@ export default function AiMentorPage() {
                 AI Mentor has access to your courses, assessments, skill matrix, and learning goals for personalized guidance.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Badge variant="outline">14-day streak</Badge>
-                <Badge variant="outline">78 skill score</Badge>
-                <Badge variant="outline">3 active courses</Badge>
+                <Badge variant="outline">{streak}-day streak</Badge>
+                <Badge variant="outline">{skillScore} skill score</Badge>
+                <Badge variant="outline">{inProgressCount} active courses</Badge>
               </div>
             </CardContent>
           </Card>

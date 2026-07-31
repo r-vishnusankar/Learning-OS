@@ -123,35 +123,19 @@ export async function fetchDashboardHomeAction() {
   const userId = await requireUserId();
   const user = await getUserWithProfile(userId);
   const snapshot = await getAnalyticsSnapshot([userId]);
-  const orgSnapshot = await getAnalyticsSnapshot();
   const leaderboard = await getLeaderboardRows(8);
   const prefs = await fetchMyPreferencesAction();
   const myRank = leaderboard.find((e) => e.userId === userId)?.rank ?? user?.companyRank ?? 0;
 
   const coursesCompleted = snapshot.completedLessons > 0
     ? Math.max(1, Math.round(snapshot.completedLessons / 8))
-    : user?.skillScore
-      ? 0
-      : 0;
+    : 0;
 
   // Derive weekly hours from lesson completions (fallback distribution)
   const totalHours = Math.max(1, Math.round(snapshot.completedLessons * 0.35) || Math.round((user?.xp ?? 0) / 120));
   const weeklyHours = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label, i) => ({
     label,
     value: Math.max(0, Math.round((totalHours / 7) * (i < 5 ? 1.2 : 0.6) * (0.7 + ((i * 17) % 5) / 10))),
-  }));
-
-  const heatmapData = Array.from({ length: 7 }, (_, week) =>
-    Array.from({ length: 7 }, (_, day) => {
-      const base = snapshot.completedLessons > 0 ? (snapshot.completedLessons % 5) + 1 : 0;
-      return Math.min(4, Math.max(0, (base + week + day) % 5));
-    })
-  );
-
-  const monthlyLearning = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"].map((label, i) => ({
-    label,
-    value: Math.round(40 + (snapshot.avgAssessmentScore || 50) * 0.4 + i * 3),
-    secondary: Math.round(35 + (orgSnapshot.avgAssessmentScore || 45) * 0.35 + i * 2),
   }));
 
   return {
@@ -173,10 +157,7 @@ export async function fetchDashboardHomeAction() {
       ),
     },
     weeklyHours,
-    heatmapData,
-    monthlyLearning,
     leaderboard,
-    orgSnapshot,
   };
 }
 

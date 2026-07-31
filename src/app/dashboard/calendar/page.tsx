@@ -13,6 +13,9 @@ import {
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useLearnerAssessments } from "@/hooks/use-assessments";
+import { useLearnerAssignments, useLearnerCertificates } from "@/hooks/use-certification";
 import { cn } from "@/lib/utils";
 
 type EventType = "assessment" | "session" | "ceremony";
@@ -26,27 +29,17 @@ interface CalendarEvent {
   description?: string;
 }
 
-const mockEvents: CalendarEvent[] = [
-  { id: "e1", title: "System Design Certification Exam", date: "2026-07-15", time: "10:00 AM", type: "assessment", description: "90 min · 40 questions" },
-  { id: "e2", title: "CI/CD Pipeline Workshop", date: "2026-07-14", time: "2:00 PM", type: "session", description: "CI/CD with GitHub Actions" },
-  { id: "e3", title: "Rate Limiter Assignment Due", date: "2026-07-15", time: "11:59 PM", type: "assessment", description: "System Design Mastery" },
-  { id: "e4", title: "Playwright Lab Session", date: "2026-07-16", time: "3:00 PM", type: "session", description: "API Testing with Playwright" },
-  { id: "e5", title: "CI/CD Pipeline Design", date: "2026-07-18", time: "9:00 AM", type: "assessment", description: "75 min case study" },
-  { id: "e6", title: "TypeScript Professional Ceremony", date: "2026-07-22", time: "4:00 PM", type: "ceremony", description: "Virtual credential celebration" },
-  { id: "e7", title: "Team Learning Sprint", date: "2026-07-23", time: "1:00 PM", type: "session", description: "Development department" },
-  { id: "e8", title: "QA Automation Practical", date: "2026-07-25", time: "10:00 AM", type: "assessment", description: "Playwright coding challenge" },
-  { id: "e9", title: "QA Automation Certificate Ceremony", date: "2026-07-28", time: "3:30 PM", type: "ceremony", description: "QA team recognition" },
-  { id: "e10", title: "Redis Caching Lab Session", date: "2026-07-13", time: "5:00 PM", type: "session", description: "System Design Mastery" },
-];
-
-const MONTH = 6;
-const YEAR = 2026;
-const MONTH_NAME = "July 2026";
-
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const typeConfig: Record<EventType, { icon: typeof CalendarIcon; color: string; badge: "warning" | "info" | "success" }> = {
-  assessment: { icon: ClipboardCheck, color: "bg-warning/15 text-warning border-warning/30", badge: "warning" },
+const typeConfig: Record<
+  EventType,
+  { icon: typeof CalendarIcon; color: string; badge: "warning" | "info" | "success" }
+> = {
+  assessment: {
+    icon: ClipboardCheck,
+    color: "bg-warning/15 text-warning border-warning/30",
+    badge: "warning",
+  },
   session: { icon: BookOpen, color: "bg-info/15 text-info border-info/30", badge: "info" },
   ceremony: { icon: Award, color: "bg-success/15 text-success border-success/30", badge: "success" },
 };
@@ -59,29 +52,125 @@ function getFirstDayOfMonth(year: number, month: number) {
   return new Date(year, month, 1).getDay();
 }
 
+function toDateKey(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function todayKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 export default function CalendarPage() {
-  const [selectedDate, setSelectedDate] = React.useState<string | null>("2026-07-13");
-  const daysInMonth = getDaysInMonth(YEAR, MONTH);
-  const firstDay = getFirstDayOfMonth(YEAR, MONTH);
+  const now = new Date();
+  const [year, setYear] = React.useState(now.getFullYear());
+  const [month, setMonth] = React.useState(now.getMonth());
+  const [selectedDate, setSelectedDate] = React.useState<string | null>(todayKey());
+
+  const { data: assessments = [], isLoading: assessmentsLoading, isError: assessmentsError } = useLearnerAssessments();
+  const { data: assignments = [], isLoading: assignmentsLoading, isError: assignmentsError } = useLearnerAssignments();
+  const { data: certificates = [], isLoading: certsLoading, isError: certsError } = useLearnerCertificates();
+  const eventsError = assessmentsError || assignmentsError || certsError;
+
+  const events = React.useMemo<CalendarEvent[]>(() => {
+    const assessmentEvents: CalendarEvent[] = assessments
+      .filter((a) => a.dueDate)
+      .map((a) => ({
+        id: `assessment-${a.id}`,
+        title: a.title,
+        date: toDateKey(a.dueDate),
+        time: formatTime(a.dueDate),
+        type: "assessment" as const,
+        description: `${a.durationMinutes} min · ${a.questionsCount} questions`,
+      }));
+
+    const sessionEvents: CalendarEvent[] = assignments
+      .filter((a) => a.dueDate)
+      .map((a) => ({
+        id: `assignment-${a.id}`,
+        title: a.title,
+        date: toDateKey(a.dueDate),
+        time: formatTime(a.dueDate),
+        type: "session" as const,
+        description: a.courseTitle,
+      }));
+
+    const ceremonyEvents: CalendarEvent[] = certificates
+      .filter((c) => c.status === "earned" && c.issuedAt)
+      .map((c) => ({
+        id: `cert-${c.id}`,
+        title: `${c.title} Ceremony`,
+        date: toDateKey(c.issuedAt!),
+        time: formatTime(c.issuedAt!),
+        type: "ceremony" as const,
+        description: "Credential celebration",
+      }));
+
+    return [...assessmentEvents, ...sessionEvents, ...ceremonyEvents];
+  }, [assessments, assignments, certificates]);
+
+  const daysInMonth = getDaysInMonth(year, month);
+  const firstDay = getFirstDayOfMonth(year, month);
+  const monthName = new Date(year, month, 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
 
   const calendarDays: (number | null)[] = [
     ...Array(firstDay).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
 
-  const eventsByDate = mockEvents.reduce<Record<string, CalendarEvent[]>>((acc, e) => {
+  const eventsByDate = events.reduce<Record<string, CalendarEvent[]>>((acc, e) => {
     (acc[e.date] ??= []).push(e);
     return acc;
   }, {});
 
-  const upcoming = [...mockEvents]
-    .filter((e) => new Date(e.date) >= new Date("2026-07-13"))
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const today = todayKey();
+  const upcoming = [...events]
+    .filter((e) => e.date >= today)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(0, 8);
 
-  const selectedEvents = selectedDate ? eventsByDate[selectedDate] ?? [] : [];
+  const selectedEvents = selectedDate ? (eventsByDate[selectedDate] ?? []) : [];
 
   const dateKey = (day: number) =>
-    `${YEAR}-${String(MONTH + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+  const goPrev = () => {
+    if (month === 0) {
+      setMonth(11);
+      setYear((y) => y - 1);
+    } else {
+      setMonth((m) => m - 1);
+    }
+  };
+
+  const goNext = () => {
+    if (month === 11) {
+      setMonth(0);
+      setYear((y) => y + 1);
+    } else {
+      setMonth((m) => m + 1);
+    }
+  };
+
+  if (assessmentsLoading || assignmentsLoading || certsLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Learning Calendar" description="Loading your schedule…" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -90,7 +179,7 @@ export default function CalendarPage() {
         description="Track assessments, learning sessions, and certificate ceremonies."
       >
         <Badge variant="outline" className="gap-1">
-          <CalendarIcon className="h-3 w-3" /> {MONTH_NAME}
+          <CalendarIcon className="h-3 w-3" /> {monthName}
         </Badge>
       </PageHeader>
 
@@ -103,14 +192,24 @@ export default function CalendarPage() {
           <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <div>
-                <CardTitle>{MONTH_NAME}</CardTitle>
+                <CardTitle>{monthName}</CardTitle>
                 <CardDescription>Click a day to view events</CardDescription>
               </div>
               <div className="flex items-center gap-1">
-                <button type="button" className="rounded-lg p-2 transition hover:bg-muted" aria-label="Previous month">
+                <button
+                  type="button"
+                  onClick={goPrev}
+                  className="rounded-lg p-2 transition hover:bg-muted"
+                  aria-label="Previous month"
+                >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
-                <button type="button" className="rounded-lg p-2 transition hover:bg-muted" aria-label="Next month">
+                <button
+                  type="button"
+                  onClick={goNext}
+                  className="rounded-lg p-2 transition hover:bg-muted"
+                  aria-label="Next month"
+                >
                   <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
@@ -118,7 +217,9 @@ export default function CalendarPage() {
             <CardContent>
               <div className="mb-2 grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground">
                 {DAYS.map((d) => (
-                  <div key={d} className="py-2">{d}</div>
+                  <div key={d} className="py-2">
+                    {d}
+                  </div>
                 ))}
               </div>
               <div className="grid grid-cols-7 gap-1">
@@ -129,7 +230,7 @@ export default function CalendarPage() {
                   const key = dateKey(day);
                   const dayEvents = eventsByDate[key] ?? [];
                   const isSelected = selectedDate === key;
-                  const isToday = key === "2026-07-13";
+                  const isToday = key === today;
 
                   return (
                     <button
@@ -174,7 +275,11 @@ export default function CalendarPage() {
                       day: "numeric",
                     })}
                   </p>
-                  {selectedEvents.length === 0 ? (
+                  {eventsError ? (
+                    <p className="text-sm text-warning">
+                      Events could not be loaded — this list may be incomplete.
+                    </p>
+                  ) : selectedEvents.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No events scheduled.</p>
                   ) : (
                     <div className="space-y-2">
@@ -189,7 +294,10 @@ export default function CalendarPage() {
                             <Icon className="mt-0.5 h-4 w-4 shrink-0" />
                             <div>
                               <p className="text-sm font-medium">{event.title}</p>
-                              <p className="text-xs opacity-80">{event.time}{event.description ? ` · ${event.description}` : ""}</p>
+                              <p className="text-xs opacity-80">
+                                {event.time}
+                                {event.description ? ` · ${event.description}` : ""}
+                              </p>
                             </div>
                           </div>
                         );
@@ -213,29 +321,46 @@ export default function CalendarPage() {
               <CardDescription>Next scheduled events</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {upcoming.map((event) => {
-                const config = typeConfig[event.type];
-                const Icon = config.icon;
-                return (
-                  <div
-                    key={event.id}
-                    className="flex gap-3 rounded-lg border border-border p-3 transition hover:border-primary/30"
-                  >
-                    <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", config.color)}>
-                      <Icon className="h-4 w-4" />
+              {eventsError ? (
+                <p className="text-sm text-warning">
+                  Events could not be loaded — this list may be incomplete.
+                </p>
+              ) : upcoming.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No upcoming events.</p>
+              ) : (
+                upcoming.map((event) => {
+                  const config = typeConfig[event.type];
+                  const Icon = config.icon;
+                  return (
+                    <div
+                      key={event.id}
+                      className="flex gap-3 rounded-lg border border-border p-3 transition hover:border-primary/30"
+                    >
+                      <div
+                        className={cn(
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                          config.color
+                        )}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{event.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(event.date + "T12:00:00").toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}{" "}
+                          · {event.time}
+                        </p>
+                        <Badge variant={config.badge} className="mt-1.5 capitalize">
+                          {event.type}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{event.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(event.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {event.time}
-                      </p>
-                      <Badge variant={config.badge} className="mt-1.5 capitalize text-[10px]">
-                        {event.type}
-                      </Badge>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </CardContent>
           </Card>
 

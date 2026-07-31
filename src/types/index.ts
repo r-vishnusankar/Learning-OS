@@ -23,6 +23,8 @@ export type AssignmentStatus = "pending" | "submitted" | "graded" | "overdue";
 export type CertificateStatus = "earned" | "locked" | "expired" | "pending";
 export type UserRole = "employee" | "manager" | "department_head" | "admin" | "instructor";
 export type Difficulty = "beginner" | "intermediate" | "advanced" | "expert";
+/** Role-based (career/level track) vs Goal-based (skill or personal objective). */
+export type LearningCategory = "role" | "goal";
 
 export interface User {
   id: string;
@@ -57,12 +59,14 @@ export interface Department {
 
 export interface Course {
   id: string;
+  slug?: string;
   title: string;
   description: string;
   thumbnail: string;
   department: DepartmentId;
   level: LearningLevel;
   difficulty: Difficulty;
+  learningCategory: LearningCategory;
   instructor: Instructor;
   durationHours: number;
   lessonsCount: number;
@@ -204,9 +208,10 @@ export interface NotificationItem {
   id: string;
   title: string;
   message: string;
-  type: "info" | "success" | "warning" | "reminder";
+  type: "info" | "success" | "warning" | "reminder" | "achievement";
   read: boolean;
   timestamp: string;
+  href?: string | null;
 }
 
 export interface ChartPoint {

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { SessionProvider } from "next-auth/react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,25 +12,27 @@ export function Providers({ children }: { children: React.ReactNode }) {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { staleTime: 60_000, refetchOnWindowFocus: false },
+          queries: { staleTime: 0, refetchOnWindowFocus: true },
         },
       })
   );
 
   return (
-    <NextThemesProvider
-      attribute="class"
-      defaultTheme="light"
-      enableSystem
-      storageKey="nexus-theme"
-      disableTransitionOnChange
-    >
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider delayDuration={200}>
-          {children}
-          <Toaster richColors position="top-right" closeButton />
-        </TooltipProvider>
-      </QueryClientProvider>
-    </NextThemesProvider>
+    <SessionProvider>
+      <NextThemesProvider
+        attribute="class"
+        defaultTheme="light"
+        enableSystem
+        storageKey="nexus-theme"
+        disableTransitionOnChange
+      >
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider delayDuration={200}>
+            {children}
+            <Toaster richColors position="top-right" closeButton />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </NextThemesProvider>
+    </SessionProvider>
   );
 }

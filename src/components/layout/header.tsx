@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
+import { signOut, useSession } from "next-auth/react";
 import {
   Bell,
   Menu,
@@ -27,97 +28,117 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useUIStore } from "@/store/ui-store";
-import { currentUser, notifications } from "@/data/mock";
-import { formatNumber } from "@/lib/utils";
+import { useUnreadNotificationCount } from "@/hooks/use-operations";
+import { formatNumber, isExamRoute } from "@/lib/utils";
 import { DEPARTMENT_LABELS, LEVEL_LABELS } from "@/constants/navigation";
+import { levelToBadgeVariant } from "@/lib/status-styles";
+import { usePathname } from "next/navigation";
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
 
 export function Header() {
+  const pathname = usePathname();
+  const { data: session } = useSession();
   const { setSidebarMobileOpen, setCommandOpen, setNotificationsOpen } = useUIStore();
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
-  const unread = notifications.filter((n) => !n.read).length;
+  const { data: unread = 0 } = useUnreadNotificationCount();
+
+  const user = session?.user;
+  const designation = user?.designation ?? "Team Member";
+  const department = user?.department ? DEPARTMENT_LABELS[user.department] : "Development";
+  const level = user?.level ?? "beginner";
+  const xp = user?.xp ?? 0;
+  const coins = user?.coins ?? 0;
 
   React.useEffect(() => setMounted(true), []);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        if (isExamRoute(pathname)) return;
         e.preventDefault();
         setCommandOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [setCommandOpen]);
+  }, [pathname, setCommandOpen]);
 
   const toggleTheme = () => {
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
   };
 
+  if (isExamRoute(pathname)) return null;
+
   return (
-    <header className="sticky top-0 z-30 flex h-20 items-center gap-4 bg-background/90 px-4 backdrop-blur-xl md:px-8">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 bg-background/85 px-4 backdrop-blur-xl md:px-8">
       <Button
         variant="ghost"
         size="icon-sm"
-        className="rounded-xl lg:hidden"
+        className="lg:hidden"
         onClick={() => setSidebarMobileOpen(true)}
       >
-        <Menu className="h-5 w-5" />
+        <Menu className="h-5 w-5 stroke-[1.75]" />
       </Button>
 
-      <div className="hidden min-w-0 flex-col sm:flex">
-        <h1 className="font-display text-xl font-semibold tracking-tight text-foreground md:text-2xl">
-          Welcome back {currentUser.name.split(" ")[0]} 👋
-        </h1>
-        <p className="text-xs text-muted-foreground">
-          {currentUser.designation} · {DEPARTMENT_LABELS[currentUser.department]}
+      <div className="hidden min-w-0 shrink-0 flex-col sm:flex">
+        <p className="text-caption">
+          {designation} · {department}
         </p>
       </div>
 
       <button
         type="button"
         onClick={() => setCommandOpen(true)}
-        className="mx-auto flex h-12 max-w-md flex-1 items-center gap-3 rounded-full border-0 bg-card px-5 text-sm text-muted-foreground shadow-(--shadow-sm) transition hover:shadow-(--shadow)"
+        className="flex h-10 w-full max-w-sm items-center gap-2.5 rounded-full bg-card px-4 text-sm text-muted-foreground shadow-(--shadow-sm) transition-all duration-200 hover:shadow-(--shadow)"
       >
-        <Search className="h-4 w-4 text-primary" />
-        <span className="flex-1 text-left">Search here...</span>
-        <kbd className="hidden rounded-lg bg-muted px-2 py-0.5 font-mono text-[10px] sm:inline-block">
+        <Search className="h-4 w-4 shrink-0 stroke-[1.75] text-primary" />
+        <span className="flex-1 truncate text-left">Search…</span>
+        <kbd className="hidden rounded-lg bg-muted px-1.5 py-0.5 font-mono text-caption sm:inline-block">
           ⌘K
         </kbd>
       </button>
 
-      <div className="ml-auto flex items-center gap-2 sm:gap-3">
-        <div className="hidden items-center gap-2 rounded-full bg-pastel-yellow px-3 py-1.5 text-xs font-semibold text-foreground sm:flex">
-          <Zap className="h-3.5 w-3.5 text-[#c9a227]" />
-          {formatNumber(currentUser.xp)} XP
+      <div className="ml-auto flex items-center gap-2">
+        <div className="hidden items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 font-data text-sm font-semibold text-secondary-foreground shadow-(--shadow-sm) sm:flex">
+          <Zap className="h-3.5 w-3.5 stroke-[1.75] text-primary" />
+          {formatNumber(xp)} XP
         </div>
-        <div className="hidden items-center gap-2 rounded-full bg-pastel-purple px-3 py-1.5 text-xs font-semibold text-primary md:flex">
-          <Coins className="h-3.5 w-3.5" />
-          {formatNumber(currentUser.coins)}
+        <div className="hidden items-center gap-1.5 rounded-full bg-card px-3 py-1.5 font-data text-sm font-medium text-foreground shadow-(--shadow-sm) md:flex">
+          <Coins className="h-3.5 w-3.5 stroke-[1.75] text-primary" />
+          {formatNumber(coins)}
         </div>
 
         <Button
           type="button"
           variant="ghost"
-          size="icon"
+          size="icon-sm"
           className="rounded-full bg-card shadow-(--shadow-sm)"
           onClick={toggleTheme}
           aria-label="Toggle theme"
         >
           {mounted && resolvedTheme === "dark" ? (
-            <Sun className="h-4 w-4" />
+            <Sun className="h-4 w-4 stroke-[1.75]" />
           ) : (
-            <Moon className="h-4 w-4" />
+            <Moon className="h-4 w-4 stroke-[1.75]" />
           )}
         </Button>
 
         <Button
           variant="ghost"
-          size="icon"
-          className="relative rounded-full bg-card text-primary shadow-(--shadow-sm)"
+          size="icon-sm"
+          className="relative rounded-full bg-card shadow-(--shadow-sm)"
           onClick={() => setNotificationsOpen(true)}
         >
-          <Bell className="h-4 w-4 fill-primary/20" />
+          <Bell className="h-4 w-4 stroke-[1.75] text-foreground" />
           {unread > 0 && (
             <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-card" />
           )}
@@ -125,37 +146,43 @@ export function Header() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" className="rounded-full ring-2 ring-primary/20 transition hover:ring-primary/40">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={currentUser.avatar} alt={currentUser.name} />
-                <AvatarFallback>AR</AvatarFallback>
+            <button
+              type="button"
+              className="rounded-full transition-all duration-200 hover:ring-2 hover:ring-primary/25"
+            >
+              <Avatar className="h-9 w-9 shadow-(--shadow-sm)">
+                <AvatarImage src={user?.image ?? undefined} alt={user?.name ?? "User"} />
+                <AvatarFallback>{initials(user?.name ?? "U")}</AvatarFallback>
               </Avatar>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 rounded-2xl">
+          <DropdownMenuContent align="end" className="w-56 rounded-2xl border-0 shadow-(--shadow-md)">
             <DropdownMenuLabel>
-              <div className="flex flex-col gap-1">
-                <span>{currentUser.name}</span>
-                <span className="text-xs font-normal text-muted-foreground">{currentUser.email}</span>
-                <Badge variant="secondary" className="mt-1 w-fit rounded-full">
-                  {LEVEL_LABELS[currentUser.level]}
+              <div className="flex flex-col gap-1.5">
+                <span className="font-semibold">{user?.name ?? "Signed in user"}</span>
+                <span className="text-sm font-normal text-description">{user?.email}</span>
+                <Badge variant={levelToBadgeVariant(level)} className="mt-0.5 w-fit">
+                  {LEVEL_LABELS[level]}
                 </Badge>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href="/dashboard/profile">
-                <User className="h-4 w-4" /> Profile
+                <User className="h-4 w-4 stroke-[1.75]" /> Profile
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/dashboard/settings">
-                <Settings className="h-4 w-4" /> Settings
+                <Settings className="h-4 w-4 stroke-[1.75]" /> Settings
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive focus:text-destructive">
-              <LogOut className="h-4 w-4" /> Sign out
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+            >
+              <LogOut className="h-4 w-4 stroke-[1.75]" /> Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -272,6 +272,8 @@ export async function listAssignmentsForUser(userId: string) {
       thumbnailUrl: courses.thumbnailUrl,
       durationMinutes: courses.durationMinutes,
       departmentId: courses.departmentId,
+      learningCategory: courses.learningCategory,
+      courseLevel: courses.level,
     })
     .from(courseAssignments)
     .innerJoin(courses, eq(courses.id, courseAssignments.courseId))
@@ -294,6 +296,8 @@ export async function listAssignmentsForUser(userId: string) {
       description: row.description,
       thumbnail: row.thumbnailUrl ?? "",
       departmentId: row.departmentId,
+      learningCategory: (row.learningCategory ?? "role") as "role" | "goal",
+      courseLevel: row.courseLevel,
       durationHours: Math.round((row.durationMinutes ?? 0) / 60),
       scope: row.scope as CourseAssignmentScope,
       mandatory: row.mandatory,

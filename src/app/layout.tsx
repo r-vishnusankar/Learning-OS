@@ -18,7 +18,7 @@ const poppinsDisplay = Poppins({
 const jetbrains = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400"],
 });
 
 export const metadata: Metadata = {
@@ -30,6 +30,21 @@ export const metadata: Metadata = {
     "Internal enterprise learning & certification platform for employee training, skill tracking, and career progression.",
 };
 
+/**
+ * Pre-paint theme bootstrap — KEEP alongside next-themes.
+ *
+ * next-themes also injects a blocking script, but it renders as the first child of
+ * <ThemeProvider>, which lives inside <body>. By then the stylesheet has loaded and
+ * <body class="bg-background"> exists under a still-light <html>, so the first paint
+ * can flash Paper White cards on a dark preference.
+ *
+ * This inline <head> script runs during HTML parse, before <body>, so `.dark` is on
+ * <html> before any themed surface paints. Both scripts read `nexus-theme` and write
+ * the same class — no conflict, only ordering. Do not remove this as a "duplicate"
+ * of next-themes without re-checking a hard reload of /login with dark active.
+ */
+const THEME_BOOTSTRAP = `(function(){try{var d=document.documentElement;var e=localStorage.getItem("nexus-theme");var m=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";var t=e==="system"?m:(e||"light");d.classList.remove("light","dark");d.classList.add(t);d.style.colorScheme=t}catch(n){}})();`;
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
@@ -37,6 +52,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       suppressHydrationWarning
       className={`${poppins.variable} ${poppinsDisplay.variable} ${jetbrains.variable} h-full`}
     >
+      <head>
+        <script
+          id="nexus-theme-bootstrap"
+          dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }}
+        />
+      </head>
       <body className="min-h-full bg-background font-sans text-foreground antialiased">
         <Providers>{children}</Providers>
       </body>

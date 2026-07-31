@@ -16,31 +16,30 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { assignments } from "@/data/mock";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useLearnerAssignments } from "@/hooks/use-certification";
 import type { AssignmentStatus } from "@/types";
 import { cn } from "@/lib/utils";
 
-const fade = {
-  initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0 },
-};
-
 const statusConfig: Record<
   AssignmentStatus,
-  { label: string; variant: "secondary" | "success" | "warning" | "destructive" | "info"; icon: typeof Clock }
+  {
+    label: string;
+    variant: "secondary" | "success" | "warning" | "pending" | "destructive" | "info";
+    icon: typeof Clock;
+  }
 > = {
-  pending: { label: "Pending", variant: "warning", icon: Clock },
+  pending: { label: "Pending", variant: "pending", icon: Clock },
   submitted: { label: "Submitted", variant: "info", icon: Send },
   graded: { label: "Graded", variant: "success", icon: CheckCircle2 },
   overdue: { label: "Overdue", variant: "destructive", icon: AlertCircle },
 };
 
-function isOverdue(dueDate: string, status: AssignmentStatus) {
-  return status === "pending" && new Date(dueDate) < new Date();
-}
-
 export default function AssignmentsPage() {
-  const sorted = [...assignments].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  const { data: assignments = [], isLoading, isError: assignmentsError } = useLearnerAssignments();
+  const sorted = [...assignments].sort(
+    (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+  );
 
   const counts = {
     pending: assignments.filter((a) => a.status === "pending").length,
@@ -56,15 +55,11 @@ export default function AssignmentsPage() {
         description="Track your coursework submissions, due dates, and grades."
       />
 
-      {/* Summary cards */}
-      <motion.div
-        {...fade}
-        transition={{ duration: 0.35 }}
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-      >
+      {!assignmentsError && (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {(
           [
-            { key: "pending", label: "Pending", color: "text-warning" },
+            { key: "pending", label: "Pending", color: "text-pastel-yellow-foreground" },
             { key: "submitted", label: "Submitted", color: "text-info" },
             { key: "graded", label: "Graded", color: "text-success" },
             { key: "overdue", label: "Overdue", color: "text-destructive" },
@@ -75,12 +70,22 @@ export default function AssignmentsPage() {
             className="rounded-xl border border-border bg-card p-4 shadow-(--shadow-sm)"
           >
             <p className={cn("text-2xl font-semibold", stat.color)}>{counts[stat.key]}</p>
-            <p className="text-xs text-muted-foreground">{stat.label}</p>
+            <p className="text-sm text-muted-foreground">{stat.label}</p>
           </div>
         ))}
-      </motion.div>
+      </div>
+      )}
 
-      {sorted.length > 0 ? (
+      {isLoading ? (
+        <Skeleton className="h-64 w-full" />
+      ) : assignmentsError ? (
+        <EmptyState
+          icon={<AlertCircle className="h-6 w-6 stroke-[1.75]" />}
+          title="Couldn't load assignments"
+          description="Assignments could not be loaded — this list may be incomplete."
+          className="ring-1 ring-warning/25"
+        />
+      ) : sorted.length > 0 ? (
         <Card>
           <CardHeader>
             <CardTitle>All assignments</CardTitle>
@@ -89,20 +94,19 @@ export default function AssignmentsPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
-                    <th className="px-5 py-3 font-medium">Assignment</th>
-                    <th className="px-5 py-3 font-medium">Course</th>
-                    <th className="px-5 py-3 font-medium">Status</th>
-                    <th className="px-5 py-3 font-medium">Due date</th>
-                    <th className="px-5 py-3 font-medium">Score</th>
-                    <th className="px-5 py-3 font-medium" />
+                  <tr className="border-b border-border bg-muted/40 text-left text-sm text-muted-foreground">
+                    <th className="px-5 py-3.5 font-medium">Assignment</th>
+                    <th className="px-5 py-3.5 font-medium">Course</th>
+                    <th className="px-5 py-3.5 font-medium">Status</th>
+                    <th className="px-5 py-3.5 font-medium">Due date</th>
+                    <th className="px-5 py-3.5 font-medium">Score</th>
+                    <th className="px-5 py-3.5 font-medium" />
                   </tr>
                 </thead>
                 <tbody>
                   {sorted.map((assignment, i) => {
                     const config = statusConfig[assignment.status];
                     const StatusIcon = config.icon;
-                    const overdue = isOverdue(assignment.dueDate, assignment.status);
 
                     return (
                       <motion.tr
@@ -120,32 +124,26 @@ export default function AssignmentsPage() {
                             <div>
                               <p className="font-medium">{assignment.title}</p>
                               {assignment.submittedAt && (
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="text-xs text-muted-foreground">
                                   Submitted {format(new Date(assignment.submittedAt), "MMM d, yyyy")}
                                 </p>
                               )}
                             </div>
                           </div>
                         </td>
-                        <td className="px-5 py-4">
-                          <Link
-                            href={`/dashboard/courses/${assignment.courseId}`}
-                            className="text-muted-foreground transition hover:text-primary"
-                          >
-                            {assignment.courseTitle}
-                          </Link>
-                        </td>
+                        <td className="px-5 py-4 text-muted-foreground">{assignment.courseTitle}</td>
                         <td className="px-5 py-4">
                           <Badge variant={config.variant} className="gap-1 capitalize">
                             <StatusIcon className="h-3 w-3" />
                             {config.label}
                           </Badge>
-                          {overdue && assignment.status === "pending" && (
-                            <Badge variant="destructive" className="ml-1.5">Overdue</Badge>
-                          )}
                         </td>
                         <td className="px-5 py-4">
-                          <span className={cn(assignment.status === "overdue" && "text-destructive font-medium")}>
+                          <span
+                            className={cn(
+                              assignment.status === "overdue" && "font-medium text-destructive"
+                            )}
+                          >
                             {format(new Date(assignment.dueDate), "MMM d, yyyy")}
                           </span>
                         </td>
@@ -159,17 +157,17 @@ export default function AssignmentsPage() {
                           )}
                         </td>
                         <td className="px-5 py-4 text-right">
-                          {assignment.status === "pending" || assignment.status === "overdue" ? (
-                            <Button size="sm">Submit</Button>
-                          ) : assignment.status === "graded" ? (
-                            <Button variant="ghost" size="sm" className="gap-1">
-                              View <ExternalLink className="h-3 w-3" />
-                            </Button>
-                          ) : (
-                            <Button variant="outline" size="sm">
-                              View
-                            </Button>
-                          )}
+                          <Button asChild size="sm" variant={assignment.status === "pending" || assignment.status === "overdue" ? "default" : "outline"}>
+                            <Link href={`/dashboard/assignments/${assignment.id}`}>
+                              {assignment.status === "pending" || assignment.status === "overdue"
+                                ? "Submit"
+                                : (
+                                  <>
+                                    View <ExternalLink className="h-3 w-3" />
+                                  </>
+                                )}
+                            </Link>
+                          </Button>
                         </td>
                       </motion.tr>
                     );
@@ -182,7 +180,7 @@ export default function AssignmentsPage() {
       ) : (
         <EmptyState
           title="No assignments"
-          description="You don't have any assignments at the moment."
+          description="You don't have any published assignments at the moment."
         />
       )}
     </div>

@@ -22,10 +22,16 @@ const PRESETS = [
   },
 ] as const;
 
+const isDevLoginUi = process.env.NODE_ENV !== "production";
+
 export function LoginForm() {
   const router = useRouter();
-  const [email, setEmail] = React.useState(PRESETS[0].email);
-  const [password, setPassword] = React.useState(DEV_PASSWORD);
+  const [email, setEmail] = React.useState<string>(
+    isDevLoginUi ? PRESETS[0].email : ""
+  );
+  const [password, setPassword] = React.useState(
+    isDevLoginUi ? DEV_PASSWORD : ""
+  );
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
 
@@ -64,28 +70,32 @@ export function LoginForm() {
             Nexus
           </h1>
           <p className="max-w-sm text-sm text-muted-foreground">
-            Sign in to continue. Use Admin or Employee presets below to test the career loop.
+            {isDevLoginUi
+              ? "Sign in to continue. Use Admin or Employee presets below to test the career loop."
+              : "Sign in to continue."}
           </p>
         </div>
       </div>
 
-      <div className="flex w-full max-w-sm gap-2">
-        {PRESETS.map((p) => (
-          <Button
-            key={p.email}
-            type="button"
-            variant={email === p.email ? "default" : "outline"}
-            className="flex-1"
-            onClick={() => {
-              setEmail(p.email);
-              setPassword(DEV_PASSWORD);
-              setError(null);
-            }}
-          >
-            {p.label}
-          </Button>
-        ))}
-      </div>
+      {isDevLoginUi ? (
+        <div className="flex w-full max-w-sm gap-2">
+          {PRESETS.map((p) => (
+            <Button
+              key={p.email}
+              type="button"
+              variant={email === p.email ? "default" : "outline"}
+              className="flex-1"
+              onClick={() => {
+                setEmail(p.email);
+                setPassword(DEV_PASSWORD);
+                setError(null);
+              }}
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
 
       <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
         <div className="space-y-2 text-left">
@@ -128,20 +138,22 @@ export function LoginForm() {
         </Button>
       </form>
 
-      <div className="w-full max-w-sm space-y-3 rounded-2xl bg-pastel-purple px-4 py-3 text-left text-xs text-muted-foreground">
-        <p className="font-semibold text-foreground">Test accounts (password: nexus123)</p>
-        {PRESETS.map((p) => (
-          <div key={p.email}>
-            <p className="font-medium text-foreground">{p.label}</p>
-            <p className="font-mono">{p.email}</p>
-            <p>{p.hint}</p>
-          </div>
-        ))}
-        <p className="pt-1">
-          Any seeded <span className="font-mono">*@nexus.local</span> employee works with the same
-          password.
-        </p>
-      </div>
+      {isDevLoginUi ? (
+        <div className="w-full max-w-sm space-y-3 rounded-2xl bg-pastel-purple px-4 py-3 text-left text-xs text-muted-foreground">
+          <p className="font-semibold text-foreground">Test accounts (password: nexus123)</p>
+          {PRESETS.map((p) => (
+            <div key={p.email}>
+              <p className="font-medium text-foreground">{p.label}</p>
+              <p className="font-mono">{p.email}</p>
+              <p>{p.hint}</p>
+            </div>
+          ))}
+          <p className="pt-1">
+            Any seeded <span className="font-mono">*@nexus.local</span> employee works with the same
+            password.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

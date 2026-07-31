@@ -16,6 +16,7 @@ import {
   Route,
   Shield,
   TrendingUp,
+  UserRoundSearch,
   Users,
 } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
@@ -33,6 +34,8 @@ import { formatNumber } from "@/lib/utils";
 const fade = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
 
 const quickLinks = [
+  { title: "Employee Progress", description: "Search employees and review learning progress dashboards", href: "/dashboard/admin/employee-progress", icon: UserRoundSearch },
+  { title: "Catalog Audit", description: "Validate course URLs and intro videos vs catalog", href: "/dashboard/admin/catalog-audit", icon: ClipboardCheck },
   { title: "Promotions", description: "See who is eligible and approve level advances", href: "/dashboard/admin/promotions", icon: TrendingUp },
   { title: "Course Management", description: "Create, publish, and archive department courses", href: "/dashboard/admin/courses", icon: Folders },
   { title: "User Management", description: "Invite users, assign roles, and manage access", href: "/dashboard/admin/users", icon: Users },
@@ -115,28 +118,28 @@ export default function AdminPage() {
           value={formatNumber(snapshot.totalUsers)}
           icon={Users}
           subtitle={`${snapshot.activeUsers} active · ${snapshot.departments.length} departments`}
-          accent="#0D9488"
+          accent="success"
         />
         <StatCard
           title="Active Courses"
           value={snapshot.publishedCourses}
           icon={BookOpen}
           subtitle={`${snapshot.publishedAssessments} assessments`}
-          accent="#0284C7"
+          accent="info"
         />
         <StatCard
           title="Learning Hours"
           value={formatNumber(Math.round(snapshot.completedLessons * 0.5))}
           icon={Clock}
           subtitle={`${formatNumber(snapshot.completedLessons)} lessons completed`}
-          accent="#059669"
+          accent="success"
         />
         <StatCard
           title="Completion Rate"
           value={`${avgCompletion}%`}
           icon={GraduationCap}
           subtitle={`${formatNumber(snapshot.certificatesEarned)} certificates`}
-          accent="#CA8A04"
+          accent="warning"
         />
       </motion.section>
 

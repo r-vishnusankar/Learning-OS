@@ -17,3 +17,9 @@ export function formatHours(n: number): string {
   if (n < 1) return `${Math.round(n * 60)}m`;
   return `${n.toFixed(n % 1 === 0 ? 0 : 1)}h`;
 }
+
+/** True for in-progress assessment attempt routes: /dashboard/assessments/:id/attempt/:attemptId */
+export function isExamRoute(pathname: string | null) {
+  if (!pathname) return false;
+  return /\/dashboard\/assessments\/[^/]+\/attempt\/[^/]+/.test(pathname);
+}

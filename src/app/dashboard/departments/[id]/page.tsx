@@ -26,7 +26,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { courses, departments, leaderboard } from "@/data/mock";
+import { Skeleton } from "@/components/ui/skeleton";
+import { usePublishedCourses } from "@/hooks/use-courses";
+import { useDepartmentsLive, useLeaderboardLive } from "@/hooks/use-operations";
 import { LEVELS, LEVEL_LABELS } from "@/constants/navigation";
 import { cn, formatNumber } from "@/lib/utils";
 import type { DepartmentId, LearningLevel } from "@/types";
@@ -63,11 +65,15 @@ export default function DepartmentDetailPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
+  const { data: departments = [], isLoading: deptsLoading } = useDepartmentsLive();
+  const { data: leaderboard = [], isLoading: lbLoading } = useLeaderboardLive();
+  const { data: allCourses = [], isLoading: coursesLoading } = usePublishedCourses();
+
   const department = departments.find((d) => d.id === id);
 
   const deptCourses = useMemo(
-    () => (department ? courses.filter((c) => c.department === department.id) : []),
-    [department]
+    () => (department ? allCourses.filter((c) => c.department === department.id) : []),
+    [department, allCourses]
   );
 
   const topPerformers = useMemo(
@@ -78,8 +84,18 @@ export default function DepartmentDetailPage() {
             .sort((a, b) => b.xp - a.xp)
             .slice(0, 5)
         : [],
-    [department]
+    [department, leaderboard]
   );
+
+  if (deptsLoading || lbLoading || coursesLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Department" description="Loading department hub…" />
+        <Skeleton className="h-48 w-full" />
+        <Skeleton className="h-72 w-full" />
+      </div>
+    );
+  }
 
   if (!department) {
     return (
@@ -140,10 +156,10 @@ export default function DepartmentDetailPage() {
       </motion.section>
 
       <motion.section {...fade} transition={{ delay: 0.05 }} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Dept Completion" value={`${department.avgCompletion}%`} icon={CheckCircle2} accent={department.color} />
-        <StatCard title="Available Courses" value={deptCourses.length || department.courseCount} icon={BookOpen} subtitle={`${inProgressCourses} in progress`} accent="#0284C7" />
-        <StatCard title="Completed" value={completedCourses} icon={Award} subtitle="By current user" accent="#D97706" />
-        <StatCard title="Top XP" value={formatNumber(topPerformers[0]?.xp ?? 0)} icon={Trophy} subtitle={topPerformers[0]?.name.split(" ")[0] ?? "—"} accent="#0F766E" />
+        <StatCard title="Dept Completion" value={`${department.avgCompletion}%`} icon={CheckCircle2} accent="primary" />
+        <StatCard title="Available Courses" value={deptCourses.length || department.courseCount} icon={BookOpen} subtitle={`${inProgressCourses} in progress`} accent="info" />
+        <StatCard title="Completed" value={completedCourses} icon={Award} subtitle="By current user" accent="warning" />
+        <StatCard title="Top XP" value={formatNumber(topPerformers[0]?.xp ?? 0)} icon={Trophy} subtitle={topPerformers[0]?.name.split(" ")[0] ?? "—"} accent="success" />
       </motion.section>
 
       <motion.section {...fade} transition={{ delay: 0.1 }}>
@@ -283,7 +299,7 @@ export default function DepartmentDetailPage() {
                 </div>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {courses.slice(0, 2).map((course) => (
+                  {deptCourses.slice(0, 2).map((course) => (
                     <CourseCard key={course.id} course={{ ...course, department: department.id as DepartmentId }} variant="compact" />
                   ))}
                 </div>

@@ -3,18 +3,30 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
+  "inline-flex items-center gap-1 rounded-full border-0 px-3 py-1 text-sm font-medium leading-none tabular-nums transition-colors duration-200",
   {
     variants: {
       variant: {
-        default: "border-transparent bg-primary text-primary-foreground",
-        secondary: "border-transparent bg-secondary text-secondary-foreground",
-        outline: "border-border text-foreground",
-        accent: "border-transparent bg-accent text-accent-foreground",
-        success: "border-transparent bg-success/15 text-success",
-        warning: "border-transparent bg-warning/15 text-warning",
-        info: "border-transparent bg-info/15 text-info",
-        destructive: "border-transparent bg-destructive/15 text-destructive",
+        default: "bg-primary/15 text-primary",
+        secondary: "bg-secondary text-secondary-foreground",
+        outline: "bg-card text-foreground shadow-(--shadow-sm)",
+        accent: "bg-pastel-purple text-primary",
+        /* Status: tint + rely on label/icon in UI (dual-channel) */
+        success: "bg-success/15 text-success-on-light",
+        warning: "bg-warning/15 text-warning-foreground",
+        /** Soft/passive attention (tier 1) — no pending colour token */
+        pending: "bg-pastel-yellow text-pastel-yellow-foreground",
+        info: "bg-info/15 text-info",
+        destructive: "bg-destructive/15 text-destructive",
+        draft: "bg-muted text-muted-foreground",
+        /** Categorical level ramp — violet intensity, not status colours */
+        beginner: "bg-primary/10 text-primary",
+        intermediate: "bg-primary/20 text-primary",
+        advanced: "bg-primary/35 text-primary",
+        expert: "bg-primary-strong text-primary-foreground",
+        /** Learning category — categorical, not status */
+        role: "bg-pastel-blue text-info",
+        goal: "bg-pastel-purple text-primary",
       },
     },
     defaultVariants: { variant: "default" },

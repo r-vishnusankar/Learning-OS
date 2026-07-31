@@ -2,16 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Filter, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { CourseCard } from "@/components/cards/course-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { courses } from "@/data/mock";
-import { DEPARTMENT_LABELS, LEVEL_LABELS } from "@/constants/navigation";
-import type { CourseStatus, DepartmentId, LearningLevel } from "@/types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS } from "@/constants/navigation";
+import { usePublishedCourses } from "@/hooks/use-courses";
+import type { CourseStatus, DepartmentId, LearningCategory, LearningLevel } from "@/types";
 
 const fade = {
   initial: { opacity: 0, y: 12 },
@@ -19,18 +19,18 @@ const fade = {
 };
 
 export default function CoursesPage() {
+  const { data: courses = [], isLoading } = usePublishedCourses();
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState<DepartmentId | "all">("all");
   const [level, setLevel] = useState<LearningLevel | "all">("all");
   const [status, setStatus] = useState<CourseStatus | "all">("all");
+  const [learningCategory, setLearningCategory] = useState<LearningCategory | "all">("all");
   const [tab, setTab] = useState("all");
 
   const filtered = useMemo(() => {
     let result = [...courses];
-
     if (tab === "in_progress") result = result.filter((c) => c.status === "in_progress");
     else if (tab === "completed") result = result.filter((c) => c.status === "completed");
-
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -43,9 +43,11 @@ export default function CoursesPage() {
     if (department !== "all") result = result.filter((c) => c.department === department);
     if (level !== "all") result = result.filter((c) => c.level === level);
     if (status !== "all") result = result.filter((c) => c.status === status);
-
+    if (learningCategory !== "all") {
+      result = result.filter((c) => c.learningCategory === learningCategory);
+    }
     return result;
-  }, [search, department, level, status, tab]);
+  }, [courses, search, department, level, status, learningCategory, tab]);
 
   const counts = {
     all: courses.length,
@@ -56,18 +58,27 @@ export default function CoursesPage() {
   const departments = Object.entries(DEPARTMENT_LABELS) as [DepartmentId, string][];
   const levels = Object.entries(LEVEL_LABELS) as [LearningLevel, string][];
 
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-48" />
+        <div className="grid gap-4 md:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-64 rounded-3xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Course Catalog"
-        description="Browse the full library of enterprise courses across all departments."
+        description="Browse live courses from your organization library."
       />
 
-      <motion.div
-        {...fade}
-        transition={{ duration: 0.35 }}
-        className="rounded-xl border border-border bg-card p-4 shadow-(--shadow-sm)"
-      >
+      <motion.div {...fade} className="rounded-xl border border-border bg-card p-4 shadow-(--shadow-sm)">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -78,95 +89,59 @@ export default function CoursesPage() {
               className="pl-9"
             />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Filter className="h-3.5 w-3.5" />
-            </div>
-            <select
-              value={department}
-              onChange={(e) => setDepartment(e.target.value as DepartmentId | "all")}
-              className="h-9 rounded-lg border border-input bg-card px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="all">All departments</option>
-              {departments.map(([id, label]) => (
-                <option key={id} value={id}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={level}
-              onChange={(e) => setLevel(e.target.value as LearningLevel | "all")}
-              className="h-9 rounded-lg border border-input bg-card px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="all">All levels</option>
-              {levels.map(([id, label]) => (
-                <option key={id} value={id}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as CourseStatus | "all")}
-              className="h-9 rounded-lg border border-input bg-card px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="all">All statuses</option>
-              <option value="not_started">Not started</option>
-              <option value="in_progress">In progress</option>
-              <option value="completed">Completed</option>
-            </select>
-          </div>
+          <select
+            className="h-11 rounded-2xl border border-input bg-card px-3 text-sm"
+            value={department}
+            onChange={(e) => setDepartment(e.target.value as DepartmentId | "all")}
+          >
+            <option value="all">All departments</option>
+            {departments.map(([id, label]) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="h-11 rounded-2xl border border-input bg-card px-3 text-sm"
+            value={level}
+            onChange={(e) => setLevel(e.target.value as LearningLevel | "all")}
+          >
+            <option value="all">All levels</option>
+            {levels.map(([id, label]) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="h-11 rounded-2xl border border-input bg-card px-3 text-sm"
+            value={learningCategory}
+            onChange={(e) => setLearningCategory(e.target.value as LearningCategory | "all")}
+          >
+            <option value="all">All categories</option>
+            <option value="role">{LEARNING_CATEGORY_LABELS.role}</option>
+            <option value="goal">{LEARNING_CATEGORY_LABELS.goal}</option>
+          </select>
         </div>
       </motion.div>
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="all">
-            All <Badge variant="secondary" className="ml-1.5">{counts.all}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="in_progress">
-            In Progress <Badge variant="secondary" className="ml-1.5">{counts.in_progress}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="completed">
-            Completed <Badge variant="secondary" className="ml-1.5">{counts.completed}</Badge>
-          </TabsTrigger>
+          <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
+          <TabsTrigger value="in_progress">In progress ({counts.in_progress})</TabsTrigger>
+          <TabsTrigger value="completed">Completed ({counts.completed})</TabsTrigger>
         </TabsList>
-
-        {(["all", "in_progress", "completed"] as const).map((tabValue) => (
-          <TabsContent key={tabValue} value={tabValue}>
-            {filtered.length > 0 ? (
-              <motion.div
-                {...fade}
-                transition={{ duration: 0.35 }}
-                className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-              >
-                {filtered.map((course, i) => (
-                  <motion.div
-                    key={course.id}
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.04, duration: 0.3 }}
-                  >
-                    <CourseCard course={course} />
-                  </motion.div>
-                ))}
-              </motion.div>
-            ) : (
-              <EmptyState
-                title="No courses match your filters"
-                description="Try changing your search or filter criteria."
-                actionLabel="Reset filters"
-                onAction={() => {
-                  setSearch("");
-                  setDepartment("all");
-                  setLevel("all");
-                  setStatus("all");
-                }}
-              />
-            )}
-          </TabsContent>
-        ))}
+        <TabsContent value={tab} className="mt-6">
+          {filtered.length === 0 ? (
+            <EmptyState title="No courses found" description="Try adjusting filters or check back later." />
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              {filtered.map((course) => (
+                <CourseCard key={course.id} course={course} />
+              ))}
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
     </div>
   );

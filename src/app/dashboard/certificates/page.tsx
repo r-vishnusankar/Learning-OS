@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
+  AlertTriangle,
   Award,
   Download,
   ExternalLink,
@@ -18,36 +19,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { certificates } from "@/data/mock";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CertificateQr } from "@/components/certificates/qr-code";
 import { APP_NAME, DEPARTMENT_LABELS, LEVEL_LABELS } from "@/constants/navigation";
+import { useLearnerCertificates } from "@/hooks/use-certification";
+import { useCurrentUser } from "@/hooks/use-me";
+import { openCertificatePrintWindow } from "@/lib/certificate-pdf";
 import type { Certificate, CertificateStatus } from "@/types";
 import { cn } from "@/lib/utils";
-
-function QrPlaceholder({ className }: { className?: string }) {
-  const pattern = [
-    [1, 1, 1, 0, 1, 0, 1, 1, 1],
-    [1, 0, 1, 1, 0, 1, 1, 0, 1],
-    [1, 1, 1, 0, 1, 1, 1, 1, 1],
-    [0, 1, 0, 1, 0, 1, 0, 1, 0],
-    [1, 0, 1, 1, 1, 0, 1, 0, 1],
-    [0, 1, 1, 0, 1, 1, 0, 1, 0],
-    [1, 1, 1, 1, 0, 1, 1, 1, 1],
-    [1, 0, 0, 1, 1, 0, 0, 0, 1],
-    [1, 1, 1, 0, 1, 1, 1, 1, 1],
-  ];
-
-  return (
-    <svg viewBox="0 0 90 90" className={cn("h-16 w-16 shrink-0", className)} aria-hidden>
-      {pattern.map((row, y) =>
-        row.map((cell, x) =>
-          cell ? (
-            <rect key={`${x}-${y}`} x={x * 10} y={y * 10} width={10} height={10} fill="currentColor" />
-          ) : null
-        )
-      )}
-    </svg>
-  );
-}
 
 function CertificateSeal({ status }: { status: CertificateStatus }) {
   return (
@@ -66,33 +45,34 @@ function CertificateSeal({ status }: { status: CertificateStatus }) {
   );
 }
 
-function CertificatePreviewCard({ cert }: { cert: Certificate }) {
+function CertificatePreviewCard({
+  cert,
+  holderName,
+}: {
+  cert: Certificate;
+  holderName: string;
+}) {
   const isEarned = cert.status === "earned";
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const verifyUrl = `${origin}/verify/${cert.credentialId}`;
 
   const handleDownload = () => {
-    toast.success("Certificate PDF downloaded", {
-      description: `${cert.title} · ${cert.credentialId}`,
+    const ok = openCertificatePrintWindow({
+      title: cert.title,
+      holderName,
+      credentialId: cert.credentialId,
+      department: DEPARTMENT_LABELS[cert.department] ?? cert.department,
+      level: LEVEL_LABELS[cert.level] ?? cert.level,
+      score: cert.score,
+      issuedAt: cert.issuedAt,
+      verifyUrl,
     });
-  };
-
-  const handleVerify = () => {
-    toast.info("Verification initiated", {
-      description: `Checking credential ${cert.credentialId} on Nexus registry…`,
-    });
-  };
-
-  const handleShare = () => {
-    toast.success("LinkedIn share opened", {
-      description: "Your certificate is ready to post to your profile.",
-    });
+    if (ok) toast.success("Print dialog opened — save as PDF");
+    else toast.error("Allow pop-ups to download the certificate PDF");
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35 }}
-    >
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
       <Card
         className={cn(
           "group relative overflow-hidden transition hover:shadow-lg",
@@ -121,7 +101,13 @@ function CertificatePreviewCard({ cert }: { cert: Certificate }) {
                 {cert.title}
               </h3>
             </div>
-            <QrPlaceholder className="text-foreground/80" />
+            {isEarned && cert.credentialId !== "PENDING" ? (
+              <CertificateQr value={verifyUrl} size={64} className="shrink-0" />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded bg-muted text-muted-foreground">
+                <Lock className="h-5 w-5" />
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -135,7 +121,7 @@ function CertificatePreviewCard({ cert }: { cert: Certificate }) {
               <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                 Credential ID
               </p>
-              <p className="mt-0.5 font-mono text-xs font-medium">{cert.credentialId}</p>
+              <p className="mt-0.5 font-code text-xs">{cert.credentialId}</p>
             </div>
 
             {cert.issuedAt && (
@@ -145,7 +131,7 @@ function CertificatePreviewCard({ cert }: { cert: Certificate }) {
             {cert.status === "locked" && (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Lock className="h-3.5 w-3.5" />
-                Complete prerequisites to unlock
+                Complete the learning path to unlock
               </p>
             )}
 
@@ -158,7 +144,7 @@ function CertificatePreviewCard({ cert }: { cert: Certificate }) {
 
             <div className="flex flex-wrap gap-1">
               {cert.skills.map((skill) => (
-                <Badge key={skill} variant="outline" className="text-[10px]">
+                <Badge key={skill} variant="outline" className="text-xs">
                   {skill}
                 </Badge>
               ))}
@@ -172,11 +158,21 @@ function CertificatePreviewCard({ cert }: { cert: Certificate }) {
               <Button size="sm" variant="outline" className="gap-1.5" onClick={handleDownload}>
                 <Download className="h-3.5 w-3.5" /> PDF
               </Button>
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={handleVerify}>
-                <ShieldCheck className="h-3.5 w-3.5" /> Verify
+              <Button asChild size="sm" variant="outline" className="gap-1.5">
+                <Link href={`/verify/${cert.credentialId}`}>
+                  <ShieldCheck className="h-3.5 w-3.5" /> Verify
+                </Link>
               </Button>
-              <Button size="sm" variant="default" className="gap-1.5" onClick={handleShare}>
-                <Share2 className="h-3.5 w-3.5" /> LinkedIn
+              <Button
+                size="sm"
+                variant="default"
+                className="gap-1.5"
+                onClick={() => {
+                  navigator.clipboard.writeText(verifyUrl);
+                  toast.success("Share link copied");
+                }}
+              >
+                <Share2 className="h-3.5 w-3.5" /> Share
               </Button>
             </>
           ) : (
@@ -199,10 +195,16 @@ function CertificatePreviewCard({ cert }: { cert: Certificate }) {
   );
 }
 
-function CertificateGrid({ items, emptyTitle, emptyDescription }: {
+function CertificateGrid({
+  items,
+  emptyTitle,
+  emptyDescription,
+  holderName,
+}: {
   items: Certificate[];
   emptyTitle: string;
   emptyDescription: string;
+  holderName: string;
 }) {
   if (items.length === 0) {
     return (
@@ -217,13 +219,16 @@ function CertificateGrid({ items, emptyTitle, emptyDescription }: {
   return (
     <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
       {items.map((cert) => (
-        <CertificatePreviewCard key={cert.id} cert={cert} />
+        <CertificatePreviewCard key={cert.id} cert={cert} holderName={holderName} />
       ))}
     </div>
   );
 }
 
 export default function CertificatesPage() {
+  const { data: certificates = [], isLoading, isError: certificatesError } = useLearnerCertificates();
+  const { data: user } = useCurrentUser();
+  const holderName = user?.name ?? "Learner";
   const earned = certificates.filter((c) => c.status === "earned");
   const locked = certificates.filter((c) => c.status === "locked");
   const pending = certificates.filter((c) => c.status === "pending");
@@ -234,48 +239,58 @@ export default function CertificatesPage() {
         title="Certificates"
         description="Your earned credentials, pending certifications, and unlockable achievements."
       >
-        <Badge variant="success" className="gap-1">
-          <Award className="h-3.5 w-3.5" /> {earned.length} earned
-        </Badge>
+        {!isLoading && !certificatesError && (
+          <Badge variant="success" className="gap-1">
+            <Award className="h-3.5 w-3.5" /> {earned.length} earned
+          </Badge>
+        )}
       </PageHeader>
 
-      <Tabs defaultValue="earned">
-        <TabsList>
-          <TabsTrigger value="earned">
-            Earned ({earned.length})
-          </TabsTrigger>
-          <TabsTrigger value="locked">
-            Locked ({locked.length})
-          </TabsTrigger>
-          <TabsTrigger value="pending">
-            Pending ({pending.length})
-          </TabsTrigger>
-        </TabsList>
+      {isLoading ? (
+        <Skeleton className="h-64 w-full" />
+      ) : certificatesError ? (
+        <EmptyState
+          icon={<AlertTriangle className="h-6 w-6 stroke-[1.75]" />}
+          title="Couldn't load certificates"
+          description="Certificates could not be loaded — this list may be incomplete."
+          className="ring-1 ring-warning/25"
+        />
+      ) : (
+        <Tabs defaultValue="earned">
+          <TabsList>
+            <TabsTrigger value="earned">Earned ({earned.length})</TabsTrigger>
+            <TabsTrigger value="locked">Locked ({locked.length})</TabsTrigger>
+            <TabsTrigger value="pending">Pending ({pending.length})</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="earned">
-          <CertificateGrid
-            items={earned}
-            emptyTitle="No certificates earned yet"
-            emptyDescription="Complete assessments and learning paths to earn your first credential."
-          />
-        </TabsContent>
+          <TabsContent value="earned">
+            <CertificateGrid
+              items={earned}
+              holderName={holderName}
+              emptyTitle="No certificates earned yet"
+              emptyDescription="Pass an assessment or complete a learning path to earn a credential."
+            />
+          </TabsContent>
 
-        <TabsContent value="locked">
-          <CertificateGrid
-            items={locked}
-            emptyTitle="No locked certificates"
-            emptyDescription="All available certificates are either earned or in progress."
-          />
-        </TabsContent>
+          <TabsContent value="locked">
+            <CertificateGrid
+              items={locked}
+              holderName={holderName}
+              emptyTitle="No locked certificates"
+              emptyDescription="All available certificates are either earned or in progress."
+            />
+          </TabsContent>
 
-        <TabsContent value="pending">
-          <CertificateGrid
-            items={pending}
-            emptyTitle="No pending certificates"
-            emptyDescription="Certificates awaiting review will appear here."
-          />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="pending">
+            <CertificateGrid
+              items={pending}
+              holderName={holderName}
+              emptyTitle="No pending certificates"
+              emptyDescription="Certificates awaiting review will appear here."
+            />
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }

@@ -22,6 +22,10 @@ function defaultAvatar(name: string) {
  * Production should use Entra SSO only.
  */
 export async function authenticateDevUser(email: string, password: string) {
+  if (process.env.NODE_ENV === "production") {
+    return null;
+  }
+
   const dev = getDevCredentials();
   const normalized = email.trim().toLowerCase();
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 import { motion } from "framer-motion";
 import {
   Award,
@@ -19,10 +20,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { achievements, currentUser, leaderboard } from "@/data/mock";
+import { achievements } from "@/data/mock";
 import { DEPARTMENT_LABELS } from "@/constants/navigation";
+import { useLeaderboardLive } from "@/hooks/use-operations";
 import { cn, formatNumber } from "@/lib/utils";
 import type { Achievement, LeaderboardEntry } from "@/types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const fade = {
   initial: { opacity: 0, y: 12 },
@@ -50,7 +53,7 @@ const rarityStyles: Record<Achievement["rarity"], { badge: string; border: strin
 const podiumConfig = [
   { place: 2, height: "h-28", medal: "text-muted-foreground", delay: 0.15 },
   { place: 1, height: "h-36", medal: "text-warning", delay: 0 },
-  { place: 3, height: "h-24", medal: "text-[#B45309]", delay: 0.3 },
+  { place: 3, height: "h-24", medal: "text-medal-bronze", delay: 0.3 },
 ];
 
 function rerank(entries: LeaderboardEntry[]): LeaderboardEntry[] {
@@ -59,7 +62,7 @@ function rerank(entries: LeaderboardEntry[]): LeaderboardEntry[] {
     .map((e, i) => ({ ...e, rank: i + 1 }));
 }
 
-function Podium({ entries }: { entries: LeaderboardEntry[] }) {
+function Podium({ entries, currentUserId }: { entries: LeaderboardEntry[]; currentUserId?: string }) {
   const top3 = entries.slice(0, 3);
   const ordered = [top3[1], top3[0], top3[2]].filter(Boolean);
 
@@ -68,7 +71,7 @@ function Podium({ entries }: { entries: LeaderboardEntry[] }) {
       {ordered.map((entry, idx) => {
         const config = podiumConfig[idx];
         if (!entry || !config) return null;
-        const isCurrentUser = entry.userId === currentUser.id;
+        const isCurrentUser = entry.userId === currentUserId;
 
         return (
           <motion.div
@@ -90,7 +93,7 @@ function Podium({ entries }: { entries: LeaderboardEntry[] }) {
             <p className="truncate text-center text-sm font-semibold">{entry.name.split(" ")[0]}</p>
             <p className="text-xs text-muted-foreground">{formatNumber(entry.xp)} XP</p>
             {isCurrentUser && (
-              <Badge className="mt-1 bg-accent text-accent-foreground">You</Badge>
+              <Badge className="mt-1 bg-pastel-purple text-primary">You</Badge>
             )}
             <motion.div
               initial={{ height: 0 }}
@@ -107,7 +110,13 @@ function Podium({ entries }: { entries: LeaderboardEntry[] }) {
   );
 }
 
-function LeaderboardTable({ entries }: { entries: LeaderboardEntry[] }) {
+function LeaderboardTable({
+  entries,
+  currentUserId,
+}: {
+  entries: LeaderboardEntry[];
+  currentUserId?: string;
+}) {
   return (
     <div className="overflow-hidden rounded-xl border border-border">
       <div className="grid grid-cols-[auto_1fr_repeat(4,minmax(0,auto))] gap-3 border-b border-border bg-muted/50 px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground max-md:hidden">
@@ -120,7 +129,7 @@ function LeaderboardTable({ entries }: { entries: LeaderboardEntry[] }) {
       </div>
       <div className="divide-y divide-border">
         {entries.map((entry) => {
-          const isCurrentUser = entry.userId === currentUser.id;
+          const isCurrentUser = entry.userId === currentUserId;
           return (
             <motion.div
               key={entry.userId}
@@ -143,7 +152,7 @@ function LeaderboardTable({ entries }: { entries: LeaderboardEntry[] }) {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">
                     {entry.name}
-                    {isCurrentUser && <Badge className="ml-2 bg-accent text-accent-foreground">You</Badge>}
+                    {isCurrentUser && <Badge className="ml-2 bg-pastel-purple text-primary">You</Badge>}
                   </p>
                   <p className="text-xs text-muted-foreground">{DEPARTMENT_LABELS[entry.department]}</p>
                 </div>
@@ -166,12 +175,25 @@ function LeaderboardTable({ entries }: { entries: LeaderboardEntry[] }) {
 
 export default function LeaderboardPage() {
   const [tab, setTab] = useState("company");
+  const { data: session } = useSession();
+  const { data: leaderboard = [], isLoading } = useLeaderboardLive();
+  const department = (session?.user?.department ?? "development") as LeaderboardEntry["department"];
+  const userId = session?.user?.id;
 
-  const companyEntries = useMemo(() => leaderboard, []);
+  const companyEntries = useMemo(() => leaderboard, [leaderboard]);
   const departmentEntries = useMemo(
-    () => rerank(leaderboard.filter((e) => e.department === currentUser.department)),
-    []
+    () => rerank(leaderboard.filter((e) => e.department === department)),
+    [leaderboard, department]
   );
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Leaderboard" description="Loading rankings…" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -180,7 +202,7 @@ export default function LeaderboardPage() {
         description="Celebrate top learners across the company and within your department."
       >
         <Badge variant="secondary" className="gap-1">
-          <Trophy className="h-3 w-3" /> Rank #{currentUser.companyRank} company
+          <Trophy className="h-3 w-3" /> Live XP rankings
         </Badge>
       </PageHeader>
 
@@ -189,10 +211,10 @@ export default function LeaderboardPage() {
           <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-linear-to-b from-primary/5 to-transparent" />
           <CardHeader className="text-center">
             <CardTitle className="font-display text-xl">Top performers</CardTitle>
-            <CardDescription>Company-wide podium · updated daily</CardDescription>
+            <CardDescription>Company-wide podium · live from Neon</CardDescription>
           </CardHeader>
           <CardContent>
-            <Podium entries={companyEntries} />
+            <Podium entries={companyEntries} currentUserId={userId} />
           </CardContent>
         </Card>
       </motion.section>
@@ -211,7 +233,7 @@ export default function LeaderboardPage() {
                 <CardDescription>All learners ranked by XP earned</CardDescription>
               </CardHeader>
               <CardContent>
-                <LeaderboardTable entries={companyEntries} />
+                <LeaderboardTable entries={companyEntries} currentUserId={userId} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -219,13 +241,11 @@ export default function LeaderboardPage() {
           <TabsContent value="department">
             <Card>
               <CardHeader>
-                <CardTitle>{DEPARTMENT_LABELS[currentUser.department]} rankings</CardTitle>
-                <CardDescription>
-                  Your department rank: #{currentUser.departmentRank}
-                </CardDescription>
+                <CardTitle>{DEPARTMENT_LABELS[department]} rankings</CardTitle>
+                <CardDescription>Filtered to your department</CardDescription>
               </CardHeader>
               <CardContent>
-                <LeaderboardTable entries={departmentEntries} />
+                <LeaderboardTable entries={departmentEntries} currentUserId={userId} />
               </CardContent>
             </Card>
           </TabsContent>

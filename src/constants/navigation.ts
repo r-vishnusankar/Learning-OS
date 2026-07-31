@@ -35,6 +35,11 @@ export const DEPARTMENT_LABELS: Record<string, string> = {
   devops: "DevOps",
 };
 
+export const LEARNING_CATEGORY_LABELS: Record<"role" | "goal", string> = {
+  role: "Role based",
+  goal: "Goal Based",
+};
+
 export const SIDEBAR_NAV: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
   { title: "My Learning", href: "/dashboard/learning", icon: "BookOpen" },
@@ -46,15 +51,16 @@ export const SIDEBAR_NAV: NavItem[] = [
   { title: "Certificates", href: "/dashboard/certificates", icon: "Award" },
   { title: "Skill Matrix", href: "/dashboard/skills", icon: "Radar" },
   { title: "Leaderboard", href: "/dashboard/leaderboard", icon: "Trophy" },
-  { title: "Reports", href: "/dashboard/analytics", icon: "BarChart3" },
   { title: "Calendar", href: "/dashboard/calendar", icon: "Calendar" },
-  { title: "AI Mentor", href: "/dashboard/ai-mentor", icon: "Sparkles" },
+  { title: "Help", href: "/dashboard/help", icon: "HelpCircle" },
   { title: "Notifications", href: "/dashboard/notifications", icon: "Bell" },
   { title: "Settings", href: "/dashboard/settings", icon: "Settings" },
 ];
 
 export const ADMIN_NAV: NavItem[] = [
   { title: "Admin Overview", href: "/dashboard/admin", icon: "Shield" },
+  { title: "Catalog Audit", href: "/dashboard/admin/catalog-audit", icon: "ClipboardCheck" },
+  { title: "Employee Progress", href: "/dashboard/admin/employee-progress", icon: "UserRoundSearch" },
   { title: "Promotions", href: "/dashboard/admin/promotions", icon: "Award" },
   { title: "Course Management", href: "/dashboard/admin/courses", icon: "Folders" },
   { title: "Course Assignments", href: "/dashboard/admin/course-assignments", icon: "Users" },

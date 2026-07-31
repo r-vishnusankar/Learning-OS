@@ -6,7 +6,8 @@ import { MessageSquare, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUIStore } from "@/store/ui-store";
 import { MarkdownMessage } from "@/components/ai/markdown-message";
-import { cn } from "@/lib/utils";
+import { cn, isExamRoute } from "@/lib/utils";
+import { usePathname } from "next/navigation";
 
 const suggestions = [
   "Summarize my current course",
@@ -18,13 +19,14 @@ const suggestions = [
 type Msg = { role: "user" | "assistant"; content: string };
 
 export function AiAssistant() {
+  const pathname = usePathname();
   const { aiOpen, setAiOpen } = useUIStore();
   const [input, setInput] = React.useState("");
   const [messages, setMessages] = React.useState<Msg[]>([
     {
       role: "assistant",
       content:
-        "Hi Alex — I'm your Nexus AI Mentor. I can summarize lessons, recommend paths, generate quizzes, and help with career guidance.",
+        "Hi — I'm your Nexus AI Mentor. I can summarize lessons, recommend paths, generate quizzes, and help with career guidance.",
     },
   ]);
 
@@ -39,11 +41,13 @@ export function AiAssistant() {
         {
           role: "assistant",
           content:
-            "Based on your progress in System Design Mastery (64%) and Playwright testing (15%), I recommend finishing the Redis Caching lab today, then scheduling the System Design Certification Exam for next week. Want a 5-question practice quiz?",
+            "This mentor is a preview and isn't connected to your live course data yet. Check back soon for personalized guidance.",
         },
       ]);
     }, 700);
   };
+
+  if (isExamRoute(pathname)) return null;
 
   return (
     <>
@@ -52,7 +56,7 @@ export function AiAssistant() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.96 }}
         onClick={() => setAiOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-br from-[#8759F2] to-[#FF3E80] text-white shadow-lg shadow-primary/30"
+        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-br from-primary-strong to-chart-2 text-primary-foreground shadow-lg shadow-primary/30"
         aria-label="Open AI Mentor"
       >
         <Sparkles className="h-6 w-6" />
@@ -66,7 +70,7 @@ export function AiAssistant() {
             exit={{ opacity: 0, y: 24, scale: 0.96 }}
             className="fixed bottom-24 right-6 z-50 flex h-[520px] w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
           >
-            <div className="flex items-center justify-between border-b bg-linear-to-r from-[#8759F2] to-[#FF3E80] px-4 py-3 text-white">
+            <div className="flex items-center justify-between border-b bg-linear-to-r from-primary-strong to-chart-2 px-4 py-3 text-primary-foreground">
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4" />
                 <div>

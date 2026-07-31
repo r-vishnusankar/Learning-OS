@@ -1,15 +1,16 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
+  AlertTriangle,
   Award,
   BookOpen,
   Clock,
   FileText,
   Flame,
   Play,
-  Sparkles,
   Target,
   Trophy,
   Zap,
@@ -28,7 +29,7 @@ import {
   useLearnerAssignments,
   useLearnerCertificates,
 } from "@/hooks/use-certification";
-import { usePublishedCourses } from "@/hooks/use-courses";
+import { useMyActiveCourses } from "@/hooks/use-courses";
 import { useDashboardHome } from "@/hooks/use-me";
 import { useMyAssignmentStats, useMyCourseAssignments } from "@/hooks/use-course-assignments";
 import { useMyEligibility } from "@/hooks/use-promotions";
@@ -73,24 +74,34 @@ type DueItem = {
 };
 
 export default function DashboardPage() {
-  const { data: home, isLoading: homeLoading } = useDashboardHome();
-  const { data: courses = [] } = usePublishedCourses();
-  const { data: assessments = [] } = useLearnerAssessments();
-  const { data: assignments = [] } = useLearnerAssignments();
+  const { data: home, isLoading: homeLoading, isError: homeError } = useDashboardHome();
+  const { data: courses = [], isLoading: coursesLoading } = useMyActiveCourses(8);
+  const { data: assessments = [], isLoading: assessmentsLoading, isError: assessmentsError } = useLearnerAssessments();
+  const { data: assignments = [], isLoading: assignmentsLoading, isError: assignmentsError } = useLearnerAssignments();
   const { data: certificates = [] } = useLearnerCertificates();
   const { data: courseAssignStats } = useMyAssignmentStats();
-  const { data: myCourseAssignments = [] } = useMyCourseAssignments();
+  const { data: myCourseAssignments = [], isLoading: courseAssignLoading, isError: courseAssignError } =
+    useMyCourseAssignments();
   const { data: eligibility } = useMyEligibility();
+
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
 
   const user = home?.user;
   const stats = home?.stats;
   const continueCourse = courses.find((c) => c.status === "in_progress");
   const myCourses = courses
-    .filter((c) => c.status === "in_progress" || c.status === "completed")
-    .slice(0, 3);
+    .filter(
+      (c) =>
+        (c.status === "in_progress" || c.status === "completed") &&
+        c.id !== continueCourse?.id
+    )
+    .slice(0, 4);
   const earnedCerts = certificates.filter((c) => c.status === "earned").length;
+  const dueLoading = assessmentsLoading || assignmentsLoading || courseAssignLoading;
+  const dueError = assessmentsError || assignmentsError || courseAssignError;
 
-  const dueItems: DueItem[] = (() => {
+  const dueItems: DueItem[] = React.useMemo(() => {
     const items: DueItem[] = [];
 
     for (const a of myCourseAssignments.filter((x) => x.status !== "completed")) {
@@ -143,14 +154,37 @@ export default function DashboardPage() {
 
     const rank = { overdue: 0, soon: 1, open: 2 };
     return items.sort((a, b) => rank[a.urgency] - rank[b.urgency]).slice(0, 6);
-  })();
+  }, [myCourseAssignments, assignments, assessments]);
+
+  if (homeError) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-sm text-muted-foreground">
+          Couldn&apos;t load your dashboard. Refresh to try again — other pages still work.
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (homeLoading || !stats || !user) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-36 w-full rounded-3xl" />
-        <Skeleton className="h-24 w-full rounded-3xl" />
-        <Skeleton className="h-64 w-full rounded-3xl" />
+      <div className="space-y-6">
+        <Skeleton className="h-44 w-full rounded-[28px]" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-[28px]" />
+          ))}
+        </div>
+        <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
+          <div className="space-y-4">
+            <Skeleton className="h-40 w-full rounded-[28px]" />
+            <Skeleton className="h-56 w-full rounded-[28px]" />
+          </div>
+          <div className="space-y-4">
+            <Skeleton className="h-64 w-full rounded-[28px]" />
+            <Skeleton className="h-56 w-full rounded-[28px]" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -159,9 +193,10 @@ export default function DashboardPage() {
   const xp = user.xp ?? 0;
   const xpProg = xpBandProgress(xp);
   const streak = stats.streak ?? 0;
-  const goalPct = Math.round(
-    (stats.todayCompletedMinutes / Math.max(1, stats.todayGoalMinutes)) * 100
-  );
+  const completedMin = stats.todayCompletedMinutes;
+  const goalMin = Math.max(1, stats.todayGoalMinutes);
+  const goalPct = Math.round((completedMin / goalMin) * 100);
+  const goalBarPct = Math.min(100, goalPct);
   const overdueCount =
     (courseAssignStats?.overdue ?? 0) +
     assignments.filter((a) => a.status === "overdue").length;
@@ -176,12 +211,12 @@ export default function DashboardPage() {
   let nudge = `Hit your ${stats.todayGoalMinutes}-minute goal and keep climbing.`;
   if (overdueCount > 0) {
     nudge = `You have ${overdueCount} overdue item${overdueCount === 1 ? "" : "s"} — clear them today.`;
+  } else if (dueSoonCount > 0) {
+    nudge = `${dueSoonCount} assignment${dueSoonCount === 1 ? "" : "s"} due this week. Stay ahead.`;
   } else if (streak === 0) {
     nudge = "Start a streak today — even 15 focused minutes counts.";
   } else if (streak >= 7) {
     nudge = `${streak}-day streak on fire. Don't break it — study a little more.`;
-  } else if (dueSoonCount > 0) {
-    nudge = `${dueSoonCount} assignment${dueSoonCount === 1 ? "" : "s"} due this week. Stay ahead.`;
   } else if (xpBehindTop > 0 && top) {
     nudge = `${formatNumber(xpBehindTop)} XP behind ${top.name.split(" ")[0]} — close the gap.`;
   }
@@ -197,9 +232,8 @@ export default function DashboardPage() {
       {/* Hero: identity + nudge */}
       <motion.section
         {...fade}
-        className="relative overflow-hidden rounded-3xl bg-linear-to-br from-pastel-purple via-card to-pastel-blue p-6 sm:p-8"
+        className="relative overflow-hidden rounded-[28px] bg-card p-6 sm:p-8"
       >
-        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -216,7 +250,7 @@ export default function DashboardPage() {
               )}
             </div>
             <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-              {greetingForHour(new Date().getHours())}, {firstName}
+              {mounted ? greetingForHour(new Date().getHours()) : "Hello"}, {firstName}
             </h1>
             <p className="max-w-xl text-description">{nudge}</p>
             <div className="flex flex-wrap gap-2 pt-1">
@@ -226,15 +260,10 @@ export default function DashboardPage() {
                   {continueCourse ? "Continue learning" : dueItems[0] ? "Start next task" : "Browse learning"}
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="gap-2 bg-card/70">
-                <Link href="/dashboard/ai-mentor">
-                  <Sparkles className="h-4 w-4 stroke-[1.75]" /> Ask AI Mentor
-                </Link>
-              </Button>
             </div>
           </div>
 
-          <div className="w-full max-w-sm rounded-2xl bg-card/80 p-4 shadow-(--shadow-sm) backdrop-blur">
+          <div className="w-full max-w-sm rounded-2xl bg-pastel-purple p-4">
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-sm font-semibold">
                 <Zap className="h-4 w-4 text-primary stroke-[1.75]" />
@@ -244,10 +273,9 @@ export default function DashboardPage() {
             </div>
             <Progress value={xpProg.pct} className="h-2.5" />
             <p className="mt-2 text-caption">
-              Today {stats.todayCompletedMinutes}/{stats.todayGoalMinutes} min · {goalPct}% of daily
-              goal
+              Today {completedMin}/{goalMin} min · {goalPct}% of daily goal
             </p>
-            <Progress value={goalPct} className="mt-1.5 h-1.5" />
+            <Progress value={goalBarPct} className="mt-1.5 h-1.5" />
           </div>
         </div>
       </motion.section>
@@ -290,27 +318,32 @@ export default function DashboardPage() {
                   className="mt-2 h-1.5 max-w-sm"
                 />
               </div>
-              <Button asChild>
-                <Link
-                  href={
-                    eligibility.status === "eligible"
-                      ? "/dashboard/learning"
-                      : eligibility.courses.find((c) => c.state === "assessment_pending")
-                            ?.assessmentId
-                        ? `/dashboard/assessments/${
-                            eligibility.courses.find((c) => c.state === "assessment_pending")!
-                              .assessmentId
-                          }`
-                        : "/dashboard/learning"
-                  }
-                >
-                  {eligibility.status === "eligible"
-                    ? "Waiting for admin approval"
-                    : eligibility.courses.some((c) => c.state === "assessment_pending")
-                      ? "Take assessment"
-                      : "Continue learning"}
-                </Link>
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild>
+                  <Link
+                    href={
+                      eligibility.status === "eligible"
+                        ? "/dashboard/learning"
+                        : eligibility.courses.find((c) => c.state === "assessment_pending")
+                              ?.assessmentId
+                          ? `/dashboard/assessments/${
+                              eligibility.courses.find((c) => c.state === "assessment_pending")!
+                                .assessmentId
+                            }`
+                          : "/dashboard/learning"
+                    }
+                  >
+                    {eligibility.status === "eligible"
+                      ? "Waiting for admin approval"
+                      : eligibility.courses.some((c) => c.state === "assessment_pending")
+                        ? "Take assessment"
+                        : "Continue learning"}
+                  </Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href="/dashboard/help">How this works</Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </motion.section>
@@ -320,7 +353,7 @@ export default function DashboardPage() {
       <motion.section
         {...fade}
         transition={{ delay: 0.04 }}
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5"
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
       >
         {[
           {
@@ -342,21 +375,28 @@ export default function DashboardPage() {
             value: stats.coursesCompleted,
             icon: BookOpen,
             tone: "text-success",
-            hint: `${earnedCerts || stats.certificates} certificates`,
+            hint: `${earnedCerts} certificate${earnedCerts === 1 ? "" : "s"}`,
           },
           {
             label: "Due / overdue",
             value: overdueCount > 0 ? overdueCount : dueSoonCount,
             icon: Target,
-            tone: overdueCount > 0 ? "text-destructive" : "text-pending",
-            hint: overdueCount > 0 ? "Overdue now" : dueSoonCount > 0 ? "Due this week" : "All clear",
+            tone: overdueCount > 0 ? "text-destructive" : "text-pastel-yellow-foreground",
+            hint:
+              overdueCount > 0
+                ? "Overdue now"
+                : dueSoonCount > 0
+                  ? "Due this week"
+                  : dueItems.length === 0
+                    ? "All clear"
+                    : "Open work",
           },
           {
-            label: "Company rank",
-            value: myRank ? `#${myRank}` : "—",
-            icon: Trophy,
+            label: "Avg score",
+            value: `${stats.averageScore}%`,
+            icon: Target,
             tone: "text-primary",
-            hint: `Dept #${stats.departmentRank || "—"}`,
+            hint: stats.averageScore > 0 ? "Across assessments" : "",
           },
         ].map((s) => (
           <Card key={s.label} className="overflow-hidden">
@@ -439,7 +479,27 @@ export default function DashboardPage() {
                 <Link href="/dashboard/learning">View all</Link>
               </Button>
             </div>
-            {dueItems.length === 0 ? (
+            {dueLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full rounded-2xl" />
+                ))}
+              </div>
+            ) : dueError ? (
+              <Card>
+                <CardContent className="flex items-center gap-3 p-5">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning/15 text-warning">
+                    <AlertTriangle className="h-5 w-5 stroke-[1.75]" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Couldn&apos;t load assignments</p>
+                    <p className="text-caption">
+                      Assignments could not be loaded — this list may be incomplete.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : dueItems.length === 0 ? (
               <Card>
                 <CardContent className="flex items-center gap-3 p-5">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success/15 text-success">
@@ -462,14 +522,14 @@ export default function DashboardPage() {
                     className={cn(
                       "flex items-center gap-3 rounded-2xl bg-card px-4 py-3.5 shadow-(--shadow-sm) transition hover:shadow-(--shadow)",
                       item.urgency === "overdue" && "ring-1 ring-destructive/25",
-                      item.urgency === "soon" && "ring-1 ring-pending/20"
+                      item.urgency === "soon" && "ring-1 ring-warning/25"
                     )}
                   >
                     <div
                       className={cn(
                         "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
                         item.kind === "course" && "bg-primary/10 text-primary",
-                        item.kind === "assignment" && "bg-pending/15 text-pending",
+                        item.kind === "assignment" && "bg-pastel-yellow text-pastel-yellow-foreground",
                         item.kind === "assessment" && "bg-info/15 text-info"
                       )}
                     >
@@ -507,7 +567,13 @@ export default function DashboardPage() {
                 <Link href="/dashboard/learning">My Learning</Link>
               </Button>
             </div>
-            {myCourses.length === 0 ? (
+            {coursesLoading ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-[88px] rounded-2xl" />
+                ))}
+              </div>
+            ) : myCourses.length === 0 ? (
               <Card>
                 <CardContent className="p-5 text-sm text-muted-foreground">
                   No courses in progress yet.{" "}
@@ -517,9 +583,9 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {myCourses.map((c) => (
-                  <CourseCard key={c.id} course={c} />
+                  <CourseCard key={c.id} course={c} variant="compact" />
                 ))}
               </div>
             )}
@@ -536,11 +602,14 @@ export default function DashboardPage() {
                     <Trophy className="h-4 w-4 text-primary stroke-[1.75]" /> Race the leaders
                   </CardTitle>
                   <p className="mt-1 text-caption">
-                    {xpBehindTop > 0 && top
-                      ? `${formatNumber(xpBehindTop)} XP behind #1 · Dept rank #${stats.departmentRank || "—"}`
-                      : myRank === 1
-                        ? "You're #1 — defend the lead"
-                        : `Skill score ${stats.skillScore}`}
+                    {leaderboard.slice(0, 5).length > 0 &&
+                    leaderboard.slice(0, 5).every((e) => (e.xp ?? 0) === 0)
+                      ? "Leaderboard is warming up"
+                      : xpBehindTop > 0 && top
+                        ? `${formatNumber(xpBehindTop)} XP behind #1 · Dept rank #${stats.departmentRank || "—"}`
+                        : myRank === 1
+                          ? "You're #1 — defend the lead"
+                          : `Skill score ${stats.skillScore}`}
                   </p>
                 </div>
                 <Button asChild variant="ghost" size="sm">
@@ -590,7 +659,7 @@ export default function DashboardPage() {
                     </div>
                   );
                 })}
-                {meOnBoard == null && myRank > 5 && (
+                {!leaderboard.slice(0, 5).some((e) => e.userId === user.id) && myRank > 0 && (
                   <div className="flex items-center gap-3 rounded-2xl bg-primary/10 px-3 py-2.5 ring-1 ring-primary/20">
                     <span className="w-6 text-center text-xs font-bold text-primary tabular-nums">
                       {myRank}
@@ -624,29 +693,6 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <HoursChart data={home.weeklyHours} />
-              </CardContent>
-            </Card>
-          </motion.section>
-
-          <motion.section {...fade} transition={{ delay: 0.12 }}>
-            <Card className="bg-pastel-pink/60">
-              <CardContent className="space-y-2 p-5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-destructive">
-                  Completions
-                </p>
-                <p className="font-display text-3xl font-semibold tabular-nums">
-                  {stats.coursesCompleted}
-                  <span className="ml-2 text-lg font-medium text-muted-foreground">
-                    courses
-                  </span>
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Avg assessment score {stats.averageScore}% ·{" "}
-                  {earnedCerts || stats.certificates} certificates earned
-                </p>
-                <Button asChild variant="outline" size="sm" className="mt-1 bg-card/80">
-                  <Link href="/dashboard/certificates">View certificates</Link>
-                </Button>
               </CardContent>
             </Card>
           </motion.section>

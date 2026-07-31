@@ -11,7 +11,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { courses, departments, skills, skillGrowth, currentUser } from "@/data/mock";
+import { Skeleton } from "@/components/ui/skeleton";
+import { usePublishedCourses } from "@/hooks/use-courses";
+import { useCurrentUser, useMySkills } from "@/hooks/use-me";
+import { useDepartmentsLive } from "@/hooks/use-operations";
 import { DEPARTMENT_LABELS } from "@/constants/navigation";
 import { cn, formatPercent } from "@/lib/utils";
 import type { Course, Skill } from "@/types";
@@ -22,6 +25,7 @@ const fade = {
 };
 
 function careerReadiness(skillsList: Skill[]) {
+  if (skillsList.length === 0) return { score: 0, gaps: 0 };
   const score = Math.round(
     skillsList.reduce((sum, s) => sum + (s.current / s.target) * 100, 0) / skillsList.length
   );
@@ -29,24 +33,54 @@ function careerReadiness(skillsList: Skill[]) {
   return { score, gaps };
 }
 
-function findCoursesForSkill(skill: Skill): Course[] {
-  return courses.filter(
-    (c) =>
-      c.department === skill.department ||
-      c.tags.some((t) => skill.name.toLowerCase().includes(t.toLowerCase()) || t.toLowerCase().includes(skill.name.split(" ")[0].toLowerCase()))
-  );
+function findCoursesForSkill(skill: Skill, courses: Course[]): Course[] {
+  return courses
+    .filter(
+      (c) =>
+        c.department === skill.department ||
+        c.tags.some(
+          (t) =>
+            skill.name.toLowerCase().includes(t.toLowerCase()) ||
+            t.toLowerCase().includes(skill.name.split(" ")[0].toLowerCase())
+        )
+    )
+    .sort((a, b) => {
+      // Prefer goal-based courses for skill-gap recommendations
+      const rank = (c: Course) => (c.learningCategory === "goal" ? 2 : 0) + c.rating;
+      return rank(b) - rank(a);
+    });
 }
 
 export default function SkillsPage() {
+  const { data: courses = [] } = usePublishedCourses();
+  const { data: user } = useCurrentUser();
+  const { data: skillsData, isLoading } = useMySkills();
+  const { data: departments = [] } = useDepartmentsLive();
+
+  const skills = skillsData?.skills ?? [];
+  const skillGrowth = skillsData?.skillGrowth ?? [];
+  const skillScore = skillsData?.skillScore ?? user?.skillScore ?? 0;
+  const department = skillsData?.department ?? user?.department;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Skill Matrix" description="Loading your skill matrix…" />
+        <Skeleton className="h-48 w-full" />
+        <Skeleton className="h-72 w-full" />
+      </div>
+    );
+  }
+
   const sortedByGap = [...skills].sort((a, b) => b.target - b.current - (a.target - a.current));
   const lowestSkills = sortedByGap.slice(0, 4);
   const readiness = careerReadiness(skills);
-  const maxDeptCompletion = Math.max(...departments.map((d) => d.avgCompletion));
+  const maxDeptCompletion = Math.max(1, ...departments.map((d) => d.avgCompletion));
 
   const recommendations = lowestSkills
     .map((skill) => ({
       skill,
-      courses: findCoursesForSkill(skill).slice(0, 1),
+      courses: findCoursesForSkill(skill, courses).slice(0, 1),
     }))
     .filter((r) => r.courses.length > 0);
 
@@ -56,7 +90,7 @@ export default function SkillsPage() {
         title="Skill Matrix"
         description="Track proficiency gaps, compare departments, and get personalized learning recommendations."
       >
-        <Badge variant="secondary">{DEPARTMENT_LABELS[currentUser.department]}</Badge>
+        {department && <Badge variant="secondary">{DEPARTMENT_LABELS[department]}</Badge>}
       </PageHeader>
 
       <motion.section {...fade} transition={{ duration: 0.4 }} className="grid gap-4 lg:grid-cols-4">
@@ -73,7 +107,7 @@ export default function SkillsPage() {
                 <p className="text-muted-foreground">Tracked</p>
               </div>
               <div className="rounded-lg border border-border bg-muted/50 p-2">
-                <p className="font-semibold text-foreground">{currentUser.skillScore}</p>
+                <p className="font-semibold text-foreground">{skillScore}</p>
                 <p className="text-muted-foreground">Skill score</p>
               </div>
             </div>
@@ -81,9 +115,9 @@ export default function SkillsPage() {
         </Card>
 
         <div className="grid gap-4 sm:grid-cols-3 lg:col-span-3">
-          <StatCard title="Strongest Skill" value={sortedByGap[sortedByGap.length - 1]?.name ?? "—"} icon={TrendingUp} subtitle={`${sortedByGap[sortedByGap.length - 1]?.current ?? 0}% proficiency`} accent="#0F766E" />
-          <StatCard title="Biggest Gap" value={sortedByGap[0]?.name ?? "—"} icon={Target} subtitle={`${(sortedByGap[0]?.target ?? 0) - (sortedByGap[0]?.current ?? 0)} pts to target`} accent="#DC2626" />
-          <StatCard title="Courses Matched" value={recommendations.length} icon={BookOpen} subtitle="Based on skill gaps" accent="#0284C7" />
+          <StatCard title="Strongest Skill" value={sortedByGap[sortedByGap.length - 1]?.name ?? "—"} icon={TrendingUp} subtitle={`${sortedByGap[sortedByGap.length - 1]?.current ?? 0}% proficiency`} accent="success" />
+          <StatCard title="Biggest Gap" value={sortedByGap[0]?.name ?? "—"} icon={Target} subtitle={`${(sortedByGap[0]?.target ?? 0) - (sortedByGap[0]?.current ?? 0)} pts to target`} accent="warning" />
+          <StatCard title="Courses Matched" value={recommendations.length} icon={BookOpen} subtitle="Based on skill gaps" accent="info" />
         </div>
       </motion.section>
 
@@ -115,39 +149,43 @@ export default function SkillsPage() {
               <CardDescription>Current vs target with gap indicators</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {skills.map((skill) => {
-                const gap = skill.target - skill.current;
-                const pct = (skill.current / skill.target) * 100;
-                return (
-                  <div key={skill.id} className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{skill.name}</p>
-                        <p className="text-[11px] text-muted-foreground">{skill.category}</p>
+              {skills.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No skills tracked yet. Complete courses to build your matrix.</p>
+              ) : (
+                skills.map((skill) => {
+                  const gap = skill.target - skill.current;
+                  const pct = (skill.current / skill.target) * 100;
+                  return (
+                    <div key={skill.id} className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{skill.name}</p>
+                          <p className="text-[11px] text-muted-foreground">{skill.category}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2 text-xs">
+                          <span className="font-semibold text-primary">{skill.current}%</span>
+                          <span className="text-muted-foreground">/ {skill.target}%</span>
+                          {gap > 15 && <Badge variant="warning">-{gap}</Badge>}
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2 text-xs">
-                        <span className="font-semibold text-primary">{skill.current}%</span>
-                        <span className="text-muted-foreground">/ {skill.target}%</span>
-                        {gap > 15 && <Badge variant="warning">-{gap}</Badge>}
+                      <div className="relative">
+                        <Progress value={skill.current} className="h-2" />
+                        <div
+                          className="absolute top-0 h-2 rounded-full border-r-2 border-dashed border-foreground/30"
+                          style={{ left: `${skill.target}%` }}
+                          title={`Target: ${skill.target}%`}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                        <span>{formatPercent(pct)} of target</span>
+                        <span className={cn(gap <= 5 ? "text-success" : gap <= 15 ? "text-warning" : "text-destructive")}>
+                          {gap <= 0 ? "On track" : `${gap} pts gap`}
+                        </span>
                       </div>
                     </div>
-                    <div className="relative">
-                      <Progress value={skill.current} className="h-2" />
-                      <div
-                        className="absolute top-0 h-2 rounded-full border-r-2 border-dashed border-foreground/30"
-                        style={{ left: `${skill.target}%` }}
-                        title={`Target: ${skill.target}%`}
-                      />
-                    </div>
-                    <div className="flex justify-between text-[10px] text-muted-foreground">
-                      <span>{formatPercent(pct)} of target</span>
-                      <span className={cn(gap <= 5 ? "text-success" : gap <= 15 ? "text-warning" : "text-destructive")}>
-                        {gap <= 0 ? "On track" : `${gap} pts gap`}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -166,10 +204,10 @@ export default function SkillsPage() {
                 .map((dept) => (
                   <div key={dept.id} className="space-y-1.5">
                     <div className="flex items-center justify-between text-sm">
-                      <span className={cn(dept.id === currentUser.department && "font-semibold text-primary")}>
+                      <span className={cn(dept.id === department && "font-semibold text-primary")}>
                         {dept.name}
-                        {dept.id === currentUser.department && (
-                          <Badge className="ml-2 bg-accent text-accent-foreground" variant="outline">
+                        {dept.id === department && (
+                          <Badge className="ml-2 bg-pastel-purple text-primary" variant="outline">
                             Yours
                           </Badge>
                         )}
@@ -198,28 +236,32 @@ export default function SkillsPage() {
               <CardDescription>Courses to close your lowest skill gaps</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-2">
-              {recommendations.map(({ skill, courses: matched }) => {
-                const course = matched[0];
-                return (
-                  <Link
-                    key={skill.id}
-                    href={`/dashboard/courses/${course.id}`}
-                    className="group flex flex-col rounded-xl border border-border p-4 transition hover:border-primary/40 hover:shadow-(--shadow-md)"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <Badge variant="destructive" className="shrink-0">
-                        Gap: {skill.target - skill.current} pts
-                      </Badge>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
-                    </div>
-                    <p className="mt-3 text-sm font-semibold">{course.title}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Improves <span className="font-medium text-foreground">{skill.name}</span> · {course.durationHours}h · +{course.xpReward} XP
-                    </p>
-                    <Progress value={course.progress} className="mt-3 h-1.5" />
-                  </Link>
-                );
-              })}
+              {recommendations.length === 0 ? (
+                <p className="text-sm text-muted-foreground sm:col-span-2">No matching courses for your current skill gaps.</p>
+              ) : (
+                recommendations.map(({ skill, courses: matched }) => {
+                  const course = matched[0];
+                  return (
+                    <Link
+                      key={skill.id}
+                      href={`/dashboard/courses/${course.slug ?? course.id}`}
+                      className="group flex flex-col rounded-xl border border-border p-4 transition hover:border-primary/40 hover:shadow-(--shadow-md)"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <Badge variant="destructive" className="shrink-0">
+                          Gap: {skill.target - skill.current} pts
+                        </Badge>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                      </div>
+                      <p className="mt-3 text-sm font-semibold">{course.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Improves <span className="font-medium text-foreground">{skill.name}</span> · {course.durationHours}h · +{course.xpReward} XP
+                      </p>
+                      <Progress value={course.progress} className="mt-3 h-1.5" />
+                    </Link>
+                  );
+                })
+              )}
             </CardContent>
           </Card>
         </motion.div>
