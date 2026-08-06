@@ -3,5 +3,5 @@
   "framework": "nextjs",
   "buildCommand": "next build",
   "devCommand": "next dev",
-  "installCommand": "npm install --include=optional"
+  "installCommand": "npm install --no-package-lock"
 }
