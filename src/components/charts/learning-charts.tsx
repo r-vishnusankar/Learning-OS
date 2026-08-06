@@ -24,15 +24,15 @@ const tooltipStyle = {
   fontSize: 12,
 };
 
-export function HoursChart({ data }: { data: ChartPoint[] }) {
+export function HoursChart({ data, height = 220 }: { data: ChartPoint[]; height?: number }) {
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+    <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={data} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-        <XAxis dataKey="label" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} axisLine={false} tickLine={false} />
+        <XAxis dataKey="label" tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} />
+        <YAxis tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} width={28} />
         <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--muted)" }} />
-        <Bar dataKey="value" fill="var(--chart-1)" radius={[6, 6, 0, 0]} />
+        <Bar dataKey="value" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

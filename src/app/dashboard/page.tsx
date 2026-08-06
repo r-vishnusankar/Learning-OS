@@ -2,61 +2,43 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
   Award,
   BookOpen,
-  Clock,
+  ChevronRight,
+  ClipboardCheck,
   FileText,
   Flame,
   Play,
-  Target,
   Trophy,
-  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CourseCard } from "@/components/cards/course-card";
-import { HoursChart } from "@/components/charts/learning-charts";
-import { StatusBadge } from "@/components/shared/status-badge";
 import { useLearnerAssessments } from "@/hooks/use-assessments";
-import {
-  useLearnerAssignments,
-  useLearnerCertificates,
-} from "@/hooks/use-certification";
-import { useMyActiveCourses } from "@/hooks/use-courses";
+import { useLearnerAssignments } from "@/hooks/use-certification";
+import { useMyActiveCourses, usePublishedCourses } from "@/hooks/use-courses";
 import { useDashboardHome } from "@/hooks/use-me";
 import { useMyAssignmentStats, useMyCourseAssignments } from "@/hooks/use-course-assignments";
 import { useMyEligibility } from "@/hooks/use-promotions";
-import { LEVEL_LABELS } from "@/constants/navigation";
-import { levelToBadgeVariant } from "@/lib/status-styles";
-import { cn, formatNumber } from "@/lib/utils";
-import type { LearningLevel } from "@/types";
+import { DEPARTMENT_LABELS, LEVEL_LABELS, LEVELS } from "@/constants/navigation";
+import { cn, formatHours, formatNumber } from "@/lib/utils";
+import type { Course, LearningLevel } from "@/types";
 
-const fade = {
-  initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0 },
+type RecommendedItem = {
+  course: Course;
+  reason: string;
 };
 
-const XP_BAND = 1000;
-
-function xpBandProgress(xp: number) {
-  const floor = Math.floor(xp / XP_BAND) * XP_BAND;
-  const next = floor + XP_BAND;
-  const into = xp - floor;
-  return {
-    floor,
-    next,
-    into,
-    remaining: Math.max(0, next - xp),
-    pct: Math.min(100, Math.round((into / XP_BAND) * 100)),
-  };
-}
+const fade = {
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const },
+};
 
 function greetingForHour(hour: number) {
   if (hour < 12) return "Good morning";
@@ -64,25 +46,93 @@ function greetingForHour(hour: number) {
   return "Good evening";
 }
 
+function toDateKey(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function todayKey() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+}
+
+type DueUrgency = "overdue" | "today" | "soon" | "upcoming" | "open";
+
 type DueItem = {
   id: string;
   title: string;
   meta: string;
   href: string;
-  urgency: "overdue" | "soon" | "open";
+  urgency: DueUrgency;
   kind: "course" | "assignment" | "assessment";
+  dueLabel?: string;
 };
+
+const URGENCY_RANK: Record<DueUrgency, number> = {
+  overdue: 0,
+  today: 1,
+  soon: 2,
+  upcoming: 3,
+  open: 4,
+};
+
+const URGENCY_LABEL: Record<DueUrgency, string> = {
+  overdue: "Overdue",
+  today: "Due today",
+  soon: "Due soon",
+  upcoming: "Upcoming",
+  open: "Available",
+};
+
+function urgencyFromDueDate(iso: string | null | undefined, isOverdue?: boolean): DueUrgency {
+  if (isOverdue) return "overdue";
+  if (!iso) return "open";
+  const key = toDateKey(iso);
+  const today = todayKey();
+  if (key < today) return "overdue";
+  if (key === today) return "today";
+  const due = new Date(iso);
+  const now = new Date();
+  const days = Math.ceil((due.getTime() - now.getTime()) / 86400000);
+  if (days <= 7) return "soon";
+  return "upcoming";
+}
+
+function KindIcon({ kind }: { kind: DueItem["kind"] }) {
+  const Icon =
+    kind === "course" ? BookOpen : kind === "assignment" ? FileText : ClipboardCheck;
+  return <Icon className="h-3.5 w-3.5" />;
+}
+
+function SectionLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+    >
+      {children}
+      <ChevronRight className="h-3.5 w-3.5" />
+    </Link>
+  );
+}
 
 export default function DashboardPage() {
   const { data: home, isLoading: homeLoading, isError: homeError } = useDashboardHome();
   const { data: courses = [], isLoading: coursesLoading } = useMyActiveCourses(8);
-  const { data: assessments = [], isLoading: assessmentsLoading, isError: assessmentsError } = useLearnerAssessments();
-  const { data: assignments = [], isLoading: assignmentsLoading, isError: assignmentsError } = useLearnerAssignments();
-  const { data: certificates = [] } = useLearnerCertificates();
+  const { data: catalog = [], isLoading: catalogLoading } = usePublishedCourses();
+  const { data: assessments = [], isLoading: assessmentsLoading, isError: assessmentsError } =
+    useLearnerAssessments();
+  const { data: assignments = [], isLoading: assignmentsLoading, isError: assignmentsError } =
+    useLearnerAssignments();
   const { data: courseAssignStats } = useMyAssignmentStats();
   const { data: myCourseAssignments = [], isLoading: courseAssignLoading, isError: courseAssignError } =
     useMyCourseAssignments();
-  const { data: eligibility } = useMyEligibility();
+  const {
+    data: eligibility,
+    isLoading: eligibilityLoading,
+    isError: eligibilityError,
+    isFetched: eligibilityFetched,
+  } = useMyEligibility();
 
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
@@ -96,32 +146,22 @@ export default function DashboardPage() {
         (c.status === "in_progress" || c.status === "completed") &&
         c.id !== continueCourse?.id
     )
-    .slice(0, 4);
-  const earnedCerts = certificates.filter((c) => c.status === "earned").length;
-  const dueLoading = assessmentsLoading || assignmentsLoading || courseAssignLoading;
+    .slice(0, 3);
   const dueError = assessmentsError || assignmentsError || courseAssignError;
 
   const dueItems: DueItem[] = React.useMemo(() => {
     const items: DueItem[] = [];
 
     for (const a of myCourseAssignments.filter((x) => x.status !== "completed")) {
-      const overdue = a.status === "overdue";
-      const soon =
-        a.daysRemaining != null && a.daysRemaining >= 0 && a.daysRemaining <= 7;
       items.push({
         id: `ca-${a.id}`,
         title: a.title,
-        meta: [
-          a.mandatory ? "Mandatory course" : "Assigned course",
-          a.dueDate
-            ? `Due ${new Date(a.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-            : null,
-          `${a.progress}%`,
-        ]
-          .filter(Boolean)
-          .join(" · "),
+        meta: a.mandatory ? "Mandatory course" : "Assigned course",
+        dueLabel: a.dueDate
+          ? new Date(a.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+          : undefined,
         href: `/dashboard/courses/${a.courseSlug}`,
-        urgency: overdue ? "overdue" : soon ? "soon" : "open",
+        urgency: urgencyFromDueDate(a.dueDate, a.status === "overdue"),
         kind: "course",
       });
     }
@@ -130,9 +170,13 @@ export default function DashboardPage() {
       items.push({
         id: `hw-${a.id}`,
         title: a.title,
-        meta: `Homework · Due ${new Date(a.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
+        meta: "Homework",
+        dueLabel: new Date(a.dueDate).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        }),
         href: `/dashboard/assignments/${a.id}`,
-        urgency: a.status === "overdue" ? "overdue" : "soon",
+        urgency: urgencyFromDueDate(a.dueDate, a.status === "overdue"),
         kind: "assignment",
       });
     }
@@ -143,47 +187,52 @@ export default function DashboardPage() {
       items.push({
         id: `ex-${a.id}`,
         title: a.title,
-        meta: a.dueDate
-          ? `Assessment · Due ${new Date(a.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-          : "Assessment · Available",
+        meta: a.status === "in_progress" ? "Assessment · In progress" : "Assessment",
+        dueLabel: a.dueDate
+          ? new Date(a.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+          : undefined,
         href: `/dashboard/assessments/${a.id}`,
-        urgency: a.status === "in_progress" ? "soon" : "open",
+        urgency: a.status === "in_progress" ? "soon" : urgencyFromDueDate(a.dueDate),
         kind: "assessment",
       });
     }
 
-    const rank = { overdue: 0, soon: 1, open: 2 };
-    return items.sort((a, b) => rank[a.urgency] - rank[b.urgency]).slice(0, 6);
+    return items.sort((a, b) => URGENCY_RANK[a.urgency] - URGENCY_RANK[b.urgency]).slice(0, 8);
   }, [myCourseAssignments, assignments, assessments]);
+
+  const dueGroups = React.useMemo(() => {
+    const order: DueUrgency[] = ["overdue", "today", "soon", "upcoming", "open"];
+    return order
+      .map((urgency) => ({
+        urgency,
+        items: dueItems.filter((i) => i.urgency === urgency),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, [dueItems]);
+
+  // Don't block What's Due on slow assessments — render once course/homework queries settle
+  const dueCoreSettled = !courseAssignLoading && !assignmentsLoading;
+  const showDueSkeleton = !dueCoreSettled && dueItems.length === 0;
 
   if (homeError) {
     return (
-      <Card>
-        <CardContent className="p-6 text-sm text-muted-foreground">
-          Couldn&apos;t load your dashboard. Refresh to try again — other pages still work.
-        </CardContent>
-      </Card>
+      <div className="w-full rounded-lg border border-border px-5 py-6 text-sm text-muted-foreground">
+        Couldn&apos;t load your dashboard. Refresh to try again — other pages still work.
+      </div>
     );
   }
 
   if (homeLoading || !stats || !user) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-44 w-full rounded-[28px]" />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-[28px]" />
-          ))}
+      <div className="w-full space-y-5">
+        <Skeleton className="h-14 w-full max-w-md rounded-lg" />
+        <div className="grid gap-4 lg:grid-cols-12">
+          <Skeleton className="h-28 rounded-lg lg:col-span-8" />
+          <Skeleton className="h-28 rounded-lg lg:col-span-4" />
         </div>
-        <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
-          <div className="space-y-4">
-            <Skeleton className="h-40 w-full rounded-[28px]" />
-            <Skeleton className="h-56 w-full rounded-[28px]" />
-          </div>
-          <div className="space-y-4">
-            <Skeleton className="h-64 w-full rounded-[28px]" />
-            <Skeleton className="h-56 w-full rounded-[28px]" />
-          </div>
+        <div className="grid gap-4 lg:grid-cols-12">
+          <Skeleton className="h-48 rounded-lg lg:col-span-8" />
+          <Skeleton className="h-48 rounded-lg lg:col-span-4" />
         </div>
       </div>
     );
@@ -191,34 +240,28 @@ export default function DashboardPage() {
 
   const firstName = user.name?.split(" ")[0] ?? "there";
   const xp = user.xp ?? 0;
-  const xpProg = xpBandProgress(xp);
   const streak = stats.streak ?? 0;
-  const completedMin = stats.todayCompletedMinutes;
-  const goalMin = Math.max(1, stats.todayGoalMinutes);
-  const goalPct = Math.round((completedMin / goalMin) * 100);
-  const goalBarPct = Math.min(100, goalPct);
   const overdueCount =
     (courseAssignStats?.overdue ?? 0) +
     assignments.filter((a) => a.status === "overdue").length;
   const dueSoonCount = courseAssignStats?.dueSoon ?? 0;
+  const dueTodayCount = dueItems.filter((i) => i.urgency === "today").length;
+  const openDueCount = dueItems.length;
 
   const leaderboard = home.leaderboard ?? [];
-  const top = leaderboard[0];
+  const topThree = leaderboard.slice(0, 3);
   const meOnBoard = leaderboard.find((e) => e.userId === user.id);
   const myRank = stats.companyRank || meOnBoard?.rank || 0;
-  const xpBehindTop = top ? Math.max(0, top.xp - xp) : 0;
 
-  let nudge = `Hit your ${stats.todayGoalMinutes}-minute goal and keep climbing.`;
+  let nudge = "Continue where you left off and stay on track.";
   if (overdueCount > 0) {
-    nudge = `You have ${overdueCount} overdue item${overdueCount === 1 ? "" : "s"} — clear them today.`;
+    nudge = `You have ${overdueCount} overdue item${overdueCount === 1 ? "" : "s"} — clear them first.`;
+  } else if (dueTodayCount > 0) {
+    nudge = `${dueTodayCount} item${dueTodayCount === 1 ? "" : "s"} due today.`;
+  } else if (continueCourse) {
+    nudge = `Pick up ${continueCourse.title} — you're ${continueCourse.progress}% through.`;
   } else if (dueSoonCount > 0) {
-    nudge = `${dueSoonCount} assignment${dueSoonCount === 1 ? "" : "s"} due this week. Stay ahead.`;
-  } else if (streak === 0) {
-    nudge = "Start a streak today — even 15 focused minutes counts.";
-  } else if (streak >= 7) {
-    nudge = `${streak}-day streak on fire. Don't break it — study a little more.`;
-  } else if (xpBehindTop > 0 && top) {
-    nudge = `${formatNumber(xpBehindTop)} XP behind ${top.name.split(" ")[0]} — close the gap.`;
+    nudge = `${dueSoonCount} assignment${dueSoonCount === 1 ? "" : "s"} due this week.`;
   }
 
   const continueHref = continueCourse
@@ -226,478 +269,730 @@ export default function DashboardPage() {
     : dueItems[0]?.href ?? "/dashboard/learning";
 
   const level = (user.level ?? "beginner") as LearningLevel;
+  const levelIndex = LEVELS.indexOf(level as (typeof LEVELS)[number]);
+  const fallbackNextLevel =
+    levelIndex >= 0 && levelIndex < LEVELS.length - 1 ? LEVELS[levelIndex + 1] : null;
+  const careerRemaining = eligibility
+    ? Math.max(0, eligibility.requiredCount - eligibility.certifiedCount)
+    : 0;
+  const careerPct =
+    eligibility && eligibility.requiredCount > 0
+      ? Math.round((eligibility.certifiedCount / eligibility.requiredCount) * 100)
+      : 0;
+
+  const careerCtaHref =
+    eligibility?.status === "eligible"
+      ? "/dashboard/learning"
+      : eligibility?.courses.find((c) => c.state === "assessment_pending")?.assessmentId
+        ? `/dashboard/assessments/${
+            eligibility.courses.find((c) => c.state === "assessment_pending")!.assessmentId
+          }`
+        : "/dashboard/learning";
+
+  const remainingHours =
+    continueCourse && continueCourse.progress < 100
+      ? Math.max(
+          0.5,
+          Math.round(
+            ((continueCourse.durationHours ?? 0) * (100 - continueCourse.progress)) / 100 * 10
+          ) / 10
+        )
+      : null;
+
+  const modules = continueCourse?.modules ?? [];
+  const modulesTotal = modules.length;
+  const modulesDone = modules.filter((m) => m.completed).length;
+
+  const weekHours = home.weeklyHours ?? [];
+  const weekTotal = weekHours.reduce((sum, p) => sum + (p.value ?? 0), 0);
+  const weekMax = Math.max(0.25, ...weekHours.map((p) => p.value ?? 0));
+  const weeklyGoalHours = Math.max(
+    1,
+    Math.round((((stats.todayGoalMinutes ?? 45) * 5) / 60) * 10) / 10
+  );
+  const activeDays = weekHours.filter((p) => (p.value ?? 0) > 0).length;
+  const completedActivities =
+    weekTotal > 0 ? Math.max(1, Math.round(weekTotal * 2)) : 0;
+
+  const nextDue = dueItems[0];
+  const dueSummaryCount =
+    overdueCount > 0 ? overdueCount : openDueCount || dueSoonCount;
+
+  const recommendations = ((): RecommendedItem[] => {
+    const dept = user.department;
+    const busyIds = new Set<string>(
+      [
+        continueCourse?.id,
+        ...myCourses.map((c) => c.id),
+        ...catalog
+          .filter((c) => c.status === "in_progress" || c.status === "completed")
+          .map((c) => c.id),
+      ].filter(Boolean) as string[]
+    );
+
+    const picked: RecommendedItem[] = [];
+    const used = new Set<string>();
+
+    const take = (course: Course | undefined, reason: string) => {
+      if (!course || used.has(course.id) || busyIds.has(course.id)) return;
+      if (picked.length >= 3) return;
+      picked.push({ course, reason });
+      used.add(course.id);
+    };
+
+    // 1) Path gaps — highest career value
+    if (eligibility?.courses?.length) {
+      const pathReason = eligibility.nextLevel
+        ? `Next for ${LEVEL_LABELS[eligibility.nextLevel]}`
+        : "On your path";
+      const pathOrdered = [...eligibility.courses]
+        .filter((row) => row.state !== "certified")
+        .sort((a, b) => {
+          const rank = (s: string) =>
+            s === "assessment_pending" ? 0 : s === "in_progress" ? 1 : 2;
+          return rank(a.state) - rank(b.state);
+        });
+      for (const row of pathOrdered) {
+        if (picked.length >= 1) break;
+        const match =
+          catalog.find((c) => c.id === row.courseId) ??
+          catalog.find((c) => c.slug === row.courseSlug);
+        if (match && match.status !== "in_progress") {
+          take(
+            match,
+            row.state === "assessment_pending" ? "Assessment pending" : pathReason
+          );
+        }
+      }
+    }
+
+    // 2) Trending in learner's department
+    const deptTrending = catalog
+      .filter(
+        (c) =>
+          c.department === dept &&
+          c.isTrending &&
+          c.status === "not_started" &&
+          !used.has(c.id) &&
+          !busyIds.has(c.id)
+      )
+      .sort((a, b) => b.rating - a.rating);
+    for (const c of deptTrending) {
+      if (picked.length >= 2) break;
+      take(c, `Trending in ${DEPARTMENT_LABELS[dept] ?? dept}`);
+    }
+
+    // 3) One cross-department hot topic
+    const adjacent = catalog
+      .filter(
+        (c) =>
+          c.department !== dept &&
+          c.isTrending &&
+          c.status === "not_started" &&
+          !used.has(c.id) &&
+          !busyIds.has(c.id)
+      )
+      .sort((a, b) => b.rating - a.rating);
+    if (adjacent[0]) {
+      take(
+        adjacent[0],
+        `Hot in ${DEPARTMENT_LABELS[adjacent[0].department] ?? adjacent[0].department}`
+      );
+    }
+
+    // Fill to 3 with strong role/goal matches
+    if (picked.length < 3) {
+      const fill = catalog
+        .filter(
+          (c) =>
+            c.status === "not_started" && !used.has(c.id) && !busyIds.has(c.id)
+        )
+        .sort((a, b) => {
+          const score = (c: Course) =>
+            c.rating +
+            (c.department === dept ? 3 : 0) +
+            (c.isTrending ? 2 : 0) +
+            (c.learningCategory === "role" ? 1 : 0);
+          return score(b) - score(a);
+        });
+      for (const c of fill) {
+        if (picked.length >= 3) break;
+        take(
+          c,
+          c.department === dept
+            ? "For your role"
+            : `From ${DEPARTMENT_LABELS[c.department] ?? c.department}`
+        );
+      }
+    }
+
+    return picked;
+  })();
 
   return (
-    <div className="space-y-6">
-      {/* Hero: identity + nudge */}
+    <div className="w-full space-y-6">
+      {/* 1. Header / learner summary */}
+      <motion.header {...fade} className="space-y-2">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {mounted ? greetingForHour(new Date().getHours()) : "Hello"}, {firstName}
+          </h1>
+          <p className="text-sm text-muted-foreground">{nudge}</p>
+        </div>
+
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{LEVEL_LABELS[level] ?? level}</span>
+          <span aria-hidden>·</span>
+          <span>
+            <span className="font-semibold tabular-nums text-foreground">{stats.hoursLearned}h</span>{" "}
+            learned
+          </span>
+          <span aria-hidden>·</span>
+          <span className="inline-flex items-center gap-1">
+            <Flame className={cn("h-3 w-3", streak > 0 && "text-warning")} />
+            <span className="font-semibold tabular-nums text-foreground">{streak}d</span> streak
+          </span>
+          <span aria-hidden>·</span>
+          <span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {stats.coursesCompleted}
+            </span>{" "}
+            completed
+          </span>
+          <span aria-hidden>·</span>
+          <span>
+            <span
+              className={cn(
+                "font-semibold tabular-nums",
+                overdueCount > 0 ? "text-destructive" : "text-foreground"
+              )}
+            >
+              {dueSummaryCount}
+            </span>{" "}
+            due
+          </span>
+          <span aria-hidden>·</span>
+          <span>
+            Avg{" "}
+            <span className="font-semibold tabular-nums text-foreground">
+              {stats.averageScore}%
+            </span>
+          </span>
+          {myRank > 0 && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="inline-flex items-center gap-1">
+                <Trophy className="h-3 w-3" />
+                Rank{" "}
+                <span className="font-semibold tabular-nums text-foreground">#{myRank}</span>
+              </span>
+            </>
+          )}
+          {nextDue && (
+            <>
+              <span aria-hidden className="hidden sm:inline">
+                ·
+              </span>
+              <span className="hidden sm:inline">
+                Next due:{" "}
+                <Link href={nextDue.href} className="font-medium text-foreground hover:underline">
+                  {nextDue.title}
+                </Link>
+                {nextDue.dueLabel ? ` · ${nextDue.dueLabel}` : ""}
+              </span>
+            </>
+          )}
+        </p>
+      </motion.header>
+
+      {/* 2–3. Continue Learning + Career Progress */}
       <motion.section
         {...fade}
-        className="relative overflow-hidden rounded-[28px] bg-card p-6 sm:p-8"
+        transition={{ ...fade.transition, delay: 0.03 }}
+        className="grid gap-4 lg:grid-cols-12 lg:gap-5"
       >
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={levelToBadgeVariant(level)}>{LEVEL_LABELS[level] ?? level}</Badge>
-              {streak > 0 && (
-                <Badge className="gap-1 border-0 bg-warning/15 text-warning">
-                  <Flame className="h-3.5 w-3.5 stroke-[1.75]" /> {streak}-day streak
-                </Badge>
-              )}
-              {myRank > 0 && (
-                <Badge variant="secondary" className="gap-1">
-                  <Trophy className="h-3.5 w-3.5 stroke-[1.75]" /> Rank #{myRank}
-                </Badge>
-              )}
-            </div>
-            <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-              {mounted ? greetingForHour(new Date().getHours()) : "Hello"}, {firstName}
-            </h1>
-            <p className="max-w-xl text-description">{nudge}</p>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button asChild size="lg" className="gap-2">
-                <Link href={continueHref}>
-                  <Play className="h-4 w-4 stroke-[1.75]" />
-                  {continueCourse ? "Continue learning" : dueItems[0] ? "Start next task" : "Browse learning"}
-                </Link>
-              </Button>
-            </div>
-          </div>
-
-          <div className="w-full max-w-sm rounded-2xl bg-pastel-purple p-4">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="flex items-center gap-1.5 text-sm font-semibold">
-                <Zap className="h-4 w-4 text-primary stroke-[1.75]" />
-                {formatNumber(xp)} XP
-              </p>
-              <p className="text-caption">{formatNumber(xpProg.remaining)} to next band</p>
-            </div>
-            <Progress value={xpProg.pct} className="h-2.5" />
-            <p className="mt-2 text-caption">
-              Today {completedMin}/{goalMin} min · {goalPct}% of daily goal
-            </p>
-            <Progress value={goalBarPct} className="mt-1.5 h-1.5" />
-          </div>
-        </div>
-      </motion.section>
-
-      {eligibility && (
-        <motion.section {...fade} transition={{ delay: 0.02 }}>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Target className="h-4 w-4 text-primary" />
-                Career progress
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1">
-                <p className="text-sm">
-                  Level{" "}
-                  <span className="font-semibold">
-                    {LEVEL_LABELS[eligibility.currentLevel]}
-                  </span>
-                  {eligibility.nextLevel
-                    ? ` → ${LEVEL_LABELS[eligibility.nextLevel]}`
-                    : " (max)"}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {eligibility.certifiedCount}/{eligibility.requiredCount} courses certified
-                  {" · "}
-                  <span className="capitalize">
-                    {eligibility.status.replaceAll("_", " ")}
-                  </span>
-                </p>
-                <Progress
-                  value={
-                    eligibility.requiredCount > 0
-                      ? Math.round(
-                          (eligibility.certifiedCount / eligibility.requiredCount) * 100
-                        )
-                      : 0
-                  }
-                  className="mt-2 h-1.5 max-w-sm"
+        <div className="lg:col-span-8">
+          {continueCourse ? (
+            <div className="flex gap-4 rounded-lg border border-border bg-card p-4">
+              <div className="relative hidden h-[88px] w-[132px] shrink-0 overflow-hidden rounded-md bg-muted sm:block">
+                <Image
+                  src={continueCourse.thumbnail}
+                  alt=""
+                  fill
+                  className="object-cover"
+                  unoptimized
                 />
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button asChild>
-                  <Link
-                    href={
-                      eligibility.status === "eligible"
-                        ? "/dashboard/learning"
-                        : eligibility.courses.find((c) => c.state === "assessment_pending")
-                              ?.assessmentId
-                          ? `/dashboard/assessments/${
-                              eligibility.courses.find((c) => c.state === "assessment_pending")!
-                                .assessmentId
-                            }`
-                          : "/dashboard/learning"
-                    }
-                  >
-                    {eligibility.status === "eligible"
-                      ? "Waiting for admin approval"
-                      : eligibility.courses.some((c) => c.state === "assessment_pending")
-                        ? "Take assessment"
-                        : "Continue learning"}
-                  </Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href="/dashboard/help">How this works</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.section>
-      )}
-
-      {/* Momentum strip */}
-      <motion.section
-        {...fade}
-        transition={{ delay: 0.04 }}
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
-      >
-        {[
-          {
-            label: "Hours learned",
-            value: stats.hoursLearned,
-            icon: Clock,
-            tone: "text-primary",
-            hint: "Estimated from lessons",
-          },
-          {
-            label: "Streak",
-            value: `${streak}d`,
-            icon: Flame,
-            tone: streak > 0 ? "text-warning" : "text-muted-foreground",
-            hint: streak > 0 ? "Keep it alive" : "Start today",
-          },
-          {
-            label: "Completed",
-            value: stats.coursesCompleted,
-            icon: BookOpen,
-            tone: "text-success",
-            hint: `${earnedCerts} certificate${earnedCerts === 1 ? "" : "s"}`,
-          },
-          {
-            label: "Due / overdue",
-            value: overdueCount > 0 ? overdueCount : dueSoonCount,
-            icon: Target,
-            tone: overdueCount > 0 ? "text-destructive" : "text-pastel-yellow-foreground",
-            hint:
-              overdueCount > 0
-                ? "Overdue now"
-                : dueSoonCount > 0
-                  ? "Due this week"
-                  : dueItems.length === 0
-                    ? "All clear"
-                    : "Open work",
-          },
-          {
-            label: "Avg score",
-            value: `${stats.averageScore}%`,
-            icon: Target,
-            tone: "text-primary",
-            hint: stats.averageScore > 0 ? "Across assessments" : "",
-          },
-        ].map((s) => (
-          <Card key={s.label} className="overflow-hidden">
-            <CardContent className="flex items-start justify-between gap-2 p-4">
-              <div className="min-w-0">
-                <p className="text-caption uppercase tracking-wide">{s.label}</p>
-                <p className={cn("mt-1 font-display text-2xl font-semibold tabular-nums", s.tone)}>
-                  {s.value}
-                </p>
-                <p className="mt-0.5 truncate text-caption">{s.hint}</p>
-              </div>
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
-                <s.icon className="h-4 w-4 stroke-[1.75]" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </motion.section>
-
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
-        {/* Continue + due */}
-        <div className="space-y-6">
-          {continueCourse && (
-            <motion.section {...fade} transition={{ delay: 0.06 }}>
-              <Card className="overflow-hidden border-0 bg-linear-to-br from-primary/10 via-card to-card shadow-(--shadow)">
-                <CardContent className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center">
-                  <div className="min-w-0 flex-1 space-y-3">
-                    <p className="text-caption font-semibold uppercase tracking-wide text-primary">
-                      Pick up where you left off
-                    </p>
-                    <h2 className="font-display text-xl font-semibold leading-snug">
+              <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">Continue learning</p>
+                    <h2 className="mt-0.5 truncate text-lg font-semibold tracking-tight">
                       {continueCourse.title}
                     </h2>
-                    <div className="flex items-center gap-3">
-                      <Progress value={continueCourse.progress} className="h-2 flex-1" />
-                      <span className="text-sm font-semibold tabular-nums">
-                        {continueCourse.progress}%
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {DEPARTMENT_LABELS[continueCourse.department] ?? continueCourse.department}
+                      {" · "}
+                      {LEVEL_LABELS[continueCourse.level] ?? continueCourse.level}
+                    </p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-muted-foreground">
+                        {modulesTotal > 0
+                          ? `${modulesDone} of ${modulesTotal} modules`
+                          : `${continueCourse.lessonsCount} lessons`}
+                        {" · "}
+                        <span className="font-semibold tabular-nums text-foreground">
+                          {continueCourse.progress}%
+                        </span>
                       </span>
                     </div>
-                    <Button asChild className="gap-2">
-                      <Link href={continueHref}>
-                        <Play className="h-4 w-4 stroke-[1.75]" /> Resume course
-                      </Link>
-                    </Button>
+                    <Progress value={continueCourse.progress} className="h-1.5" />
+                    <p className="text-xs text-muted-foreground">
+                      {remainingHours != null ? `~${remainingHours}h remaining` : "In progress"}
+                      {continueCourse.lastAccessed
+                        ? ` · Last activity ${new Date(
+                            continueCourse.lastAccessed
+                          ).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}`
+                        : ""}
+                    </p>
                   </div>
-                  <div className="relative mx-auto flex h-28 w-28 shrink-0 items-center justify-center sm:mx-0">
-                    <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
-                      <circle
-                        cx="18"
-                        cy="18"
-                        r="15"
-                        fill="none"
-                        className="stroke-muted"
-                        strokeWidth="3"
-                      />
-                      <circle
-                        cx="18"
-                        cy="18"
-                        r="15"
-                        fill="none"
-                        className="stroke-primary"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        strokeDasharray={`${continueCourse.progress} 100`}
-                      />
-                    </svg>
-                    <span className="absolute font-display text-xl font-semibold">
-                      {continueCourse.progress}%
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.section>
-          )}
-
-          <motion.section {...fade} transition={{ delay: 0.08 }}>
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h2 className="font-display text-lg font-semibold">What&apos;s due</h2>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/dashboard/learning">View all</Link>
-              </Button>
-            </div>
-            {dueLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full rounded-2xl" />
-                ))}
+                </div>
+                <Button asChild className="h-10 shrink-0 gap-2 px-4">
+                  <Link href={continueHref}>
+                    <Play className="h-4 w-4" />
+                    Resume
+                  </Link>
+                </Button>
               </div>
-            ) : dueError ? (
-              <Card>
-                <CardContent className="flex items-center gap-3 p-5">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning/15 text-warning">
-                    <AlertTriangle className="h-5 w-5 stroke-[1.75]" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Couldn&apos;t load assignments</p>
-                    <p className="text-caption">
-                      Assignments could not be loaded — this list may be incomplete.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : dueItems.length === 0 ? (
-              <Card>
-                <CardContent className="flex items-center gap-3 p-5">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success/15 text-success">
-                    <Award className="h-5 w-5 stroke-[1.75]" />
-                  </div>
-                  <div>
-                    <p className="font-medium">You&apos;re clear</p>
-                    <p className="text-caption">
-                      No urgent work — push XP with a new lesson or challenge the leaderboard.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-2">
-                {dueItems.map((item) => (
-                  <Link
-                    key={item.id}
-                    href={item.href}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border px-4 py-4">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Continue learning</p>
+                <h2 className="mt-0.5 text-base font-semibold tracking-tight">
+                  Nothing in progress
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Start an assigned task or open the catalog.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button asChild size="sm" className="h-9 px-3">
+                  <Link href={dueItems[0]?.href ?? "/dashboard/learning"}>
+                    {dueItems[0] ? "Start next task" : "My Learning"}
+                  </Link>
+                </Button>
+                <Button asChild size="sm" variant="outline" className="h-9 px-3">
+                  <Link href="/dashboard/courses">Catalog</Link>
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <aside className="lg:col-span-4">
+          <div className="flex flex-col gap-3 rounded-lg border border-border px-4 py-4">
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Career progress</p>
+              {eligibilityLoading && !eligibilityFetched ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-36" />
+                  <Skeleton className="h-1.5 w-full" />
+                  <Skeleton className="h-3 w-44" />
+                </div>
+              ) : eligibility ? (
+                <>
+                  <p className="text-base font-semibold tracking-tight">
+                    {LEVEL_LABELS[eligibility.currentLevel]}
+                    {eligibility.nextLevel ? (
+                      <span className="font-normal text-muted-foreground">
+                        {" → "}
+                        {LEVEL_LABELS[eligibility.nextLevel]}
+                      </span>
+                    ) : (
+                      <span className="font-normal text-muted-foreground"> · Max level</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {eligibility.certifiedCount} of {eligibility.requiredCount} requirements
+                    completed
+                  </p>
+                  <Progress value={careerPct} className="h-1.5" />
+                  <p className="text-xs text-muted-foreground">
+                    {careerRemaining === 0
+                      ? "All requirements met"
+                      : `${careerRemaining} requirement${careerRemaining === 1 ? "" : "s"} remaining`}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-semibold tracking-tight">
+                    {LEVEL_LABELS[level] ?? level}
+                    {fallbackNextLevel ? (
+                      <span className="font-normal text-muted-foreground">
+                        {" → "}
+                        {LEVEL_LABELS[fallbackNextLevel]}
+                      </span>
+                    ) : (
+                      <span className="font-normal text-muted-foreground"> · Max level</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {eligibilityError
+                      ? "Couldn’t load promotion requirements."
+                      : "Open your learning path to track certification requirements."}
+                  </p>
+                </>
+              )}
+            </div>
+            <Link
+              href={eligibility ? careerCtaHref : "/dashboard/learning"}
+              className="inline-flex items-center gap-0.5 text-sm font-medium text-primary hover:underline"
+            >
+              View path
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </aside>
+      </motion.section>
+
+      {/* 4–6. What's Due + This Week + Leaderboard */}
+      <div className="grid items-start gap-6 lg:grid-cols-12 lg:gap-5">
+        <motion.section
+          {...fade}
+          transition={{ ...fade.transition, delay: 0.05 }}
+          className="lg:col-span-8"
+        >
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h2 className="text-base font-semibold tracking-tight">What&apos;s due</h2>
+            <SectionLink href="/dashboard/learning">View all</SectionLink>
+          </div>
+
+          {showDueSkeleton ? (
+            <div className="space-y-2">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <Skeleton key={i} className="h-11 w-full rounded-md" />
+              ))}
+            </div>
+          ) : dueError && dueItems.length === 0 ? (
+            <div className="flex items-start gap-2.5 py-1">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+              <div>
+                <p className="text-sm font-medium">Couldn&apos;t load assignments</p>
+                <p className="text-xs text-muted-foreground">Refresh to try again.</p>
+              </div>
+            </div>
+          ) : dueItems.length === 0 ? (
+            <div className="flex items-start gap-2.5 py-1">
+              <Award className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+              <div>
+                <p className="text-sm font-medium">You&apos;re clear</p>
+                <p className="text-xs text-muted-foreground">
+                  {assessmentsLoading
+                    ? "No course or homework deadlines right now. Checking assessments…"
+                    : "No urgent work — continue a course or explore the catalog."}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {dueGroups.map((group) => (
+                <div key={group.urgency}>
+                  <p
                     className={cn(
-                      "flex items-center gap-3 rounded-2xl bg-card px-4 py-3.5 shadow-(--shadow-sm) transition hover:shadow-(--shadow)",
-                      item.urgency === "overdue" && "ring-1 ring-destructive/25",
-                      item.urgency === "soon" && "ring-1 ring-warning/25"
+                      "mb-1.5 text-[11px] font-semibold uppercase tracking-wide",
+                      group.urgency === "overdue" && "text-destructive",
+                      (group.urgency === "today" || group.urgency === "soon") &&
+                        "text-warning-foreground",
+                      (group.urgency === "upcoming" || group.urgency === "open") &&
+                        "text-muted-foreground"
                     )}
                   >
-                    <div
-                      className={cn(
-                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
-                        item.kind === "course" && "bg-primary/10 text-primary",
-                        item.kind === "assignment" && "bg-pastel-yellow text-pastel-yellow-foreground",
-                        item.kind === "assessment" && "bg-info/15 text-info"
-                      )}
-                    >
-                      {item.kind === "course" ? (
-                        <BookOpen className="h-4 w-4 stroke-[1.75]" />
-                      ) : item.kind === "assignment" ? (
-                        <FileText className="h-4 w-4 stroke-[1.75]" />
-                      ) : (
-                        <Target className="h-4 w-4 stroke-[1.75]" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{item.title}</p>
-                      <p className="truncate text-caption">{item.meta}</p>
-                    </div>
-                    <StatusBadge
-                      status={
-                        item.urgency === "overdue"
-                          ? "overdue"
-                          : item.urgency === "soon"
-                            ? "pending"
-                            : "available"
-                      }
-                    />
-                  </Link>
-                ))}
+                    {URGENCY_LABEL[group.urgency]}
+                  </p>
+                  <ul className="divide-y divide-border border-y border-border">
+                    {group.items.map((item) => (
+                      <li key={item.id}>
+                        <Link
+                          href={item.href}
+                          className="flex items-center gap-3 py-2.5 transition-colors hover:bg-muted/30"
+                        >
+                          <span
+                            className={cn(
+                              "flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
+                              group.urgency === "overdue" &&
+                                "bg-destructive/10 text-destructive",
+                              (group.urgency === "today" || group.urgency === "soon") &&
+                                "bg-warning/10 text-warning-foreground",
+                              (group.urgency === "upcoming" || group.urgency === "open") &&
+                                "bg-muted text-muted-foreground"
+                            )}
+                          >
+                            <KindIcon kind={item.kind} />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{item.title}</p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {item.meta}
+                              {item.dueLabel ? ` · ${item.dueLabel}` : ""}
+                            </p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </motion.section>
+
+        <aside className="space-y-6 lg:col-span-4">
+          {/* 5. This week */}
+          <motion.section {...fade} transition={{ ...fade.transition, delay: 0.06 }}>
+            <h2 className="mb-3 text-base font-semibold tracking-tight">This week</h2>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <p className="text-sm font-semibold tabular-nums tracking-tight">
+                  {weekTotal.toFixed(1)}h
+                  <span className="font-normal text-muted-foreground">
+                    {" "}
+                    / {weeklyGoalHours}h
+                  </span>
+                </p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Weekly goal</p>
               </div>
-            )}
+              <div>
+                <p className="text-sm font-semibold tabular-nums tracking-tight">{activeDays}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Active days</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold tabular-nums tracking-tight">
+                  {completedActivities}
+                </p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Activities</p>
+              </div>
+            </div>
+            <div className="mt-3 flex h-8 items-end gap-1">
+              {weekHours.map((point) => (
+                <div
+                  key={point.label}
+                  className="flex min-w-0 flex-1 flex-col items-center gap-1"
+                  title={`${point.label}: ${point.value ?? 0}h`}
+                >
+                  <div
+                    className={cn(
+                      "w-full rounded-sm",
+                      (point.value ?? 0) > 0 ? "bg-primary/70" : "bg-muted"
+                    )}
+                    style={{
+                      height:
+                        (point.value ?? 0) > 0
+                          ? `${Math.max(12, ((point.value ?? 0) / weekMax) * 100)}%`
+                          : "12%",
+                    }}
+                  />
+                  <span className="text-[9px] text-muted-foreground">
+                    {String(point.label).slice(0, 1)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </motion.section>
 
-          <motion.section {...fade} transition={{ delay: 0.1 }}>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-display text-lg font-semibold">Your courses</h2>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/dashboard/learning">My Learning</Link>
-              </Button>
+          {/* 6. Leaderboard */}
+          <motion.section {...fade} transition={{ ...fade.transition, delay: 0.07 }}>
+            <div className="mb-2 flex items-baseline justify-between gap-2">
+              <h2 className="text-base font-semibold tracking-tight">Leaderboard</h2>
+              <SectionLink href="/dashboard/leaderboard">Full board</SectionLink>
             </div>
-            {coursesLoading ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-[88px] rounded-2xl" />
-                ))}
-              </div>
-            ) : myCourses.length === 0 ? (
-              <Card>
-                <CardContent className="p-5 text-sm text-muted-foreground">
-                  No courses in progress yet.{" "}
-                  <Link href="/dashboard/courses" className="font-medium text-primary underline-offset-2 hover:underline">
-                    Browse the catalog
-                  </Link>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {myCourses.map((c) => (
-                  <CourseCard key={c.id} course={c} variant="compact" />
-                ))}
-              </div>
+            <ul className="space-y-1">
+              {topThree.map((entry) => {
+                const isYou = entry.userId === user.id;
+                return (
+                  <li
+                    key={entry.userId}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-md px-1 py-1.5",
+                      isYou && "bg-muted/50"
+                    )}
+                  >
+                    <span className="w-5 text-center text-xs font-semibold tabular-nums text-muted-foreground">
+                      #{entry.rank}
+                    </span>
+                    <Avatar className="h-6 w-6">
+                      <AvatarImage src={entry.avatar} />
+                      <AvatarFallback className="text-[9px]">{entry.name[0]}</AvatarFallback>
+                    </Avatar>
+                    <p className="min-w-0 flex-1 truncate text-sm font-medium">
+                      {entry.name}
+                      {isYou ? " (you)" : ""}
+                    </p>
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                      {formatNumber(entry.xp)} XP
+                    </span>
+                  </li>
+                );
+              })}
+              {topThree.length === 0 && (
+                <p className="text-xs text-muted-foreground">Leaderboard is warming up.</p>
+              )}
+            </ul>
+            {myRank > 0 && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Your rank:{" "}
+                <span className="font-semibold text-foreground">#{myRank}</span>
+              </p>
             )}
           </motion.section>
+        </aside>
+      </div>
+
+      {/* 7. Your Courses — natural flow below */}
+      <motion.section {...fade} transition={{ ...fade.transition, delay: 0.08 }}>
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <h2 className="text-base font-semibold tracking-tight">Your courses</h2>
+          <SectionLink href="/dashboard/learning">My Learning</SectionLink>
         </div>
 
-        {/* Competition + hours */}
-        <div className="space-y-6">
-          <motion.section {...fade} transition={{ delay: 0.06 }}>
-            <Card className="overflow-hidden">
-              <CardHeader className="flex-row items-start justify-between space-y-0 pb-2">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Trophy className="h-4 w-4 text-primary stroke-[1.75]" /> Race the leaders
-                  </CardTitle>
-                  <p className="mt-1 text-caption">
-                    {leaderboard.slice(0, 5).length > 0 &&
-                    leaderboard.slice(0, 5).every((e) => (e.xp ?? 0) === 0)
-                      ? "Leaderboard is warming up"
-                      : xpBehindTop > 0 && top
-                        ? `${formatNumber(xpBehindTop)} XP behind #1 · Dept rank #${stats.departmentRank || "—"}`
-                        : myRank === 1
-                          ? "You're #1 — defend the lead"
-                          : `Skill score ${stats.skillScore}`}
-                  </p>
-                </div>
-                <Button asChild variant="ghost" size="sm">
-                  <Link href="/dashboard/leaderboard">Full board</Link>
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-2.5">
-                {leaderboard.slice(0, 5).map((entry) => {
-                  const isYou = entry.userId === user.id;
-                  const isTop = entry.rank === 1;
-                  return (
-                    <div
-                      key={entry.userId}
-                      className={cn(
-                        "flex items-center gap-3 rounded-2xl px-3 py-2.5",
-                        isYou && "bg-primary/10 ring-1 ring-primary/20",
-                        !isYou && isTop && "bg-warning/10"
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "w-6 text-center text-xs font-bold tabular-nums",
-                          isTop ? "text-warning" : "text-muted-foreground"
-                        )}
-                      >
-                        {entry.rank}
-                      </span>
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={entry.avatar} />
-                        <AvatarFallback>{entry.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">
-                          {entry.name}
-                          {isYou ? " (you)" : ""}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {formatNumber(entry.xp)} XP
-                          {!isYou && entry.xp > xp
-                            ? ` · +${formatNumber(entry.xp - xp)} ahead`
-                            : !isYou && xp > entry.xp
-                              ? ` · you lead by ${formatNumber(xp - entry.xp)}`
-                              : ""}
-                        </p>
-                      </div>
-                      {isTop && <Flame className="h-4 w-4 text-warning stroke-[1.75]" />}
+        {coursesLoading ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-[72px] rounded-lg" />
+            ))}
+          </div>
+        ) : myCourses.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {continueCourse
+              ? "Other enrollments will appear here as you start more courses."
+              : "No courses in progress yet. "}
+            {!continueCourse && (
+              <Link
+                href="/dashboard/courses"
+                className="font-medium text-primary underline-offset-2 hover:underline"
+              >
+                Browse the catalog
+              </Link>
+            )}
+          </p>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {myCourses.map((c) => {
+              const href = `/dashboard/courses/${c.slug ?? c.id}`;
+              const action =
+                c.status === "completed"
+                  ? "Review"
+                  : c.progress > 0
+                    ? "Continue"
+                    : "Start";
+              return (
+                <li key={c.id}>
+                  <Link
+                    href={href}
+                    className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted/30"
+                  >
+                    <div className="relative h-12 w-[72px] shrink-0 overflow-hidden rounded-md bg-muted">
+                      <Image
+                        src={c.thumbnail}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
                     </div>
-                  );
-                })}
-                {!leaderboard.slice(0, 5).some((e) => e.userId === user.id) && myRank > 0 && (
-                  <div className="flex items-center gap-3 rounded-2xl bg-primary/10 px-3 py-2.5 ring-1 ring-primary/20">
-                    <span className="w-6 text-center text-xs font-bold text-primary tabular-nums">
-                      {myRank}
-                    </span>
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.avatar} />
-                      <AvatarFallback>{user.name[0]}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{user.name} (you)</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {formatNumber(xp)} XP · climb into the top 5
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="truncate text-sm font-medium">{c.title}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {DEPARTMENT_LABELS[c.department] ?? c.department}
+                        {" · "}
+                        {LEVEL_LABELS[c.level] ?? c.level}
+                      </p>
+                      {c.status !== "completed" && (
+                        <div className="flex items-center gap-2">
+                          <Progress value={c.progress} className="h-1 flex-1" />
+                          <span className="text-[11px] tabular-nums text-muted-foreground">
+                            {c.progress}%
+                          </span>
+                        </div>
+                      )}
+                      <p className="text-[11px] font-medium text-primary">
+                        {c.status === "completed" ? "Completed" : `${action} →`}
                       </p>
                     </div>
-                  </div>
-                )}
-                <Button asChild className="mt-2 w-full gap-2">
-                  <Link href={continueHref}>
-                    <Zap className="h-4 w-4 stroke-[1.75]" /> Earn XP — study now
                   </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </motion.section>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </motion.section>
 
-          <motion.section {...fade} transition={{ delay: 0.1 }}>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Hours this week</CardTitle>
-                <p className="text-caption">From your lesson activity</p>
-              </CardHeader>
-              <CardContent>
-                <HoursChart data={home.weeklyHours} />
-              </CardContent>
-            </Card>
-          </motion.section>
-        </div>
-      </div>
+      {/* 8. Recommended for you — discovery, tertiary */}
+      {(catalogLoading || recommendations.length > 0) && (
+        <motion.section {...fade} transition={{ ...fade.transition, delay: 0.09 }}>
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight">Recommended for you</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Path gaps, department trending, and adjacent skills
+              </p>
+            </div>
+            <SectionLink href="/dashboard/courses">Browse catalog</SectionLink>
+          </div>
+
+          {catalogLoading && recommendations.length === 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-[84px] rounded-lg" />
+              ))}
+            </div>
+          ) : (
+            <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {recommendations.map(({ course: c, reason }) => {
+                const href = `/dashboard/courses/${c.slug ?? c.id}`;
+                return (
+                  <li key={c.id}>
+                    <Link
+                      href={href}
+                      className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted/30"
+                    >
+                      <div className="relative h-12 w-[72px] shrink-0 overflow-hidden rounded-md bg-muted">
+                        <Image
+                          src={c.thumbnail}
+                          alt=""
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="text-[11px] font-medium text-muted-foreground">
+                          {reason}
+                        </p>
+                        <p className="truncate text-sm font-medium">{c.title}</p>
+                        <p className="truncate text-[11px] text-muted-foreground">
+                          {DEPARTMENT_LABELS[c.department] ?? c.department}
+                          {" · "}
+                          {LEVEL_LABELS[c.level] ?? c.level}
+                          {" · "}
+                          {formatHours(c.durationHours)}
+                        </p>
+                        <p className="text-[11px] font-medium text-primary">Explore →</p>
+                      </div>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </motion.section>
+      )}
     </div>
   );
 }

@@ -1,49 +1,122 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  ArrowRight,
   Award,
   BookOpen,
   Brain,
+  ChevronRight,
   ClipboardCheck,
   Clock,
   FileText,
   Folders,
   GraduationCap,
-  Lightbulb,
   Route,
   Shield,
   TrendingUp,
   UserRoundSearch,
   Users,
+  type LucideIcon,
 } from "lucide-react";
-import { PageHeader } from "@/components/shared/page-header";
-import { StatCard } from "@/components/cards/stat-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAnalytics, useDepartmentsLive, useLeaderboardLive } from "@/hooks/use-operations";
 import { DEPARTMENT_LABELS } from "@/constants/navigation";
-import { formatNumber } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 
-const fade = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
+const fade = {
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const },
+};
 
-const quickLinks = [
-  { title: "Employee Progress", description: "Search employees and review learning progress dashboards", href: "/dashboard/admin/employee-progress", icon: UserRoundSearch },
-  { title: "Catalog Audit", description: "Validate course URLs and intro videos vs catalog", href: "/dashboard/admin/catalog-audit", icon: ClipboardCheck },
-  { title: "Promotions", description: "See who is eligible and approve level advances", href: "/dashboard/admin/promotions", icon: TrendingUp },
-  { title: "Course Management", description: "Create, publish, and archive department courses", href: "/dashboard/admin/courses", icon: Folders },
-  { title: "User Management", description: "Invite users, assign roles, and manage access", href: "/dashboard/admin/users", icon: Users },
-  { title: "Assessments", description: "Build and publish quizzes and exams", href: "/dashboard/admin/assessments", icon: ClipboardCheck },
-  { title: "Learning Paths", description: "Design multi-course learning journeys", href: "/dashboard/admin/paths", icon: Route },
-  { title: "Assignments", description: "Create graded assignments and review submissions", href: "/dashboard/admin/assignments", icon: FileText },
-  { title: "Certificates", description: "Issue, revoke, and reissue credentials", href: "/dashboard/admin/certificates", icon: Award },
+type QuickLink = {
+  title: string;
+  description: string;
+  href: string;
+  icon: LucideIcon;
+};
+
+const primaryActions = [
+  {
+    title: "Employee Progress",
+    href: "/dashboard/admin/employee-progress",
+    icon: UserRoundSearch,
+  },
+  {
+    title: "Promotions",
+    href: "/dashboard/admin/promotions",
+    icon: TrendingUp,
+  },
+] as const;
+
+const adminTools: QuickLink[] = [
+  {
+    title: "Course assignments",
+    description: "Assign mandatory courses by level",
+    href: "/dashboard/admin/course-assignments",
+    icon: BookOpen,
+  },
+  {
+    title: "Course management",
+    description: "Publish and archive catalog courses",
+    href: "/dashboard/admin/courses",
+    icon: Folders,
+  },
+  {
+    title: "Assessments",
+    description: "Build quizzes and knowledge checks",
+    href: "/dashboard/admin/assessments",
+    icon: ClipboardCheck,
+  },
+  {
+    title: "Homework",
+    description: "Create and review submissions",
+    href: "/dashboard/admin/assignments",
+    icon: FileText,
+  },
+  {
+    title: "Learning paths",
+    description: "Design multi-course journeys",
+    href: "/dashboard/admin/paths",
+    icon: Route,
+  },
+  {
+    title: "Users",
+    description: "Roles, invites, and access",
+    href: "/dashboard/admin/users",
+    icon: Users,
+  },
+  {
+    title: "Certificates",
+    description: "Issue, revoke, and reissue",
+    href: "/dashboard/admin/certificates",
+    icon: Award,
+  },
+  {
+    title: "Catalog audit",
+    description: "Validate course URLs and media",
+    href: "/dashboard/admin/catalog-audit",
+    icon: ClipboardCheck,
+  },
 ];
+
+function SectionLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+    >
+      {children}
+      <ChevronRight className="h-3.5 w-3.5" />
+    </Link>
+  );
+}
 
 export default function AdminPage() {
   const { data: analytics, isLoading: analyticsLoading } = useAnalytics();
@@ -53,8 +126,9 @@ export default function AdminPage() {
   if (analyticsLoading || deptsLoading || lbLoading || !analytics) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Admin Overview" description="Loading organization analytics…" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-10 w-56" />
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
       </div>
     );
   }
@@ -64,7 +138,8 @@ export default function AdminPage() {
     snapshot.departments.length === 0
       ? 0
       : Math.round(
-          snapshot.departments.reduce((s, d) => s + d.avgCompletion, 0) / snapshot.departments.length
+          snapshot.departments.reduce((s, d) => s + d.avgCompletion, 0) /
+            snapshot.departments.length
         );
 
   const sortedByCompletion = [...snapshot.departments].sort(
@@ -73,194 +148,268 @@ export default function AdminPage() {
   const lowest = sortedByCompletion[0];
   const highest = sortedByCompletion[sortedByCompletion.length - 1];
 
-  const aiInsights = [
+  const insights = [
     lowest
       ? {
           title: `${lowest.name} needs support`,
-          description: `${lowest.name} completion rate (${lowest.avgCompletion}%) is below org average (${avgCompletion}%). Schedule mentorship sessions.`,
+          description: `Completion at ${lowest.avgCompletion}% vs ${avgCompletion}% org average.`,
           priority: "high" as const,
         }
       : null,
     highest
       ? {
           title: `${highest.name} leads adoption`,
-          description: `${highest.name} at ${highest.avgCompletion}% completion — share their onboarding playbook with other departments.`,
+          description: `${highest.avgCompletion}% completion — share their playbook.`,
           priority: "medium" as const,
         }
       : null,
     {
       title: "Assessment activity",
-      description: `${snapshot.assessmentsTaken} assessments taken with ${snapshot.avgAssessmentScore}% average score across the organization.`,
+      description: `${snapshot.assessmentsTaken} taken · ${snapshot.avgAssessmentScore}% avg score.`,
       priority: "low" as const,
     },
-  ].filter(Boolean) as { title: string; description: string; priority: "high" | "medium" | "low" }[];
+  ].filter(Boolean) as {
+    title: string;
+    description: string;
+    priority: "high" | "medium" | "low";
+  }[];
 
   const displayDepartments = departments.length > 0 ? departments : snapshot.departments;
+  const learningHours = Math.round(snapshot.completedLessons * 0.5);
+
+  const metrics = [
+    {
+      label: "Employees",
+      value: formatNumber(snapshot.totalUsers),
+      meta: `${snapshot.activeUsers} active`,
+      icon: Users,
+    },
+    {
+      label: "Active courses",
+      value: String(snapshot.publishedCourses),
+      meta: `${snapshot.publishedAssessments} assessments`,
+      icon: BookOpen,
+    },
+    {
+      label: "Learning hours",
+      value: formatNumber(learningHours),
+      meta: `${formatNumber(snapshot.completedLessons)} lessons`,
+      icon: Clock,
+    },
+    {
+      label: "Completion",
+      value: `${avgCompletion}%`,
+      meta: `${formatNumber(snapshot.certificatesEarned)} certificates`,
+      icon: GraduationCap,
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Admin Overview"
-        description="Organization analytics, top performers, and administrative quick actions."
-      >
-        <Badge variant="outline" className="gap-1">
-          <Shield className="h-3 w-3" /> Department Head
-        </Badge>
-      </PageHeader>
-
-      <motion.section
-        {...fade}
-        transition={{ duration: 0.4 }}
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
-      >
-        <StatCard
-          title="Total Employees"
-          value={formatNumber(snapshot.totalUsers)}
-          icon={Users}
-          subtitle={`${snapshot.activeUsers} active · ${snapshot.departments.length} departments`}
-          accent="success"
-        />
-        <StatCard
-          title="Active Courses"
-          value={snapshot.publishedCourses}
-          icon={BookOpen}
-          subtitle={`${snapshot.publishedAssessments} assessments`}
-          accent="info"
-        />
-        <StatCard
-          title="Learning Hours"
-          value={formatNumber(Math.round(snapshot.completedLessons * 0.5))}
-          icon={Clock}
-          subtitle={`${formatNumber(snapshot.completedLessons)} lessons completed`}
-          accent="success"
-        />
-        <StatCard
-          title="Completion Rate"
-          value={`${avgCompletion}%`}
-          icon={GraduationCap}
-          subtitle={`${formatNumber(snapshot.certificatesEarned)} certificates`}
-          accent="warning"
-        />
-      </motion.section>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <motion.section
-          {...fade}
-          transition={{ delay: 0.05, duration: 0.4 }}
-          className="lg:col-span-2 space-y-4"
-        >
-          <div className="flex items-center gap-2">
-            <Brain className="h-5 w-5 text-primary" />
-            <h2 className="font-display text-lg font-semibold">AI Insights</h2>
+    <div className="w-full space-y-6">
+      {/* 1. Header */}
+      <motion.header {...fade} className="space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight">Admin Overview</h1>
+              <Badge variant="outline" className="gap-1 font-normal">
+                <Shield className="h-3 w-3" />
+                Department Head
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Org health, who needs attention, and the tools to act.
+            </p>
           </div>
-          <div className="space-y-3">
-            {aiInsights.map((insight) => (
-              <Card key={insight.title}>
-                <CardContent className="flex gap-4 p-5">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <Lightbulb className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">{insight.title}</p>
-                      <Badge
-                        variant={
-                          insight.priority === "high"
-                            ? "destructive"
-                            : insight.priority === "medium"
-                              ? "warning"
-                              : "secondary"
-                        }
-                        className="capitalize"
-                      >
-                        {insight.priority}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">{insight.description}</p>
-                  </div>
-                </CardContent>
-              </Card>
+          <div className="flex flex-wrap gap-2">
+            {primaryActions.map((action) => (
+              <Button key={action.href} asChild size="sm" variant={action === primaryActions[0] ? "default" : "outline"} className="h-9 gap-1.5">
+                <Link href={action.href}>
+                  <action.icon className="h-3.5 w-3.5" />
+                  {action.title}
+                </Link>
+              </Button>
             ))}
           </div>
-        </motion.section>
+        </div>
+      </motion.header>
 
-        <motion.section {...fade} transition={{ delay: 0.1, duration: 0.4 }} className="space-y-4">
-          <h2 className="font-display text-lg font-semibold">Quick Links</h2>
-          {quickLinks.map((link) => (
-            <Card key={link.href} className="group transition hover:border-primary/40">
-              <CardContent className="p-5">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-primary">
-                    <link.icon className="h-5 w-5" />
+      {/* 2. KPI strip — one composition, not four competing cards */}
+      <motion.section
+        {...fade}
+        transition={{ ...fade.transition, delay: 0.03 }}
+        className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-4"
+      >
+        {metrics.map((m) => (
+          <div key={m.label} className="bg-card px-4 py-3.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">{m.label}</p>
+              <m.icon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+            </div>
+            <p className="mt-1.5 font-display text-2xl font-semibold tracking-tight tabular-nums">
+              {m.value}
+            </p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">{m.meta}</p>
+          </div>
+        ))}
+      </motion.section>
+
+      {/* 3. Attention + Top performers */}
+      <motion.section
+        {...fade}
+        transition={{ ...fade.transition, delay: 0.05 }}
+        className="grid gap-4 lg:grid-cols-12 lg:gap-5"
+      >
+        <div className="flex min-h-0 flex-col rounded-xl border border-border bg-card lg:col-span-7">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Brain className="h-4 w-4 text-primary" aria-hidden />
+              <h2 className="text-sm font-semibold tracking-tight">Needs attention</h2>
+            </div>
+            <span className="text-[11px] text-muted-foreground">{insights.length} signals</span>
+          </div>
+          <ul className="divide-y divide-border">
+            {insights.map((insight) => (
+              <li key={insight.title} className="flex gap-3 px-4 py-3">
+                <span
+                  className={cn(
+                    "mt-1.5 h-2 w-2 shrink-0 rounded-full",
+                    insight.priority === "high" && "bg-destructive",
+                    insight.priority === "medium" && "bg-warning",
+                    insight.priority === "low" && "bg-muted-foreground/40"
+                  )}
+                  aria-hidden
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium">{insight.title}</p>
+                    <Badge
+                      variant={
+                        insight.priority === "high"
+                          ? "destructive"
+                          : insight.priority === "medium"
+                            ? "warning"
+                            : "secondary"
+                      }
+                      className="px-1.5 py-0 text-[10px] capitalize"
+                    >
+                      {insight.priority}
+                    </Badge>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium">{link.title}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{link.description}</p>
-                    <Button asChild variant="ghost" size="sm" className="mt-2 h-8 gap-1 px-0 text-primary">
-                      <Link href={link.href}>
-                        Open <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" />
-                      </Link>
-                    </Button>
-                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{insight.description}</p>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </motion.section>
-      </div>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              Top Performers
-            </CardTitle>
-            <CardDescription>Company leaderboard — highest XP earners</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="flex min-h-0 flex-col rounded-xl border border-border bg-card lg:col-span-5">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold tracking-tight">Top performers</h2>
+            <SectionLink href="/dashboard/leaderboard">Leaderboard</SectionLink>
+          </div>
+          <ul className="divide-y divide-border">
             {leaderboard.slice(0, 5).map((entry) => (
-              <div key={entry.userId} className="flex items-center gap-3">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-xs font-semibold">
+              <li key={entry.userId} className="flex items-center gap-3 px-4 py-2.5">
+                <span className="w-5 shrink-0 text-center text-xs font-semibold tabular-nums text-muted-foreground">
                   {entry.rank}
                 </span>
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src={entry.avatar} />
-                  <AvatarFallback>{entry.name[0]}</AvatarFallback>
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={entry.avatar} alt="" />
+                  <AvatarFallback className="text-xs">{entry.name[0]}</AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{entry.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="truncate text-[11px] text-muted-foreground">
                     {DEPARTMENT_LABELS[entry.department]} · {formatNumber(entry.xp)} XP
                   </p>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Award className="h-3.5 w-3.5" />
+                <span className="inline-flex shrink-0 items-center gap-1 text-[11px] tabular-nums text-muted-foreground">
+                  <Award className="h-3 w-3" aria-hidden />
                   {entry.certificates}
-                </div>
-              </div>
+                </span>
+              </li>
             ))}
-          </CardContent>
-        </Card>
+            {leaderboard.length === 0 && (
+              <li className="px-4 py-8 text-center text-sm text-muted-foreground">
+                No leaderboard data yet.
+              </li>
+            )}
+          </ul>
+        </div>
+      </motion.section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Department completion rates</CardTitle>
-            <CardDescription>Average course completion by department</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {displayDepartments.slice(0, 6).map((dept) => (
-              <div key={dept.id}>
-                <div className="mb-1.5 flex items-center justify-between text-sm">
-                  <span className="font-medium">{dept.name}</span>
-                  <span className="text-muted-foreground">{dept.avgCompletion}%</span>
-                </div>
-                <Progress value={dept.avgCompletion} className="h-2" />
+      {/* 4. Department health */}
+      <motion.section
+        {...fade}
+        transition={{ ...fade.transition, delay: 0.07 }}
+        className="rounded-xl border border-border bg-card"
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight">Department completion</h2>
+            <p className="text-[11px] text-muted-foreground">
+              Average course completion · org avg {avgCompletion}%
+            </p>
+          </div>
+          <SectionLink href="/dashboard/departments">Departments</SectionLink>
+        </div>
+        <div className="grid gap-x-6 gap-y-3 p-4 sm:grid-cols-2">
+          {displayDepartments.slice(0, 8).map((dept) => (
+            <div key={dept.id}>
+              <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+                <span className="truncate font-medium">{dept.name}</span>
+                <span
+                  className={cn(
+                    "shrink-0 tabular-nums text-xs",
+                    dept.avgCompletion < avgCompletion
+                      ? "font-medium text-destructive"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {dept.avgCompletion}%
+                </span>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+              <Progress value={dept.avgCompletion} className="h-1.5" />
+            </div>
+          ))}
+          {displayDepartments.length === 0 && (
+            <p className="col-span-full py-6 text-center text-sm text-muted-foreground">
+              No department data yet.
+            </p>
+          )}
+        </div>
+      </motion.section>
+
+      {/* 5. Admin tools — dense grid, not stacked cards */}
+      <motion.section {...fade} transition={{ ...fade.transition, delay: 0.09 }} className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold tracking-tight">Admin tools</h2>
+          <p className="text-[11px] text-muted-foreground">Jump to the console you need</p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {adminTools.map((tool) => (
+            <Link
+              key={tool.href}
+              href={tool.href}
+              className="group flex items-start gap-3 rounded-xl border border-border bg-card px-3.5 py-3 transition-colors hover:border-primary/35 hover:bg-muted/30"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
+                <tool.icon className="h-4 w-4" aria-hidden />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium leading-tight group-hover:text-primary">
+                  {tool.title}
+                </p>
+                <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+                  {tool.description}
+                </p>
+              </div>
+              <ChevronRight className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+            </Link>
+          ))}
+        </div>
+      </motion.section>
     </div>
   );
 }
