@@ -72,6 +72,7 @@ export default function AdminCoursesPage() {
     description: "",
     departmentId: "development" as DepartmentId,
     learningCategory: "role" as LearningCategory,
+    openToAll: true,
   });
 
   const { data: courses = [], isLoading } = useAdminCourses({
@@ -112,6 +113,7 @@ export default function AdminCoursesPage() {
         description: form.description || "Course description pending.",
         departmentId: form.departmentId,
         learningCategory: form.learningCategory,
+        openToAll: form.openToAll,
       });
       toast.success("Course created");
       setDialogOpen(false);
@@ -120,6 +122,7 @@ export default function AdminCoursesPage() {
         description: "",
         departmentId: "development",
         learningCategory: "role",
+        openToAll: true,
       });
       router.push(`/dashboard/admin/courses/${created.id}`);
     } catch {
@@ -188,6 +191,25 @@ export default function AdminCoursesPage() {
                       Role-based = career track · Goal-based = skill or objective learning
                     </p>
                   </div>
+                  <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-input bg-card px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium">Open to all employees</p>
+                      <p className="text-xs text-muted-foreground">
+                        When off, only employees in the selected department can see this course
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={form.openToAll}
+                      onClick={() => setForm((f) => ({ ...f, openToAll: !f.openToAll }))}
+                      className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${form.openToAll ? "bg-primary" : "bg-input"}`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-background shadow-lg transition-transform ${form.openToAll ? "translate-x-5" : "translate-x-0"}`}
+                      />
+                    </button>
+                  </label>
                 </div>
                 <DialogFooter>
                   <Button type="submit" disabled={createCourse.isPending}>
@@ -329,6 +351,9 @@ export default function AdminCoursesPage() {
                     >
                       {LEARNING_CATEGORY_LABELS[course.learningCategory] ??
                         course.learningCategory}
+                    </Badge>
+                    <Badge variant={course.openToAll ? "secondary" : "outline"}>
+                      {course.openToAll ? "Open to all" : "Dept. only"}
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">

@@ -59,9 +59,9 @@ export async function getAdminCourses(filters?: {
   });
 }
 
-export async function getPublishedCourses() {
+export async function getPublishedCourses(userDepartmentId?: string) {
   const db = getDb();
-  return db
+  const rows = await db
     .select({
       course: courses,
       instructor: instructors,
@@ -70,6 +70,13 @@ export async function getPublishedCourses() {
     .leftJoin(instructors, eq(courses.instructorId, instructors.id))
     .where(eq(courses.publishStatus, "published"))
     .orderBy(desc(courses.updatedAt));
+
+  if (!userDepartmentId) return rows;
+
+  // When a department is known: show openToAll courses + department-specific ones
+  return rows.filter(
+    (r) => r.course.openToAll || r.course.departmentId === userDepartmentId
+  );
 }
 
 export async function getCourseById(id: string) {

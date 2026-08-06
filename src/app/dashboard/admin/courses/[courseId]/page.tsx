@@ -289,6 +289,28 @@ export default function CourseBuilderPage() {
               refetch();
             }}
           />
+          <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-input bg-card px-4 py-3 md:col-span-2">
+            <div>
+              <p className="text-sm font-medium">Open to all employees</p>
+              <p className="text-xs text-muted-foreground">
+                When off, only employees in the selected department can see this course
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={c.openToAll}
+              onClick={async () => {
+                await updateCourseAction({ id: courseId, openToAll: !c.openToAll });
+                refetch();
+              }}
+              className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${c.openToAll ? "bg-primary" : "bg-input"}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-background shadow-lg transition-transform ${c.openToAll ? "translate-x-5" : "translate-x-0"}`}
+              />
+            </button>
+          </label>
         </CardContent>
       </Card>
 

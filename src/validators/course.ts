@@ -41,6 +41,7 @@ export const createCourseSchema = z.object({
   learningObjectives: z.array(z.string()).default([]),
   prerequisites: z.array(z.string()).default([]),
   isTrending: z.boolean().default(false),
+  openToAll: z.boolean().default(true),
 });
 
 export const updateCourseSchema = createCourseSchema.partial().extend({

@@ -74,8 +74,11 @@ export async function fetchAssignableCoursesAction() {
 
 export async function fetchPublishedCoursesAction() {
   const userId = await requireUserId();
+  const profile = await (await import("@/lib/profile")).getProfileByUserId(userId);
+  const userDepartmentId = profile?.department ?? undefined;
+
   const [rows, prefs, completedSet] = await Promise.all([
-    getPublishedCourses(),
+    getPublishedCourses(userDepartmentId),
     (await import("@/services/me")).fetchMyPreferencesAction(),
     getUserCompletedLessonIdSet(userId),
   ]);
@@ -181,6 +184,7 @@ export async function createCourseAction(input: unknown) {
       learningObjectives: data.learningObjectives,
       prerequisites: data.prerequisites,
       isTrending: data.isTrending,
+      openToAll: data.openToAll ?? true,
       publishStatus: "draft",
     })
     .returning();
@@ -217,6 +221,7 @@ export async function updateCourseAction(input: unknown) {
       ...(data.prerequisites !== undefined ? { prerequisites: data.prerequisites } : {}),
       ...(data.durationMinutes !== undefined ? { durationMinutes: data.durationMinutes } : {}),
       ...(data.isTrending !== undefined ? { isTrending: data.isTrending } : {}),
+      ...(data.openToAll !== undefined ? { openToAll: data.openToAll } : {}),
       ...(data.publishStatus !== undefined ? { publishStatus: data.publishStatus } : {}),
       updatedAt: new Date(),
     })

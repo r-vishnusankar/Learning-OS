@@ -71,6 +71,7 @@ export const courses = pgTable("course", {
   enrolledCount: integer("enrolled_count").notNull().default(0),
   rating: integer("rating").notNull().default(0),
   isTrending: boolean("is_trending").notNull().default(false),
+  openToAll: boolean("open_to_all").notNull().default(true),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
