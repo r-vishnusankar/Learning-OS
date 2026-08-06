@@ -19,10 +19,11 @@ function defaultAvatar(name: string) {
 
 /**
  * Dev auth: shared password for demo admin + any existing *@nexus.local roster user.
- * Production should use Entra SSO only.
+ * Production should use Entra SSO only, unless ENABLE_DEV_LOGIN=true is set.
  */
 export async function authenticateDevUser(email: string, password: string) {
-  if (process.env.NODE_ENV === "production") {
+  const devLoginEnabled = process.env.ENABLE_DEV_LOGIN === "true";
+  if (process.env.NODE_ENV === "production" && !devLoginEnabled) {
     return null;
   }
 
