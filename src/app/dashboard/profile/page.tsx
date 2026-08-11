@@ -63,7 +63,7 @@ export default function ProfilePage() {
       date: user.joinDate
         ? new Date(user.joinDate).toLocaleDateString("en-US", { month: "short", year: "numeric" })
         : "—",
-      title: "Joined Nexus",
+      title: "Joined Skillrr",
       description: `Onboarded as ${user.designation} in ${DEPARTMENT_LABELS[user.department]}`,
     },
     ...earnedCerts.slice(0, 3).map((c) => ({
@@ -94,7 +94,7 @@ export default function ProfilePage() {
     <div className="space-y-6">
       <PageHeader
         title="My Profile"
-        description="Your learning journey, credentials, and career progress at Nexus."
+        description="Your learning journey, credentials, and career progress at Skillrr."
       />
 
       <motion.section
@@ -183,7 +183,7 @@ export default function ProfilePage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Career timeline</CardTitle>
-            <CardDescription>Milestones from your Nexus account</CardDescription>
+            <CardDescription>Milestones from your Skillrr account</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="relative space-y-0">

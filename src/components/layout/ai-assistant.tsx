@@ -26,7 +26,7 @@ export function AiAssistant() {
     {
       role: "assistant",
       content:
-        "Hi — I'm your Nexus AI Mentor. I can summarize lessons, recommend paths, generate quizzes, and help with career guidance.",
+        "Hi — I'm your Skillrr AI Mentor. I can summarize lessons, recommend paths, generate quizzes, and help with career guidance.",
     },
   ]);
 
@@ -56,7 +56,7 @@ export function AiAssistant() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.96 }}
         onClick={() => setAiOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-br from-primary-strong to-chart-2 text-primary-foreground shadow-lg shadow-primary/30"
+        className="fixed bottom-6 right-6 z-40 flex h-11 w-11 items-center justify-center rounded-[length:var(--radius-lg)] bg-foreground text-background shadow-(--shadow-md)"
         aria-label="Open AI Mentor"
       >
         <Sparkles className="h-6 w-6" />
@@ -68,17 +68,17 @@ export function AiAssistant() {
             initial={{ opacity: 0, y: 24, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.96 }}
-            className="fixed bottom-24 right-6 z-50 flex h-[520px] w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
+            className="fixed bottom-24 right-6 z-50 flex h-[500px] w-[360px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[length:var(--radius-lg)] border border-border bg-card shadow-(--shadow-lg)"
           >
-            <div className="flex items-center justify-between border-b bg-linear-to-r from-primary-strong to-chart-2 px-4 py-3 text-primary-foreground">
+            <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3 text-foreground">
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4" />
                 <div>
                   <p className="text-sm font-semibold">AI Mentor</p>
-                  <p className="text-[11px] text-white/80">Always on · Enterprise secure</p>
+                  <p className="text-[11px] text-muted-foreground">Always on · Enterprise secure</p>
                 </div>
               </div>
-              <Button variant="ghost" size="icon-sm" className="text-white hover:bg-white/15" onClick={() => setAiOpen(false)}>
+              <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:bg-secondary" onClick={() => setAiOpen(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -88,10 +88,10 @@ export function AiAssistant() {
                 <div
                   key={i}
                   className={cn(
-                    "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
+                    "max-w-[85%] rounded-[length:var(--radius)] px-3 py-2 text-sm leading-relaxed",
                     m.role === "assistant"
-                      ? "bg-muted text-foreground"
-                      : "ml-auto bg-primary text-primary-foreground"
+                      ? "bg-secondary text-foreground"
+                      : "ml-auto bg-foreground text-background"
                   )}
                 >
                   {m.role === "assistant" ? (
@@ -109,7 +109,7 @@ export function AiAssistant() {
                   key={s}
                   type="button"
                   onClick={() => send(s)}
-                  className="rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+                  className="rounded-[length:var(--radius)] border border-border bg-card px-2.5 py-1 text-[11px] text-muted-foreground transition-colors duration-150 hover:border-border-control hover:text-foreground"
                 >
                   {s}
                 </button>
@@ -127,7 +127,7 @@ export function AiAssistant() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask anything…"
-                className="h-10 flex-1 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                className="h-8 flex-1 rounded-[length:var(--radius-control)] border border-border bg-background px-3 text-sm outline-none transition-colors hover:border-border-control focus:border-ring focus:ring-2 focus:ring-ring/20"
               />
               <Button type="submit" size="icon" disabled={!input.trim()}>
                 <Send className="h-4 w-4" />

@@ -155,7 +155,7 @@ export default function AnalyticsPage() {
           <Brain className="h-5 w-5 text-primary" />
           <h2 className="font-display text-lg font-semibold">AI Insights</h2>
           <Badge variant="info" className="gap-1">
-            <Zap className="h-3 w-3" /> Nexus AI
+            <Zap className="h-3 w-3" /> Skillrr AI
           </Badge>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">

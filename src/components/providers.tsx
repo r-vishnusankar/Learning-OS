@@ -23,7 +23,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         attribute="class"
         defaultTheme="light"
         enableSystem
-        storageKey="nexus-theme"
+        storageKey="skillrr-theme"
         disableTransitionOnChange
       >
         <QueryClientProvider client={queryClient}>

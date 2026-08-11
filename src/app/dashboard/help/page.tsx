@@ -49,7 +49,7 @@ const STEPS = [
   },
   {
     title: "Pass the course assessment",
-    body: "When lessons are done, Nexus opens (or prompts) the knowledge check for that course. You must pass it — lessons alone are not enough.",
+    body: "When lessons are done, Skillrr opens (or prompts) the knowledge check for that course. You must pass it — lessons alone are not enough.",
     href: "/dashboard/assessments",
     icon: ClipboardCheck,
   },
@@ -69,12 +69,12 @@ const STEPS = [
 
 const FAQS: FaqItem[] = [
   {
-    id: "what-is-nexus",
+    id: "what-is-skillrr",
     category: "Getting started",
-    question: "What is Nexus and what should I do first?",
+    question: "What is Skillrr and what should I do first?",
     answer: (
       <p>
-        Nexus is your company learning and career platform. Start on the{" "}
+        Skillrr is your company learning and career platform. Start on the{" "}
         <strong>Dashboard</strong> to see career progress, then go to{" "}
         <strong>My Learning</strong> for courses assigned to your role and level. Finish those
         courses and pass their assessments to become promotion-eligible.
@@ -381,7 +381,7 @@ export default function HelpPage() {
               How promotion works (read this first)
             </CardTitle>
             <CardDescription>
-              Nexus gates career level advancement on learning proof — not courses alone.
+              Skillrr gates career level advancement on learning proof — not courses alone.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

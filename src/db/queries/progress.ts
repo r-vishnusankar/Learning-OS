@@ -10,7 +10,7 @@ export async function upsertLessonProgress(input: {
 }) {
   const db = getDb();
   const now = new Date();
-  const completed = input.completed ?? input.percentage >= 100;
+  const wantCompleted = input.completed ?? input.percentage >= 100;
 
   const [existing] = await db
     .select()
@@ -18,14 +18,21 @@ export async function upsertLessonProgress(input: {
     .where(and(eq(lessonProgress.userId, input.userId), eq(lessonProgress.lessonId, input.lessonId)))
     .limit(1);
 
-  const completedAt = completed ? now : existing?.completedAt ?? null;
+  // Completion is one-way; percentage never decreases. Views must not wipe either.
+  const completed = Boolean(existing?.completed) || wantCompleted;
+  const percentage = Math.max(
+    existing?.percentage ?? 0,
+    input.percentage,
+    completed ? 100 : 0
+  );
+  const completedAt = completed ? (existing?.completedAt ?? now) : null;
 
   await db
     .insert(lessonProgress)
     .values({
       userId: input.userId,
       lessonId: input.lessonId,
-      percentage: input.percentage,
+      percentage,
       completed,
       lastViewedAt: now,
       completedAt,
@@ -33,14 +40,14 @@ export async function upsertLessonProgress(input: {
     .onConflictDoUpdate({
       target: [lessonProgress.userId, lessonProgress.lessonId],
       set: {
-        percentage: input.percentage,
+        percentage,
         completed,
         lastViewedAt: now,
         completedAt,
       },
     });
 
-  return { percentage: input.percentage, completed };
+  return { percentage, completed };
 }
 
 export async function markLessonComplete(userId: string, lessonId: string) {

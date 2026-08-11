@@ -93,7 +93,7 @@ export default function AiMentorPage() {
     setMessages([
       {
         role: "assistant",
-        content: `Hi ${firstName} — I'm your Nexus AI Mentor. I can summarize lessons, explain concepts, generate quizzes, run mock interviews, and analyze your skills. How can I help today?`,
+        content: `Hi ${firstName} — I'm your Skillrr AI Mentor. I can summarize lessons, explain concepts, generate quizzes, run mock interviews, and analyze your skills. How can I help today?`,
       },
     ]);
     setGreetingReady(true);
@@ -169,7 +169,7 @@ export default function AiMentorPage() {
               <MessageSquare className="h-5 w-5" />
             </div>
             <div>
-              <p className="font-display font-semibold">Nexus AI Mentor</p>
+              <p className="font-display font-semibold">Skillrr AI Mentor</p>
               <p className="text-xs text-teal-100">Powered by enterprise AI · Context-aware</p>
             </div>
           </div>

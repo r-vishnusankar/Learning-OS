@@ -46,7 +46,7 @@ async function seedCertification() {
       .values({
         title: "Senior Systems Engineer Track",
         description:
-          "Progress from system design fundamentals through assessment to a verifiable Nexus certificate.",
+          "Progress from system design fundamentals through assessment to a verifiable Skillrr certificate.",
         departmentId: "development",
         level: "senior",
         thumbnailUrl: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&q=80",

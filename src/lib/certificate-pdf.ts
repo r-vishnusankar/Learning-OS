@@ -39,7 +39,7 @@ export function openCertificatePrintWindow(opts: {
 </head>
 <body>
   <div class="frame">
-    <div class="brand">Nexus · Enterprise Learning Platform</div>
+    <div class="brand">Skillrr · Learning that unlocks achievement</div>
     <h1>Certificate of Achievement</h1>
     <p class="sub">This certifies that</p>
     <div class="name">${opts.holderName}</div>

@@ -58,7 +58,7 @@ const levelRoadmaps: Record<LearningLevel, LevelRoadmap> = {
   senior: { videos: 14, reading: 8, assignments: 6, labs: 4, assessment: "Senior Capstone", certificate: "Senior Professional", xp: 1200, badge: "Trailblazer", unlock: "Advanced cert + mentor approval" },
   lead: { videos: 10, reading: 6, assignments: 4, labs: 2, assessment: "Leadership Assessment", certificate: "Team Lead Certificate", xp: 1000, badge: "Team Catalyst", unlock: "Senior cert + 1 year tenure" },
   architect: { videos: 16, reading: 10, assignments: 6, labs: 5, assessment: "Architecture Review Board", certificate: "Architect Credential", xp: 1500, badge: "Visionary", unlock: "Senior cert + portfolio review" },
-  expert: { videos: 8, reading: 5, assignments: 3, labs: 3, assessment: "Expert Panel Evaluation", certificate: "Expert Mastery Badge", xp: 2000, badge: "Nexus Legend", unlock: "Architect cert + contribution score 90+" },
+  expert: { videos: 8, reading: 5, assignments: 3, labs: 3, assessment: "Expert Panel Evaluation", certificate: "Expert Mastery Badge", xp: 2000, badge: "Skillrr Legend", unlock: "Architect cert + contribution score 90+" },
 };
 
 export default function DepartmentDetailPage() {

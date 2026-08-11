@@ -65,6 +65,16 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) — unauthenticated users go to `/login`.
 
+### Share via Cloudflare tunnel
+
+With `npm run dev` already running, expose it on a temporary public HTTPS URL:
+
+```bash
+npm run tunnel
+```
+
+Requires [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/) on your PATH. The CLI prints a `https://*.trycloudflare.com` URL — restart the Next.js dev server after the first tunnel setup so `allowedDevOrigins` takes effect.
+
 ### Temporary dev login
 
 Until company Microsoft Entra ID is configured, use:

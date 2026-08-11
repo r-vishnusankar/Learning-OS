@@ -37,7 +37,7 @@ async function seedOperations() {
     await db.insert(notifications).values([
       {
         userId: demoUser.id,
-        title: "Welcome to Nexus Ops",
+        title: "Welcome to Skillrr",
         message: "Enterprise operations are live — manage users, teams, and analytics from Admin.",
         type: "success",
         href: "/dashboard/admin",

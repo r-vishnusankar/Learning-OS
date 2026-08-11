@@ -103,7 +103,7 @@ export async function inviteUserAction(input: unknown) {
 
   await db.insert(notifications).values({
     userId: user.id,
-    title: "Welcome to Nexus",
+    title: "Welcome to Skillrr",
     message: "Your learning account is ready. Start with My Learning or a Learning Path.",
     type: "success",
     href: "/dashboard/learning",

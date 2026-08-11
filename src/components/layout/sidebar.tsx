@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   LayoutDashboard,
   BookOpen,
@@ -24,19 +25,34 @@ import {
   Users,
   Image,
   ChevronLeft,
+  ChevronDown,
   LogOut,
   HelpCircle,
   UserRoundSearch,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { cn, isExamRoute } from "@/lib/utils";
-import { ADMIN_NAV, APP_NAME, SIDEBAR_NAV } from "@/constants/navigation";
+import {
+  ADMIN_NAV_GROUPS,
+  APP_NAME,
+  SIDEBAR_NAV_GROUPS,
+  SIDEBAR_PINNED,
+} from "@/constants/navigation";
 import { canAccessAdmin } from "@/lib/roles";
 import { useUIStore } from "@/store/ui-store";
 import { useUnreadNotificationCount } from "@/hooks/use-operations";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { NexusLogo } from "@/components/brand/nexus-logo";
+import { SkillrrIcon, SkillrrLogo } from "@/components/brand/skillrr-logo";
+import type { NavGroup, NavItem } from "@/types";
 
 const SIDEBAR_WIDTH = 240;
 
@@ -64,48 +80,72 @@ const icons: Record<string, React.ComponentType<{ className?: string }>> = {
   UserRoundSearch,
 };
 
+function isNavActive(pathname: string, href: string) {
+  if (pathname === href) return true;
+  // Exact-only for section roots so they don't steal child active states
+  if (href === "/dashboard" || href === "/dashboard/admin") return false;
+  return pathname.startsWith(`${href}/`);
+}
+
+function groupContainsPath(group: NavGroup, pathname: string) {
+  return group.items.some((item) => isNavActive(pathname, item.href));
+}
+
+function resolveGroupOpen(
+  group: NavGroup,
+  pathname: string,
+  navGroupOpen: Record<string, boolean>
+) {
+  if (Object.prototype.hasOwnProperty.call(navGroupOpen, group.id)) {
+    return navGroupOpen[group.id]!;
+  }
+  if (groupContainsPath(group, pathname)) return true;
+  return group.defaultOpen ?? false;
+}
+
 function NavLink({
   href,
   title,
   icon,
   badge,
   collapsed,
+  nested = false,
 }: {
   href: string;
   title: string;
   icon: string;
   badge?: number;
   collapsed: boolean;
+  nested?: boolean;
 }) {
   const pathname = usePathname();
-  const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+  const active = isNavActive(pathname, href);
   const Icon = icons[icon] ?? LayoutDashboard;
 
   const link = (
     <Link
       href={href}
       className={cn(
-        "group relative flex min-w-0 items-center gap-2.5 rounded-xl py-2 text-[13px] font-medium leading-5 tracking-normal transition-all duration-200 ease-out",
-        collapsed ? "justify-center px-2" : "px-2.5 pl-3",
+        "group flex min-w-0 items-center gap-2 rounded-[length:var(--radius)] py-1.5 text-[13px] leading-5 transition-colors duration-150",
+        collapsed ? "justify-center px-2" : nested ? "px-2.5" : "px-2.5",
         active
-          ? "bg-secondary text-primary"
-          : "text-sidebar-foreground hover:bg-secondary/70 hover:text-primary"
+          ? "bg-sidebar-active font-medium text-foreground"
+          : "font-normal text-sidebar-foreground hover:bg-sidebar-active/60 hover:text-foreground"
       )}
     >
-      {active && !collapsed && (
-        <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
+      {!nested && (
+        <Icon
+          className={cn(
+            "h-4 w-4 shrink-0 stroke-[1.5] transition-colors duration-150",
+            active ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+          )}
+        />
       )}
-      <Icon
-        className={cn(
-          "h-4 w-4 shrink-0 stroke-[1.75] transition-colors duration-200",
-          active ? "text-primary" : "text-muted-foreground group-hover:text-primary"
-        )}
-      />
       {!collapsed && (
         <>
-          <span className="min-w-0 flex-1 truncate tracking-normal">{title}</span>
+          <span className="min-w-0 flex-1 truncate">{title}</span>
           {badge ? (
-            <span className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary-strong px-1.5 text-[11px] font-semibold leading-none text-white">
+            <span className="ml-auto flex h-4 min-w-4 shrink-0 items-center justify-center rounded-[3px] bg-foreground/10 px-1 text-[10px] font-medium leading-none text-foreground">
               {badge}
             </span>
           ) : null}
@@ -125,24 +165,157 @@ function NavLink({
   return link;
 }
 
+function NavGroupSection({
+  group,
+  collapsed,
+  items,
+}: {
+  group: NavGroup;
+  collapsed: boolean;
+  items: NavItem[];
+}) {
+  const pathname = usePathname();
+  const navGroupOpen = useUIStore((s) => s.navGroupOpen);
+  const setNavGroupOpen = useUIStore((s) => s.setNavGroupOpen);
+  const open = resolveGroupOpen(group, pathname, navGroupOpen);
+  const sectionActive = groupContainsPath(group, pathname);
+  const Icon = icons[group.icon] ?? LayoutDashboard;
+  const badgeTotal = items.reduce((sum, item) => sum + (item.badge ?? 0), 0);
+
+  // Open the group that owns the active route when the path changes (allows manual collapse after).
+  useEffect(() => {
+    if (!group.items.some((item) => isNavActive(pathname, item.href))) return;
+    if (useUIStore.getState().navGroupOpen[group.id] === true) return;
+    setNavGroupOpen(group.id, true);
+    // Intentionally keyed to pathname so a manual collapse sticks until the next navigation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- group.items is stable per id
+  }, [pathname, group.id, setNavGroupOpen]);
+
+  if (collapsed) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            title={group.title}
+            className={cn(
+              "flex w-full items-center justify-center rounded-[length:var(--radius)] px-2 py-1.5 transition-colors duration-150",
+              sectionActive
+                ? "bg-sidebar-active text-foreground"
+                : "text-muted-foreground hover:bg-sidebar-active/60 hover:text-foreground"
+            )}
+            aria-label={group.title}
+          >
+            <Icon className="h-4 w-4 shrink-0 stroke-[1.5]" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="right" align="start" className="min-w-44">
+          <DropdownMenuLabel>{group.title}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {items.map((item) => {
+            const ItemIcon = icons[item.icon] ?? LayoutDashboard;
+            return (
+              <DropdownMenuItem key={item.href} asChild>
+                <Link href={item.href} className="flex items-center gap-2">
+                  <ItemIcon className="h-4 w-4 stroke-[1.5]" />
+                  <span className="flex-1">{item.title}</span>
+                  {item.badge ? (
+                    <span className="text-[10px] font-medium text-muted-foreground">
+                      {item.badge}
+                    </span>
+                  ) : null}
+                </Link>
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
+  return (
+    <div className="space-y-0.5">
+      <button
+        type="button"
+        onClick={() => setNavGroupOpen(group.id, !open)}
+        aria-expanded={open}
+        aria-controls={`nav-group-${group.id}`}
+        className={cn(
+          "group flex w-full min-w-0 items-center gap-2 rounded-[length:var(--radius)] px-2.5 py-1.5 text-[13px] leading-5 transition-colors duration-150",
+          sectionActive
+            ? "bg-sidebar-active/70 font-medium text-foreground"
+            : "font-normal text-sidebar-foreground hover:bg-sidebar-active/60 hover:text-foreground"
+        )}
+      >
+        <Icon
+          className={cn(
+            "h-4 w-4 shrink-0 stroke-[1.5] transition-colors duration-150",
+            sectionActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+          )}
+        />
+        <span className="min-w-0 flex-1 truncate text-left">{group.title}</span>
+        {badgeTotal > 0 && !open ? (
+          <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-[3px] bg-foreground/10 px-1 text-[10px] font-medium leading-none text-foreground">
+            {badgeTotal}
+          </span>
+        ) : null}
+        <ChevronDown
+          className={cn(
+            "h-3.5 w-3.5 shrink-0 stroke-[1.75] text-muted-foreground transition-transform duration-200",
+            open && "rotate-180"
+          )}
+        />
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            id={`nav-group-${group.id}`}
+            key={group.id}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="relative ml-[18px] space-y-0.5 border-l border-border/80 py-0.5 pl-2.5">
+              {items.map((item) => (
+                <NavLink key={item.href} {...item} collapsed={false} nested />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function withNotificationBadge(items: NavItem[], unreadCount: number): NavItem[] {
+  return items.map((item) =>
+    item.href === "/dashboard/notifications"
+      ? { ...item, badge: unreadCount > 0 ? unreadCount : undefined }
+      : item
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar, sidebarMobileOpen, setSidebarMobileOpen } = useUIStore();
   const { data: session } = useSession();
   const { data: unreadCount = 0 } = useUnreadNotificationCount();
   const showAdmin = canAccessAdmin(session?.user?.role);
-  const learnerNav = SIDEBAR_NAV.map((item) =>
-    item.href === "/dashboard/notifications"
-      ? { ...item, badge: unreadCount > 0 ? unreadCount : undefined }
-      : item
-  );
+
+  const learnerGroups = SIDEBAR_NAV_GROUPS.map((group) => ({
+    ...group,
+    items: withNotificationBadge(group.items, unreadCount),
+  }));
 
   if (isExamRoute(pathname)) return null;
 
   const content = (
     <aside
       className={cn(
-        "flex h-full flex-col overflow-hidden bg-sidebar text-sidebar-foreground shadow-(--shadow-sm) transition-all duration-300",
+        "flex h-full flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-300",
         sidebarCollapsed ? "w-16" : "w-[240px]"
       )}
     >
@@ -152,23 +325,25 @@ export function Sidebar() {
           sidebarCollapsed && "justify-center px-2"
         )}
       >
-        <NexusLogo size={32} className="shrink-0" />
-        {!sidebarCollapsed && (
-          <div className="min-w-0 flex-1 overflow-hidden">
-            <p className="truncate font-display text-[15px] font-semibold leading-5 tracking-normal text-foreground">
-              {APP_NAME}
-            </p>
-            <p className="truncate text-[12px] leading-4 tracking-normal text-muted-foreground">
-              Learning Platform
-            </p>
-          </div>
+        {sidebarCollapsed ? (
+          <SkillrrIcon size={32} />
+        ) : (
+          <SkillrrLogo size={28} />
         )}
       </div>
 
       <ScrollArea className="min-h-0 flex-1 px-2">
         <nav className="space-y-0.5 py-2">
-          {learnerNav.map((item) => (
+          {SIDEBAR_PINNED.map((item) => (
             <NavLink key={item.href} {...item} collapsed={sidebarCollapsed} />
+          ))}
+          {learnerGroups.map((group) => (
+            <NavGroupSection
+              key={group.id}
+              group={group}
+              collapsed={sidebarCollapsed}
+              items={group.items}
+            />
           ))}
         </nav>
 
@@ -177,13 +352,18 @@ export function Sidebar() {
             <div className="mx-2 my-3 h-px bg-border" />
 
             {!sidebarCollapsed && (
-              <p className="mb-2 px-3 text-[11px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted-foreground">
+              <p className="mb-1 px-2.5 text-[11px] font-medium uppercase leading-4 tracking-[0.08em] text-muted-foreground/70">
                 Admin
               </p>
             )}
             <nav className="space-y-0.5 pb-2">
-              {ADMIN_NAV.map((item) => (
-                <NavLink key={item.href} {...item} collapsed={sidebarCollapsed} />
+              {ADMIN_NAV_GROUPS.map((group) => (
+                <NavGroupSection
+                  key={group.id}
+                  group={group}
+                  collapsed={sidebarCollapsed}
+                  items={group.items}
+                />
               ))}
             </nav>
           </>
@@ -195,7 +375,7 @@ export function Sidebar() {
           {!sidebarCollapsed && (
             <Link
               href="/dashboard/settings"
-              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] font-medium leading-5 tracking-normal text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-primary"
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-[length:var(--radius)] px-2.5 py-1.5 text-[13px] leading-5 text-muted-foreground transition-colors duration-150 hover:bg-sidebar-active/60 hover:text-foreground"
             >
               <Settings className="h-4 w-4 shrink-0 stroke-[1.75]" />
               <span className="truncate">Settings</span>
@@ -204,7 +384,7 @@ export function Sidebar() {
           <button
             type="button"
             onClick={toggleSidebar}
-            className="flex shrink-0 items-center justify-center rounded-xl p-2 text-muted-foreground transition-all duration-200 hover:bg-secondary hover:text-primary"
+            className="flex shrink-0 items-center justify-center rounded-[length:var(--radius)] p-1.5 text-muted-foreground transition-colors duration-150 hover:bg-sidebar-active/60 hover:text-foreground"
             aria-label="Toggle sidebar"
           >
             <ChevronLeft
@@ -220,7 +400,7 @@ export function Sidebar() {
           <button
             type="button"
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="flex w-full min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13px] font-medium leading-5 tracking-normal text-muted-foreground transition-all duration-200 hover:bg-destructive/10 hover:text-destructive"
+            className="flex w-full min-w-0 items-center gap-2 rounded-[length:var(--radius)] px-2.5 py-1.5 text-[13px] leading-5 text-muted-foreground transition-colors duration-150 hover:bg-destructive/10 hover:text-destructive"
           >
             <LogOut className="h-4 w-4 shrink-0 stroke-[1.75]" />
             <span className="truncate">Log out</span>

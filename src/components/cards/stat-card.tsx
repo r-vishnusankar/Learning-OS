@@ -37,14 +37,14 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-3xl border-0 bg-card p-5 shadow-(--shadow-sm) transition duration-300 hover:-translate-y-0.5 hover:shadow-(--shadow-md)",
+        "group relative overflow-hidden rounded-[length:var(--radius)] border border-border bg-card p-4 transition-colors duration-150 hover:border-border-control",
         className
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
-          <p className="mt-2 font-data font-display text-2xl font-semibold tracking-tight">{value}</p>
+          <p className="mt-1.5 font-data text-xl font-semibold tracking-tight">{value}</p>
           {(subtitle || trend) && (
             <p className="mt-1 text-xs text-muted-foreground">
               {trend && <span className="font-medium text-success-on-light">{trend} </span>}
@@ -53,7 +53,7 @@ export function StatCard({
           )}
         </div>
         <div
-          className="flex h-10 w-10 items-center justify-center rounded-xl transition group-hover:scale-105"
+          className="flex h-8 w-8 items-center justify-center rounded-[length:var(--radius)]"
           style={{ background: tone.tint, color: tone.color }}
         >
           <Icon className="h-5 w-5" />

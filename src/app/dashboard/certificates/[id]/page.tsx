@@ -200,7 +200,7 @@ export default function CertificateDetailPage() {
                 <ShieldCheck className="h-4 w-4 text-primary" />
                 Verification
               </CardTitle>
-              <CardDescription>Validate this credential on the Nexus registry</CardDescription>
+              <CardDescription>Validate this credential on the Skillrr registry</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg border border-border bg-muted/40 p-4">

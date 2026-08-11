@@ -226,3 +226,11 @@ export interface NavItem {
   icon: string;
   badge?: number;
 }
+
+export interface NavGroup {
+  id: string;
+  title: string;
+  icon: string;
+  items: NavItem[];
+  defaultOpen?: boolean;
+}

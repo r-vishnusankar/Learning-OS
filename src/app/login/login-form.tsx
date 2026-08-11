@@ -44,13 +44,13 @@ function MicrosoftMark({ className }: { className?: string }) {
 }
 
 const fieldClass = cn(
-  "flex h-11 w-full rounded-lg border border-border bg-card pl-10 pr-3 text-sm text-foreground",
+  "flex h-8 w-full rounded-[length:var(--radius-control)] border border-border bg-card pl-9 pr-3 text-sm text-foreground",
   "placeholder:text-muted-foreground",
   "transition-colors duration-150",
   "hover:border-border-control",
-  "focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/25",
+  "focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20",
   "disabled:cursor-not-allowed disabled:opacity-50",
-  "aria-invalid:border-destructive aria-invalid:focus-visible:ring-destructive/25"
+  "aria-invalid:border-destructive aria-invalid:focus-visible:ring-destructive/20"
 );
 
 export function LoginForm({ entraEnabled = false }: { entraEnabled?: boolean }) {
@@ -103,12 +103,12 @@ export function LoginForm({ entraEnabled = false }: { entraEnabled?: boolean }) 
 
   return (
     <div className="w-full max-w-[420px]">
-      <div className="rounded-2xl border border-border/80 bg-card p-7 shadow-(--shadow-md) sm:p-8">
+      <div className="rounded-[length:var(--radius-lg)] border border-border bg-card p-6 sm:p-7">
         <div className="space-y-1">
           <h2 className="font-display text-2xl font-semibold tracking-tight text-foreground">
             Welcome back
           </h2>
-          <p className="text-sm text-muted-foreground">Sign in to continue to Nexus</p>
+          <p className="text-sm text-muted-foreground">Sign in to continue to Skillrr</p>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-7 flex flex-col" noValidate>
@@ -203,12 +203,12 @@ export function LoginForm({ entraEnabled = false }: { entraEnabled?: boolean }) 
             type="submit"
             disabled={loading || microsoftLoading}
             className={cn(
-              "mt-5 flex h-11 w-full items-center justify-center rounded-lg",
-              "bg-primary-strong text-sm font-semibold text-primary-foreground",
+              "mt-4 flex h-8 w-full items-center justify-center rounded-[length:var(--radius-control)]",
+              "bg-primary text-sm font-medium text-primary-foreground",
               "transition-colors duration-150",
               "hover:bg-primary-hover",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-              "disabled:pointer-events-none disabled:opacity-60"
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
+              "disabled:pointer-events-none disabled:opacity-50"
             )}
           >
             {loading ? "Signing in…" : "Sign in"}
@@ -226,12 +226,12 @@ export function LoginForm({ entraEnabled = false }: { entraEnabled?: boolean }) 
           onClick={handleMicrosoft}
           disabled={loading || microsoftLoading}
           className={cn(
-            "flex h-11 w-full items-center justify-center gap-2.5 rounded-lg",
+            "flex h-8 w-full items-center justify-center gap-2 rounded-[length:var(--radius-control)]",
             "border border-border bg-card text-sm font-medium text-foreground",
             "transition-colors duration-150",
-            "hover:bg-muted/50",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30",
-            "disabled:pointer-events-none disabled:opacity-60"
+            "hover:bg-secondary",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20",
+            "disabled:pointer-events-none disabled:opacity-50"
           )}
         >
           <MicrosoftMark />
@@ -262,7 +262,7 @@ export function LoginForm({ entraEnabled = false }: { entraEnabled?: boolean }) 
       </div>
 
       {isDevLoginUi ? (
-        <div className="mt-4 overflow-hidden rounded-xl border border-border/80 bg-muted/50">
+        <div className="mt-4 overflow-hidden rounded-[length:var(--radius-lg)] border border-border bg-muted/40">
           <button
             type="button"
             onClick={() => setDevOpen((v) => !v)}
@@ -282,7 +282,7 @@ export function LoginForm({ entraEnabled = false }: { entraEnabled?: boolean }) 
                 <button
                   key={p.email}
                   type="button"
-                  className="flex w-full flex-col gap-0.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-card hover:text-foreground"
+                  className="flex w-full flex-col gap-0.5 rounded-[length:var(--radius)] px-2 py-1.5 text-left transition-colors hover:bg-card hover:text-foreground"
                   onClick={() => {
                     setEmail(p.email);
                     setPassword(DEV_PASSWORD);

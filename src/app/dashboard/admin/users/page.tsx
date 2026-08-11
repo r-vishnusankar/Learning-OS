@@ -158,7 +158,7 @@ export default function AdminUsersPage() {
               <DialogHeader>
                 <DialogTitle>Invite user</DialogTitle>
                 <DialogDescription>
-                  Creates a Nexus account profile. CSV format: name,email,department,role,designation
+                  Creates a Skillrr account profile. CSV format: name,email,department,role,designation
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleInvite} className="space-y-4">

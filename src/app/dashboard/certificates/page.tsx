@@ -75,7 +75,7 @@ function CertificatePreviewCard({
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
       <Card
         className={cn(
-          "group relative overflow-hidden transition hover:shadow-lg",
+          "group relative flex h-full flex-col overflow-hidden transition hover:shadow-lg",
           isEarned
             ? "border-warning/25 bg-linear-to-br from-card via-card to-warning/5"
             : cert.status === "pending"
@@ -91,7 +91,7 @@ function CertificatePreviewCard({
         />
         <CertificateSeal status={cert.status} />
 
-        <CardContent className="relative p-6 pt-8">
+        <CardContent className="relative flex-1 p-6 pt-8">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">

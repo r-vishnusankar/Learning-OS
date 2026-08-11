@@ -44,11 +44,11 @@ export function CourseCard({ course, variant = "default", className }: CourseCar
       <Link
         href={href}
         className={cn(
-          "group flex gap-3 rounded-2xl bg-card p-3 shadow-(--shadow-sm) transition-all duration-200 hover:-translate-y-0.5 hover:shadow-(--shadow)",
+          "group flex gap-3 rounded-[length:var(--radius)] border border-border bg-card p-3 transition-colors duration-150 hover:bg-secondary/40",
           className
         )}
       >
-        <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-xl bg-muted">
+        <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-[length:var(--radius)] bg-muted">
           <Image
             src={course.thumbnail}
             alt={course.title}
@@ -87,8 +87,7 @@ export function CourseCard({ course, variant = "default", className }: CourseCar
   return (
     <article
       className={cn(
-        "group flex h-full flex-col overflow-hidden rounded-[28px] bg-card shadow-(--shadow-card) transition-all duration-200 ease-out",
-        "hover:-translate-y-1.5 hover:shadow-(--shadow-card-hover)",
+        "group flex h-full flex-col overflow-hidden rounded-[length:var(--radius)] border border-border bg-card transition-colors duration-150 hover:border-border-control",
         className
       )}
     >
@@ -102,16 +101,16 @@ export function CourseCard({ course, variant = "default", className }: CourseCar
         />
         <div className="absolute inset-0 bg-linear-to-t from-black/35 via-transparent to-transparent" />
         <div className="absolute left-4 top-4 flex flex-wrap gap-1.5">
-          <Badge variant={levelVariant} className="bg-card/95 shadow-(--shadow-sm) backdrop-blur">
+          <Badge variant={levelVariant} className="bg-card/90 backdrop-blur-sm">
             {LEVEL_LABELS[course.level] ?? course.level}
           </Badge>
-          <Badge variant={categoryVariant} className="bg-card/95 shadow-(--shadow-sm) backdrop-blur">
+          <Badge variant={categoryVariant} className="bg-card/90 backdrop-blur-sm">
             {categoryLabel}
           </Badge>
         </div>
         <button
           type="button"
-          className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-card/95 text-foreground shadow-(--shadow-sm) backdrop-blur transition duration-200 hover:bg-card"
+          className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-[length:var(--radius)] border border-border/80 bg-card/90 text-foreground backdrop-blur-sm transition-colors duration-150 hover:bg-card"
           onClick={onToggleSave}
           aria-label={course.isSaved ? "Unsave course" : "Save course"}
         >
@@ -130,7 +129,7 @@ export function CourseCard({ course, variant = "default", className }: CourseCar
             <Badge variant={categoryVariant}>{categoryLabel}</Badge>
           </div>
           <Link href={href}>
-            <h3 className="text-card-title line-clamp-2 transition-colors duration-200 group-hover:text-primary">
+            <h3 className="text-card-title line-clamp-2 transition-colors duration-150 group-hover:text-foreground/70">
               {course.title}
             </h3>
           </Link>
@@ -139,7 +138,7 @@ export function CourseCard({ course, variant = "default", className }: CourseCar
 
         <div className="flex items-center gap-2.5">
           <div
-            className="h-8 w-8 shrink-0 rounded-full bg-secondary bg-cover bg-center"
+            className="h-7 w-7 shrink-0 rounded-full bg-secondary bg-cover bg-center"
             style={{ backgroundImage: `url(${course.instructor.avatar})` }}
             aria-hidden
           />
@@ -172,7 +171,7 @@ export function CourseCard({ course, variant = "default", className }: CourseCar
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-caption">
               <span>Progress</span>
-              <span className="font-data font-semibold text-primary">{course.progress}%</span>
+              <span className="font-data font-medium text-foreground">{course.progress}%</span>
             </div>
             <Progress value={course.progress} className="h-1.5" />
           </div>

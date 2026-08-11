@@ -79,14 +79,14 @@ export function Header() {
   if (isExamRoute(pathname)) return null;
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 bg-background/85 px-4 backdrop-blur-xl md:px-8">
+    <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-border bg-background px-4 md:px-6">
       <Button
         variant="ghost"
         size="icon-sm"
         className="lg:hidden"
         onClick={() => setSidebarMobileOpen(true)}
       >
-        <Menu className="h-5 w-5 stroke-[1.75]" />
+        <Menu className="h-4 w-4 stroke-[1.5]" />
       </Button>
 
       <div className="hidden min-w-0 shrink-0 flex-col sm:flex">
@@ -98,22 +98,22 @@ export function Header() {
       <button
         type="button"
         onClick={() => setCommandOpen(true)}
-        className="flex h-10 w-full max-w-sm items-center gap-2.5 rounded-full bg-card px-4 text-sm text-muted-foreground shadow-(--shadow-sm) transition-all duration-200 hover:shadow-(--shadow)"
+        className="flex h-7 w-full max-w-[280px] items-center gap-2 rounded-[length:var(--radius)] border border-border bg-card px-3 text-muted-foreground transition-colors duration-150 hover:border-border-control hover:text-foreground"
       >
-        <Search className="h-4 w-4 shrink-0 stroke-[1.75] text-primary" />
-        <span className="flex-1 truncate text-left">Search…</span>
-        <kbd className="hidden rounded-lg bg-muted px-1.5 py-0.5 font-mono text-caption sm:inline-block">
+        <Search className="h-3.5 w-3.5 shrink-0 stroke-[1.5]" />
+        <span className="flex-1 truncate text-left text-xs">Search…</span>
+        <kbd className="hidden rounded bg-muted px-1 py-px font-mono text-[10px] sm:inline-block">
           ⌘K
         </kbd>
       </button>
 
       <div className="ml-auto flex items-center gap-2">
-        <div className="hidden items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 font-data text-sm font-semibold text-secondary-foreground shadow-(--shadow-sm) sm:flex">
-          <Zap className="h-3.5 w-3.5 stroke-[1.75] text-primary" />
+        <div className="hidden items-center gap-1 rounded-[length:var(--radius)] border border-border bg-card px-2.5 py-1 font-data text-xs font-medium text-foreground sm:flex">
+          <Zap className="h-3 w-3 stroke-[1.5] text-muted-foreground" />
           {formatNumber(xp)} XP
         </div>
-        <div className="hidden items-center gap-1.5 rounded-full bg-card px-3 py-1.5 font-data text-sm font-medium text-foreground shadow-(--shadow-sm) md:flex">
-          <Coins className="h-3.5 w-3.5 stroke-[1.75] text-primary" />
+        <div className="hidden items-center gap-1 rounded-[length:var(--radius)] border border-border bg-card px-2.5 py-1 font-data text-xs font-medium text-foreground md:flex">
+          <Coins className="h-3 w-3 stroke-[1.5] text-muted-foreground" />
           {formatNumber(coins)}
         </div>
 
@@ -121,26 +121,25 @@ export function Header() {
           type="button"
           variant="ghost"
           size="icon-sm"
-          className="rounded-full bg-card shadow-(--shadow-sm)"
           onClick={toggleTheme}
           aria-label="Toggle theme"
         >
           {mounted && resolvedTheme === "dark" ? (
-            <Sun className="h-4 w-4 stroke-[1.75]" />
+            <Sun className="h-4 w-4 stroke-[1.5]" />
           ) : (
-            <Moon className="h-4 w-4 stroke-[1.75]" />
+            <Moon className="h-4 w-4 stroke-[1.5]" />
           )}
         </Button>
 
         <Button
           variant="ghost"
           size="icon-sm"
-          className="relative rounded-full bg-card shadow-(--shadow-sm)"
+          className="relative"
           onClick={() => setNotificationsOpen(true)}
         >
-          <Bell className="h-4 w-4 stroke-[1.75] text-foreground" />
+          <Bell className="h-4 w-4 stroke-[1.5] text-foreground" />
           {unread > 0 && (
-            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-card" />
+            <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-destructive ring-1 ring-background" />
           )}
         </Button>
 
@@ -148,19 +147,19 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="rounded-full transition-all duration-200 hover:ring-2 hover:ring-primary/25"
+              className="rounded-[length:var(--radius)] transition-colors duration-150 hover:ring-2 hover:ring-border"
             >
-              <Avatar className="h-9 w-9 shadow-(--shadow-sm)">
+              <Avatar className="h-7 w-7">
                 <AvatarImage src={user?.image ?? undefined} alt={user?.name ?? "User"} />
-                <AvatarFallback>{initials(user?.name ?? "U")}</AvatarFallback>
+                <AvatarFallback className="text-xs">{initials(user?.name ?? "U")}</AvatarFallback>
               </Avatar>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 rounded-2xl border-0 shadow-(--shadow-md)">
+          <DropdownMenuContent align="end" className="w-52 rounded-[length:var(--radius-lg)] border border-border shadow-(--shadow-md)">
             <DropdownMenuLabel>
-              <div className="flex flex-col gap-1.5">
-                <span className="font-semibold">{user?.name ?? "Signed in user"}</span>
-                <span className="text-sm font-normal text-description">{user?.email}</span>
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-semibold">{user?.name ?? "Signed in user"}</span>
+                <span className="text-xs font-normal text-muted-foreground">{user?.email}</span>
                 <Badge variant={levelToBadgeVariant(level)} className="mt-0.5 w-fit">
                   {LEVEL_LABELS[level]}
                 </Badge>
@@ -169,12 +168,12 @@ export function Header() {
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href="/dashboard/profile">
-                <User className="h-4 w-4 stroke-[1.75]" /> Profile
+                <User className="h-3.5 w-3.5 stroke-[1.5]" /> Profile
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/dashboard/settings">
-                <Settings className="h-4 w-4 stroke-[1.75]" /> Settings
+                <Settings className="h-3.5 w-3.5 stroke-[1.5]" /> Settings
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -182,7 +181,7 @@ export function Header() {
               className="text-destructive focus:text-destructive"
               onClick={() => signOut({ callbackUrl: "/login" })}
             >
-              <LogOut className="h-4 w-4 stroke-[1.75]" /> Sign out
+              <LogOut className="h-3.5 w-3.5 stroke-[1.5]" /> Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -15,11 +15,11 @@ export function EmptyState({ title, description, actionLabel, onAction, classNam
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-[28px] bg-card px-6 py-16 text-center shadow-(--shadow-card)",
+        "flex flex-col items-center justify-center rounded-[length:var(--radius)] border border-border bg-card px-6 py-14 text-center",
         className
       )}
     >
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-primary">
+      <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-[length:var(--radius)] bg-secondary text-muted-foreground">
         {icon ?? <Inbox className="h-6 w-6 stroke-[1.75]" />}
       </div>
       <h3 className="text-card-title">{title}</h3>

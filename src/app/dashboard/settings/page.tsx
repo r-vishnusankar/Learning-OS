@@ -357,7 +357,7 @@ export default function SettingsPage() {
                   checked={notifications.marketingEmails}
                   onChange={(v) => setNotifications((n) => ({ ...n, marketingEmails: v }))}
                   label="Product updates"
-                  description="Nexus platform news and feature announcements"
+                  description="Skillrr platform news and feature announcements"
                 />
                 <Button
                   className="mt-4 gap-2"
@@ -376,11 +376,11 @@ export default function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Appearance</CardTitle>
-                <CardDescription>Customize how Nexus looks on your device</CardDescription>
+                <CardDescription>Customize how Skillrr looks on your device</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Theme changes apply instantly. Nexus uses a teal-forward design system optimized for extended learning sessions.
+                  Theme changes apply instantly. Skillrr uses a clean design system optimized for extended learning sessions.
                 </p>
                 <div className="grid gap-3 sm:grid-cols-3">
                   {(["light", "dark", "system"] as const).map((t) => (
@@ -509,7 +509,7 @@ export default function SettingsPage() {
                   checked={privacy.analyticsOptIn}
                   onChange={(v) => setPrivacy((p) => ({ ...p, analyticsOptIn: v }))}
                   label="Learning analytics"
-                  description="Help improve Nexus with anonymized usage data"
+                  description="Help improve Skillrr with anonymized usage data"
                 />
                 <Button
                   className="mt-4 gap-2"
