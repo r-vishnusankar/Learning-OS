@@ -79,23 +79,67 @@ export function SkillGrowthChart({ data }: { data: ChartPoint[] }) {
   );
 }
 
+function radarLabel(name: string) {
+  return name.length <= 16 ? name : name.split(" ")[0];
+}
+
+function RadarAxisTick({
+  x = 0,
+  y = 0,
+  cx = 0,
+  cy = 0,
+  payload,
+}: {
+  x?: number;
+  y?: number;
+  cx?: number;
+  cy?: number;
+  payload?: { value: string };
+}) {
+  if (!payload?.value) return null;
+  const dx = x - cx;
+  const dy = y - cy;
+  const textAnchor = dx > 10 ? "start" : dx < -10 ? "end" : "middle";
+  const dyOffset = dy > 12 ? 8 : dy < -12 ? -2 : 3;
+
+  return (
+    <text
+      x={x}
+      y={y + dyOffset}
+      textAnchor={textAnchor}
+      fill="var(--muted-foreground)"
+      fontSize={11}
+    >
+      {payload.value}
+    </text>
+  );
+}
+
 export function SkillRadarChart({ skills }: { skills: Skill[] }) {
   const data = skills.map((s) => ({
-    skill: s.name.split(" ")[0],
+    skill: radarLabel(s.name),
     current: s.current,
     target: s.target,
   }));
 
   return (
-    <ResponsiveContainer width="100%" height={300}>
-      <RadarChart data={data} cx="50%" cy="50%" outerRadius="70%">
-        <PolarGrid stroke="var(--border)" />
-        <PolarAngleAxis dataKey="skill" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
-        <Radar name="Current" dataKey="current" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.25} />
-        <Radar name="Target" dataKey="target" stroke="var(--chart-2)" fill="transparent" strokeDasharray="4 4" />
-        <Tooltip contentStyle={tooltipStyle} />
-      </RadarChart>
-    </ResponsiveContainer>
+    <div className="h-[300px] w-full overflow-visible sm:h-[340px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart
+          data={data}
+          cx="50%"
+          cy="50%"
+          outerRadius="52%"
+          margin={{ top: 24, right: 72, bottom: 24, left: 72 }}
+        >
+          <PolarGrid stroke="var(--border)" />
+          <PolarAngleAxis dataKey="skill" tick={<RadarAxisTick />} tickLine={false} />
+          <Radar name="Current" dataKey="current" stroke="var(--chart-1)" fill="var(--chart-1)" fillOpacity={0.25} />
+          <Radar name="Target" dataKey="target" stroke="var(--chart-2)" fill="transparent" strokeDasharray="4 4" />
+          <Tooltip contentStyle={tooltipStyle} />
+        </RadarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 
