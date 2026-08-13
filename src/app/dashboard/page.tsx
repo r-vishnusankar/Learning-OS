@@ -21,7 +21,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLearnerAssessments } from "@/hooks/use-assessments";
 import { useLearnerAssignments } from "@/hooks/use-certification";
-import { useMyActiveCourses, usePublishedCourses } from "@/hooks/use-courses";
+import { useMyActiveCourses, useRecommendedCourses } from "@/hooks/use-courses";
 import { useDashboardHome } from "@/hooks/use-me";
 import { useMyAssignmentStats, useMyCourseAssignments } from "@/hooks/use-course-assignments";
 import { useMyEligibility } from "@/hooks/use-promotions";
@@ -119,7 +119,7 @@ function SectionLink({ href, children }: { href: string; children: React.ReactNo
 export default function DashboardPage() {
   const { data: home, isLoading: homeLoading, isError: homeError } = useDashboardHome();
   const { data: courses = [], isLoading: coursesLoading } = useMyActiveCourses(8);
-  const { data: catalog = [], isLoading: catalogLoading } = usePublishedCourses();
+  const { data: catalog = [], isLoading: catalogLoading } = useRecommendedCourses(12);
   const { data: assessments = [], isLoading: assessmentsLoading, isError: assessmentsError } =
     useLearnerAssessments();
   const { data: assignments = [], isLoading: assignmentsLoading, isError: assignmentsError } =
@@ -519,8 +519,8 @@ export default function DashboardPage() {
                   src={continueCourse.thumbnail}
                   alt=""
                   fill
+                  sizes="132px"
                   className="object-cover"
-                  unoptimized
                 />
               </div>
               <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 sm:flex-row sm:items-center">
@@ -902,8 +902,8 @@ export default function DashboardPage() {
                         src={c.thumbnail}
                         alt=""
                         fill
+                        sizes="72px"
                         className="object-cover"
-                        unoptimized
                       />
                     </div>
                     <div className="min-w-0 flex-1 space-y-1">
@@ -967,8 +967,8 @@ export default function DashboardPage() {
                           src={c.thumbnail}
                           alt=""
                           fill
+                          sizes="72px"
                           className="object-cover"
-                          unoptimized
                         />
                       </div>
                       <div className="min-w-0 flex-1 space-y-1">

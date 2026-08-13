@@ -55,6 +55,32 @@ export async function fetchAdminCoursesAction(filters?: {
   }));
 }
 
+/** Lean published courses for dashboard recommendations — no modules/lessons. */
+export async function fetchRecommendedCoursesAction(limit = 12) {
+  const userId = await requireUserId();
+  const profile = await (await import("@/lib/profile")).getProfileByUserId(userId);
+  const userDepartmentId = profile?.department ?? undefined;
+
+  const [rows, activeIds] = await Promise.all([
+    getPublishedCourses(userDepartmentId),
+    getUserActiveCourseIds(userId, 24),
+  ]);
+
+  const busy = new Set(activeIds);
+  const ranked = rows
+    .filter((row) => !busy.has(row.course.id))
+    .sort((a, b) => {
+      const score = (row: (typeof rows)[number]) =>
+        (row.course.departmentId === userDepartmentId ? 4 : 0) +
+        (row.course.isTrending ? 3 : 0) +
+        (row.course.rating ?? 0);
+      return score(b) - score(a);
+    })
+    .slice(0, limit);
+
+  return ranked.map((row) => mapCourseToUi({ ...row, progress: 0 }, [], {}, false));
+}
+
 /** Published courses for assigners (includes department_head). */
 export async function fetchAssignableCoursesAction() {
   await requireCourseAssigner();

@@ -9,8 +9,9 @@ import {
   fetchAssignableCoursesAction,
   fetchCourseBuilderAction,
   fetchCourseBySlugAction,
-  fetchPublishedCoursesAction,
   fetchMyActiveCoursesAction,
+  fetchPublishedCoursesAction,
+  fetchRecommendedCoursesAction,
   publishCourseAction,
   updateCourseAction,
 } from "@/services/courses";
@@ -20,6 +21,16 @@ export function usePublishedCourses() {
   return useQuery({
     queryKey: ["courses", "published"],
     queryFn: () => fetchPublishedCoursesAction(),
+    staleTime: 60_000,
+  });
+}
+
+/** Dashboard home: 12 lean catalog cards, no curriculum payload. */
+export function useRecommendedCourses(limit = 12) {
+  return useQuery({
+    queryKey: ["courses", "recommended", limit],
+    queryFn: () => fetchRecommendedCoursesAction(limit),
+    staleTime: 120_000,
   });
 }
 
@@ -28,6 +39,7 @@ export function useMyActiveCourses(limit = 8) {
   return useQuery({
     queryKey: ["courses", "active", limit],
     queryFn: () => fetchMyActiveCoursesAction(limit),
+    staleTime: 60_000,
   });
 }
 

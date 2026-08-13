@@ -22,6 +22,7 @@ export function useDashboardHome() {
   return useQuery({
     queryKey: ["dashboard-home"],
     queryFn: () => fetchDashboardHomeAction(),
+    staleTime: 60_000,
   });
 }
 
