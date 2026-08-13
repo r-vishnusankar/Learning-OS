@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type SelectHTMLAttributes } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   BookOpen,
   Bookmark,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -39,6 +40,30 @@ const fade = {
   initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0 },
 };
+
+function FilterSelect({
+  className,
+  children,
+  ...props
+}: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <div className="relative shrink-0 text-secondary-foreground">
+      <select
+        {...props}
+        className={cn(
+          "h-10 cursor-pointer appearance-none rounded-full py-0 pl-4 pr-9 text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring",
+          className,
+        )}
+      >
+        {children}
+      </select>
+      <ChevronDown
+        aria-hidden
+        className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 stroke-[1.75] text-current opacity-70"
+      />
+    </div>
+  );
+}
 
 function CourseRow({
   title,
@@ -310,11 +335,11 @@ export default function LearningPage() {
             className="h-12 border-0 bg-transparent pl-11 shadow-none focus-visible:ring-0"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2 px-1 pb-1 sm:pb-0">
-          <select
+        <div className="flex shrink-0 flex-wrap items-center gap-2 px-1 pb-1 sm:pb-0">
+          <FilterSelect
             value={department}
             onChange={(e) => setDepartment(e.target.value as DepartmentId | "all")}
-            className="h-10 rounded-full bg-secondary px-4 text-sm font-medium text-secondary-foreground transition-all duration-200 hover:bg-secondary/80 focus:outline-none focus:ring-2 focus:ring-ring"
+            className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
           >
             <option value="all">All departments</option>
             {departments.map(([id, label]) => (
@@ -322,37 +347,37 @@ export default function LearningPage() {
                 {label}
               </option>
             ))}
-          </select>
-          <select
+          </FilterSelect>
+          <FilterSelect
             value={difficulty}
             onChange={(e) => setDifficulty(e.target.value as Difficulty | "all")}
-            className="h-10 rounded-full bg-secondary px-4 text-sm font-medium text-secondary-foreground transition-all duration-200 hover:bg-secondary/80 focus:outline-none focus:ring-2 focus:ring-ring"
+            className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
           >
             {difficulties.map((d) => (
               <option key={d.value} value={d.value}>
                 {d.label}
               </option>
             ))}
-          </select>
-          <select
+          </FilterSelect>
+          <FilterSelect
             value={learningCategory}
             onChange={(e) => setLearningCategory(e.target.value as LearningCategory | "all")}
-            className="h-10 rounded-full bg-secondary px-4 text-sm font-medium text-secondary-foreground transition-all duration-200 hover:bg-secondary/80 focus:outline-none focus:ring-2 focus:ring-ring"
+            className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
           >
             <option value="all">All categories</option>
             <option value="role">{LEARNING_CATEGORY_LABELS.role}</option>
             <option value="goal">{LEARNING_CATEGORY_LABELS.goal}</option>
-          </select>
-          <select
+          </FilterSelect>
+          <FilterSelect
             value={sort}
             onChange={(e) => setSort(e.target.value as SortOption)}
-            className="h-10 rounded-full bg-muted px-4 text-sm font-medium text-foreground transition-all duration-200 hover:bg-muted/80 focus:outline-none focus:ring-2 focus:ring-ring"
+            className="bg-muted text-foreground hover:bg-muted/80"
           >
             <option value="recommended">Recommended</option>
             <option value="rating">Highest rated</option>
             <option value="newest">Recently viewed</option>
             <option value="duration">Shortest first</option>
-          </select>
+          </FilterSelect>
         </div>
       </motion.div>
 
