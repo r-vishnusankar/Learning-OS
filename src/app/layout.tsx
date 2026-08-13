@@ -30,6 +30,9 @@ export const metadata: Metadata = {
     "Learning & certification platform for employee training, skill tracking, and career progression.",
 };
 
+/** Run serverless functions in Singapore, next to the Neon database (ap-southeast-1). */
+export const preferredRegion = "sin1";
+
 /**
  * Pre-paint theme bootstrap — KEEP alongside next-themes.
  *

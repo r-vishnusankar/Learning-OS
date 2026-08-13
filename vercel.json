@@ -2,5 +2,6 @@
   "framework": "nextjs",
   "buildCommand": "next build",
   "devCommand": "next dev",
-  "installCommand": "npm install --no-package-lock"
+  "installCommand": "npm install --no-package-lock",
+  "regions": ["sin1"]
 }
