@@ -1,5 +1,4 @@
 {
-  "name": "learning-dashboard",
   "framework": "nextjs",
   "buildCommand": "next build",
   "devCommand": "next dev",

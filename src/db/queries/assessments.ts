@@ -144,3 +144,98 @@ export function scoreAnswers(
 
   return { score, maxScore, needsManual, percentage: maxScore ? Math.round((score / maxScore) * 100) : 0 };
 }
+
+function shuffle<T>(items: T[]): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/** Start (or resume) an in-progress attempt. Same path as startAttemptAction. */
+export async function startAttemptForUser(userId: string, assessmentId: string) {
+  const assessment = await getAssessmentById(assessmentId);
+  if (!assessment || assessment.publishStatus !== "published") {
+    throw new Error("Assessment not available");
+  }
+
+  const existing = await getInProgressAttempt(userId, assessmentId);
+  if (existing) return existing;
+
+  const attempts = await getUserAttempts(userId, assessmentId);
+  const submitted = attempts.filter((a) => a.status !== "in_progress");
+  if (submitted.length >= assessment.maxAttempts) {
+    throw new Error("Max attempts reached");
+  }
+
+  let qs = await getQuestionsForAssessment(assessmentId);
+  if (!qs.length) throw new Error("No questions in this assessment");
+  if (assessment.randomize) qs = shuffle(qs);
+
+  const db = getDb();
+  const [attempt] = await db
+    .insert(assessmentAttempts)
+    .values({
+      assessmentId,
+      userId,
+      questionOrder: qs.map((q) => q.id),
+      answers: {},
+      status: "in_progress",
+      maxScore: qs.reduce((sum, q) => sum + q.points, 0),
+    })
+    .returning();
+
+  return attempt;
+}
+
+/**
+ * Grade an in-progress attempt with scoreAnswers and persist.
+ * Does not mint a certificate — callers use mintCertificateForAssessmentPass.
+ */
+export async function gradeInProgressAttempt(
+  attemptId: string,
+  extraAnswers?: Record<string, string | string[]>
+) {
+  const attempt = await getAttemptById(attemptId);
+  if (!attempt || attempt.status !== "in_progress") {
+    throw new Error("Invalid attempt");
+  }
+
+  const assessment = await getAssessmentById(attempt.assessmentId);
+  if (!assessment) throw new Error("Assessment missing");
+
+  const qs = await getQuestionsForAssessment(assessment.id);
+  const answers = { ...attempt.answers, ...(extraAnswers ?? {}) };
+  const result = scoreAnswers(qs, answers, assessment.negativeMarking);
+  const passed = result.percentage >= assessment.passingScore;
+  const status = result.needsManual ? "submitted" : "graded";
+
+  const db = getDb();
+  const [updated] = await db
+    .update(assessmentAttempts)
+    .set({
+      answers,
+      score: result.score,
+      maxScore: result.maxScore,
+      percentage: result.percentage,
+      passed: result.needsManual ? null : passed,
+      status,
+      submittedAt: new Date(),
+    })
+    .where(
+      and(eq(assessmentAttempts.id, attemptId), eq(assessmentAttempts.status, "in_progress"))
+    )
+    .returning();
+
+  return {
+    attempt: updated ?? (await getAttemptById(attemptId)),
+    assessment,
+    questions: qs,
+    result,
+    passed: result.needsManual ? null : passed,
+    needsManual: result.needsManual,
+    wrote: Boolean(updated),
+  };
+}

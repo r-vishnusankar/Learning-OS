@@ -12,10 +12,10 @@ Repo root: c:\Users\Vishnu\Desktop\AI_Product_Lab\02_Experiments\Learning Dashbo
 
 ## Test accounts
 
-Role 1 (admin / demo learner):  demo@nexus.local / nexus123
-  — Seeded as platform admin (profiles.role = "admin"). This is the only credentials login that works today.
-Role 2 (employee / manager / etc.):  NO separate password logins
-  — Employee roster can be seeded via `npm run db:seed-employees` / `db:setup-career-loop` (profiles exist in Neon), but Credentials auth only accepts DEV_LOGIN_EMAIL + DEV_LOGIN_PASSWORD. Role/permission testing requires either changing the demo user's role in DB/admin UI, or Entra SSO once configured.
+Role 1 (superadmin):  superadmin@valoriz.com / Skillrr@2026
+Role 2 (personal admin):  vishnu.sankar@valoriz.com / Skillrr@2026
+Role 3 (any employee):  their @valoriz.com email / Skillrr@2026
+  — Shared password while Entra SSO is not configured. Roster is seeded via `npm run db:seed-employees`.
 Role 3 (Microsoft Entra SSO):  NOT CONFIGURED
   — AUTH_MICROSOFT_ENTRA_ID_* in .env.local are still placeholders; SSO button appears only when real Entra vars are set.
 

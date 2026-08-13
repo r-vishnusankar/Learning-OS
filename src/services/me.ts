@@ -121,10 +121,12 @@ export async function toggleSavedCourseAction(courseId: string) {
 
 export async function fetchDashboardHomeAction() {
   const userId = await requireUserId();
-  const user = await getUserWithProfile(userId);
-  const snapshot = await getAnalyticsSnapshot([userId]);
-  const leaderboard = await getLeaderboardRows(8);
-  const prefs = await fetchMyPreferencesAction();
+  const [user, snapshot, leaderboard, prefs] = await Promise.all([
+    getUserWithProfile(userId),
+    getAnalyticsSnapshot([userId]),
+    getLeaderboardRows(8),
+    fetchMyPreferencesAction(),
+  ]);
   const myRank = leaderboard.find((e) => e.userId === userId)?.rank ?? user?.companyRank ?? 0;
 
   const coursesCompleted = snapshot.completedLessons > 0

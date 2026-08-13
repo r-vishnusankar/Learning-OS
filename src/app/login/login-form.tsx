@@ -12,15 +12,16 @@ import {
   Lock,
   Mail,
 } from "lucide-react";
+import { DEFAULT_DEV_PASSWORD, SUPERADMIN_EMAIL } from "@/lib/dev-credentials";
 import { canAccessAdmin } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import type { UserRole } from "@/types";
 
-const DEV_PASSWORD = "nexus123";
+const DEV_PASSWORD = DEFAULT_DEV_PASSWORD;
 
 const PRESETS = [
-  { label: "Admin", email: "demo@nexus.local" },
-  { label: "Employee", email: "riju.thomas@nexus.local" },
+  { label: "Super Admin", email: SUPERADMIN_EMAIL },
+  { label: "Employee", email: "riju.thomas@valoriz.com" },
 ] as const;
 
 const isDevLoginUi = process.env.NODE_ENV !== "production";
@@ -126,7 +127,7 @@ export function LoginForm({ entraEnabled = false }: { entraEnabled?: boolean }) 
                 type="email"
                 autoComplete="username"
                 inputMode="email"
-                placeholder="demo@nexus.local"
+                placeholder="Enter your Skillrr email"
                 value={email}
                 onChange={(event) => {
                   setEmail(event.target.value);

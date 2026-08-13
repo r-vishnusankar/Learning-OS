@@ -165,7 +165,7 @@ export async function deleteUserAction(input: unknown) {
     throw new Error("User not found.");
   }
 
-  const demoEmail = (process.env.DEV_LOGIN_EMAIL ?? "demo@nexus.local").toLowerCase();
+  const demoEmail = (process.env.DEV_LOGIN_EMAIL ?? "vishnu.sankar@valoriz.com").toLowerCase();
   if (target.email?.toLowerCase() === demoEmail) {
     throw new Error("The platform demo admin account cannot be deleted.");
   }

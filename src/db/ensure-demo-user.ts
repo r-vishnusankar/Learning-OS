@@ -8,7 +8,7 @@ config({ path: ".env.local" });
 
 async function main() {
   const db = drizzle(neon(process.env.DATABASE_URL!));
-  const email = process.env.DEV_LOGIN_EMAIL ?? "demo@nexus.local";
+  const email = process.env.DEV_LOGIN_EMAIL ?? "vishnu.sankar@valoriz.com";
   const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
   let userId = existing?.id;
@@ -17,8 +17,8 @@ async function main() {
       .insert(users)
       .values({
         email,
-        name: "Alex Rivera",
-        image: "https://api.dicebear.com/9.x/avataaars/svg?seed=Alex",
+        name: "Vishnu Sankar",
+        image: "https://api.dicebear.com/9.x/avataaars/svg?seed=Vishnu%20Sankar",
       })
       .returning();
     userId = created.id;

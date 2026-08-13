@@ -4,7 +4,12 @@ import { eq } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { buildDepartmentCourseCatalog } from "@/db/catalog/department-courses";
+import {
+  DEPARTMENT_INSTRUCTORS,
+  instructorAvatar,
+} from "@/db/catalog/department-instructors";
 import { courses, instructors, lessons, modules } from "@/db/schema";
+import type { DepartmentId } from "@/types";
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -13,27 +18,41 @@ async function main() {
   const db = drizzle(neon(databaseUrl));
   const catalog = buildDepartmentCourseCatalog();
 
-  let instructorId: string | null = null;
-  const [existingInstructor] = await db.select().from(instructors).limit(1);
-  if (existingInstructor) {
-    instructorId = existingInstructor.id;
-  } else {
+  const instructorIds = new Map<string, string>();
+  for (const profile of Object.values(DEPARTMENT_INSTRUCTORS)) {
+    if (instructorIds.has(profile.name)) continue;
+
+    const [existing] = await db
+      .select()
+      .from(instructors)
+      .where(eq(instructors.name, profile.name))
+      .limit(1);
+
+    if (existing) {
+      instructorIds.set(profile.name, existing.id);
+      continue;
+    }
+
     const [created] = await db
       .insert(instructors)
       .values({
-        name: "Nexus Academy Faculty",
-        avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=NexusFaculty",
-        title: "Enterprise Learning Faculty",
-        bio: "Cross-department curriculum team for Nexus learning tracks.",
+        name: profile.name,
+        avatar: instructorAvatar(profile.name),
+        title: profile.title,
+        bio: profile.bio,
       })
       .returning();
-    instructorId = created.id;
+    instructorIds.set(profile.name, created.id);
   }
 
   let created = 0;
   let skipped = 0;
 
   for (const item of catalog) {
+    const dept = item.departmentId as DepartmentId;
+    const profile = DEPARTMENT_INSTRUCTORS[dept];
+    const instructorId = instructorIds.get(profile.name) ?? null;
+
     const [existing] = await db
       .select({ id: courses.id })
       .from(courses)
@@ -43,7 +62,11 @@ async function main() {
     if (existing) {
       await db
         .update(courses)
-        .set({ thumbnailUrl: item.thumbnailUrl, updatedAt: new Date() })
+        .set({
+          thumbnailUrl: item.thumbnailUrl,
+          instructorId,
+          updatedAt: new Date(),
+        })
         .where(eq(courses.id, existing.id));
       skipped += 1;
       continue;

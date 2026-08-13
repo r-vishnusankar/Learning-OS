@@ -1,5 +1,5 @@
 {
-  "name": "learning-dashboard",
+  "name": "skillrr",
   "version": "1.0.0",
   "private": true,
   "engines": {
@@ -23,17 +23,23 @@
     "db:seed": "tsx src/db/seed.ts && tsx src/db/seed-courses.ts && tsx src/db/migrate-assessments.ts && tsx src/db/seed-assessments.ts && tsx src/db/migrate-certification.ts && tsx src/db/seed-certification.ts && tsx src/db/migrate-operations.ts && tsx src/db/seed-operations.ts && tsx src/db/migrate-course-assignments.ts",
     "db:seed-catalog": "tsx scripts/seed-department-courses.ts",
     "db:update-catalog-thumbs": "tsx scripts/update-catalog-thumbnails.ts",
+    "db:update-course-instructors": "tsx scripts/update-course-instructors.ts",
     "db:resync-catalog": "tsx scripts/resync-catalog-courses.ts",
     "db:audit-catalog": "tsx scripts/audit-catalog-courses.ts",
     "test:course-url-audit": "tsx scripts/test-course-url-audit.ts",
     "docs:course-catalog": "tsx scripts/generate-course-catalog-doc.ts",
     "db:migrate-promotions": "tsx src/db/migrate-promotions.ts",
     "db:seed-employees": "tsx scripts/seed-employees.ts",
+    "db:update-employee-emails": "tsx scripts/update-employee-emails.ts",
+    "db:ensure-superadmin": "tsx scripts/ensure-superadmin.ts",
     "db:assign-level-courses": "tsx scripts/assign-level-courses.ts",
     "db:seed-course-assessments": "tsx scripts/seed-course-assessments.ts",
     "db:seed-beginner-paths": "tsx scripts/seed-beginner-paths.ts",
     "db:setup-career-loop": "tsx src/db/migrate-promotions.ts && tsx scripts/seed-employees.ts && tsx scripts/seed-course-assessments.ts && tsx scripts/assign-level-courses.ts",
-    "db:revert-career-loop": "tsx scripts/revert-career-loop.ts"
+    "db:revert-career-loop": "tsx scripts/revert-career-loop.ts",
+    "db:inspect-vishnu-demo": "tsx scripts/_inspect-vishnu-readonly.ts",
+    "db:seed-vishnu-demo": "tsx scripts/seed-vishnu-demo.ts",
+    "db:revert-vishnu-demo": "tsx scripts/revert-vishnu-demo.ts"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",

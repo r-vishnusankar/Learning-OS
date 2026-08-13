@@ -45,7 +45,7 @@ export default function CourseDetailPage() {
               <Badge className="bg-white/20 text-white">{LEVEL_LABELS[course.level]}</Badge>
               <Badge
                 variant={course.learningCategory === "goal" ? "goal" : "role"}
-                className="bg-card/95 shadow-(--shadow-sm)"
+                className="shadow-(--shadow-sm) ring-1 ring-black/10"
               >
                 {LEARNING_CATEGORY_LABELS[course.learningCategory] ?? "Role based"}
               </Badge>

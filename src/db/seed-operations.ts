@@ -11,11 +11,19 @@ async function seedOperations() {
   if (!databaseUrl) throw new Error("DATABASE_URL is not set");
   const db = drizzle(neon(databaseUrl));
 
-  const [demoUser] = await db
+  const demoEmail = (process.env.DEV_LOGIN_EMAIL ?? "vishnu.sankar@valoriz.com").toLowerCase();
+  let [demoUser] = await db
     .select()
     .from(users)
-    .where(eq(users.email, "demo@nexus.local"))
+    .where(eq(users.email, demoEmail))
     .limit(1);
+  if (!demoUser) {
+    [demoUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, "demo@nexus.local"))
+      .limit(1);
+  }
 
   if (!demoUser) {
     console.log("Demo user missing — skip ops seed");

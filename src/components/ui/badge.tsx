@@ -18,11 +18,11 @@ const badgeVariants = cva(
         info: "bg-info/15 text-info-on-tint",
         destructive: "bg-destructive/15 text-destructive-on-tint",
         draft: "bg-muted text-muted-foreground",
-        /* Level ramp — subtle gray tints */
+        /* Level ramp — subtle gray tints; keep bg+text pairs intact (do not override bg alone) */
         beginner: "bg-muted text-muted-foreground",
         intermediate: "bg-secondary text-secondary-foreground",
         advanced: "bg-foreground/10 text-foreground",
-        expert: "bg-foreground text-background",
+        expert: "bg-primary text-primary-foreground",
         /* Learning category */
         role: "bg-pastel-blue text-info-on-tint",
         goal: "bg-pastel-purple text-foreground",

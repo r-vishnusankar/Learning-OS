@@ -11,8 +11,9 @@ import {
 } from "@/db/schema";
 import type { HomeworkAssignmentScope } from "@/db/schema/certification";
 import type { PublishStatus } from "@/db/schema/courses";
-import type { DepartmentId } from "@/types";
-export { generateCredentialId } from "@/lib/credentials";
+import type { DepartmentId, LearningLevel } from "@/types";
+import { generateCredentialId } from "@/lib/credentials";
+export { generateCredentialId };
 
 export async function listLearningPaths(opts?: { publishStatus?: PublishStatus }) {
   const db = getDb();
@@ -262,4 +263,47 @@ export async function findActiveCertForAssessment(userId: string, assessmentId: 
     )
     .limit(1);
   return row ?? null;
+}
+
+/** Persist a certificate for a passed auto-graded attempt. Same insert as mintCertificateForAssessmentPass. */
+export async function insertCertificateForAssessmentPass(input: {
+  userId: string;
+  assessmentId: string;
+  attemptId: string;
+  title: string;
+  departmentId: DepartmentId;
+  level: LearningLevel;
+  score: number;
+  skills?: string[];
+  courseId?: string | null;
+}) {
+  const existingAttempt = await findExistingCertForAttempt(input.userId, input.attemptId);
+  if (existingAttempt) return existingAttempt;
+
+  const active = await findActiveCertForAssessment(input.userId, input.assessmentId);
+  if (active) return active;
+
+  const db = getDb();
+  const [created] = await db
+    .insert(certificates)
+    .values({
+      userId: input.userId,
+      credentialId: generateCredentialId(),
+      title: input.title.includes("Certificate")
+        ? input.title
+        : `${input.title} Certificate`,
+      departmentId: input.departmentId,
+      level: input.level,
+      status: "earned",
+      courseId: input.courseId ?? null,
+      assessmentId: input.assessmentId,
+      attemptId: input.attemptId,
+      score: input.score,
+      skills: input.skills ?? [],
+      issuedAt: new Date(),
+      expiresAt: new Date(Date.now() + 365 * 2 * 86400000),
+    })
+    .returning();
+
+  return created;
 }

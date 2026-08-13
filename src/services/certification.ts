@@ -14,8 +14,7 @@ import {
 } from "@/db/schema/certification";
 import {
   countPathSteps,
-  findActiveCertForAssessment,
-  findExistingCertForAttempt,
+  insertCertificateForAssessmentPass,
   getCertificateByCredentialId,
   getCertificateById,
   canUserAccessHomework,
@@ -78,35 +77,12 @@ export async function mintCertificateForAssessmentPass(input: {
   skills?: string[];
   courseId?: string | null;
 }) {
-  const existingAttempt = await findExistingCertForAttempt(input.userId, input.attemptId);
-  if (existingAttempt) return existingAttempt;
-
-  const active = await findActiveCertForAssessment(input.userId, input.assessmentId);
-  if (active) return active;
-
-  const db = getDb();
-  const [created] = await db
-    .insert(certificates)
-    .values({
-      userId: input.userId,
-      credentialId: generateCredentialId(),
-      title: input.title.includes("Certificate")
-        ? input.title
-        : `${input.title} Certificate`,
-      departmentId: input.departmentId,
-      level: input.level,
-      status: "earned",
-      courseId: input.courseId ?? null,
-      assessmentId: input.assessmentId,
-      attemptId: input.attemptId,
-      score: input.score,
-      skills: input.skills ?? [],
-      issuedAt: new Date(),
-      expiresAt: new Date(Date.now() + 365 * 2 * 86400000),
-    })
-    .returning();
-
-  revalidatePath("/dashboard/certificates");
+  const created = await insertCertificateForAssessmentPass(input);
+  try {
+    revalidatePath("/dashboard/certificates");
+  } catch {
+    // CLI / seed has no Next.js request context
+  }
   return created;
 }
 

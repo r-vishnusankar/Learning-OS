@@ -1,9 +1,8 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { CommandPalette } from "@/components/layout/command-palette";
-import { AiAssistant } from "@/components/layout/ai-assistant";
-import { NotificationPanel } from "@/components/layout/notification-panel";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { AiAssistant, NotificationPanel } from "@/components/layout/lazy-overlays";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (

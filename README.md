@@ -77,12 +77,14 @@ Requires [cloudflared](https://developers.cloudflare.com/cloudflare-one/connecti
 
 ### Temporary dev login
 
-Until company Microsoft Entra ID is configured, use:
+Until company Microsoft Entra ID is configured, every `@valoriz.com` employee uses the same password:
 
 | Field | Value |
 |-------|-------|
-| Email | `demo@nexus.local` |
-| Password | `nexus123` |
+| Email | your Valoriz email (e.g. `riju.thomas@valoriz.com`) |
+| Super Admin | `superadmin@valoriz.com` |
+| Personal admin | `vishnu.sankar@valoriz.com` |
+| Password | `Skillrr@2026` |
 
 Override via `DEV_LOGIN_EMAIL` and `DEV_LOGIN_PASSWORD` in `.env.local`. Microsoft SSO appears automatically once Entra env vars are set.
 

@@ -101,10 +101,10 @@ export function CourseCard({ course, variant = "default", className }: CourseCar
         />
         <div className="absolute inset-0 bg-linear-to-t from-black/35 via-transparent to-transparent" />
         <div className="absolute left-4 top-4 flex flex-wrap gap-1.5">
-          <Badge variant={levelVariant} className="bg-card/90 backdrop-blur-sm">
+          <Badge variant={levelVariant} className="shadow-sm ring-1 ring-black/10">
             {LEVEL_LABELS[course.level] ?? course.level}
           </Badge>
-          <Badge variant={categoryVariant} className="bg-card/90 backdrop-blur-sm">
+          <Badge variant={categoryVariant} className="shadow-sm ring-1 ring-black/10">
             {categoryLabel}
           </Badge>
         </div>

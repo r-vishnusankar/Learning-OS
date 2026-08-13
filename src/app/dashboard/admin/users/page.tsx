@@ -48,6 +48,7 @@ import {
   useUpdateUser,
 } from "@/hooks/use-operations";
 import { useCurrentUser } from "@/hooks/use-me";
+import { isProtectedAdminEmail } from "@/lib/dev-credentials";
 import type { DepartmentId, UserRole } from "@/types";
 
 const fade = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 } };
@@ -375,7 +376,7 @@ export default function AdminUsersPage() {
                                 disabled={
                                   deleteUser.isPending ||
                                   user.id === me?.id ||
-                                  user.email === "demo@nexus.local"
+                                  isProtectedAdminEmail(user.email)
                                 }
                                 onClick={async () => {
                                   const ok = window.confirm(

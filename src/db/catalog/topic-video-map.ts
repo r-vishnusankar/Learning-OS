@@ -122,7 +122,7 @@ export const TOPIC_VIDEO: Record<string, string> = {
   "Omnichannel Design": "https://www.youtube.com/embed/Gsfsq2epdr8",
   "Enterprise Growth Strategy": "https://www.youtube.com/embed/laY6fvlwa4c",
   "Category Creation": "https://www.youtube.com/embed/pgPwaNpC0so",
-  "CMO Partnership": "https://www.youtube.com/embed/Mn3UcNbdneg",
+  "CMO Partnership": "https://www.youtube.com/embed/wHXiTx5D5KI",
   "Design Thinking Basics": "https://www.youtube.com/embed/MkaIrwOlP6Y",
   "Visual Hierarchy": "https://www.youtube.com/embed/yfoY53QXEnI",
   "Figma Foundations": "https://www.youtube.com/embed/FTFaQWZBqQ8",

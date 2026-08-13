@@ -50,10 +50,10 @@ export const departments: Department[] = [
 
 const instructor = {
   id: "i1",
-  name: "Dr. Priya Sharma",
-  avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=Priya",
-  title: "Principal Engineering Educator",
-  bio: "15+ years building scalable systems and teaching enterprise engineering practices.",
+  name: "Riju Thomas",
+  avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=Riju%20Thomas",
+  title: "Technical Architect · Development",
+  bio: "Leads Skillrr development learning tracks and mentoring for engineers.",
 };
 
 export const courses: Course[] = [
@@ -147,7 +147,13 @@ export const courses: Course[] = [
     level: "intermediate",
     difficulty: "intermediate",
     learningCategory: "goal",
-    instructor: { ...instructor, id: "i3", name: "Elena Vasquez", avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=Elena" },
+    instructor: {
+      ...instructor,
+      id: "i3",
+      name: "Vishnuprasad P S",
+      avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=Vishnuprasad%20P%20S",
+      title: "UI Lead · Design",
+    },
     durationHours: 10,
     lessonsCount: 14,
     enrolledCount: 986,

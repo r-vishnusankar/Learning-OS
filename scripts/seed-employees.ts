@@ -45,7 +45,10 @@ async function main() {
   let updated = 0;
 
   for (const emp of catalog) {
-    const [existing] = await db.select().from(users).where(eq(users.email, emp.email)).limit(1);
+    let [existing] = await db.select().from(users).where(eq(users.email, emp.email)).limit(1);
+    if (!existing) {
+      [existing] = await db.select().from(users).where(eq(users.name, emp.name)).limit(1);
+    }
 
     let userId = existing?.id;
     if (!userId) {
@@ -62,14 +65,16 @@ async function main() {
     } else {
       await db
         .update(users)
-        .set({ name: emp.name, image: avatar(emp.name) })
+        .set({ name: emp.name, email: emp.email, image: avatar(emp.name) })
         .where(eq(users.id, userId));
       updated += 1;
     }
 
     const [profile] = await db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
+    const keepAdmin =
+      profile?.role === "admin" || emp.email === "superadmin@valoriz.com";
     const profileValues = {
-      role: emp.role,
+      role: keepAdmin ? profile.role : emp.role,
       department: emp.department,
       designation: emp.designation,
       level: emp.level,

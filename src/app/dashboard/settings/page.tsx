@@ -207,8 +207,9 @@ export default function SettingsPage() {
         <Card>
           <CardContent className="space-y-4 p-6">
             <p className="text-sm text-muted-foreground">
-              Sign out and sign back in with <span className="font-mono">demo@nexus.local</span> to
-              refresh your session, then reopen Settings.
+              Sign out and sign back in with{" "}
+              <span className="font-mono">vishnu.sankar@valoriz.com</span> to refresh your session,
+              then reopen Settings.
             </p>
             <Button asChild>
               <a href="/login">Go to login</a>

@@ -2,6 +2,10 @@ import { config } from "dotenv";
 import { eq } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
+import {
+  DEPARTMENT_INSTRUCTORS,
+  instructorAvatar,
+} from "@/db/catalog/department-instructors";
 import { courses, instructors, lessons, modules, profiles, users } from "@/db/schema";
 
 config({ path: ".env.local" });
@@ -19,7 +23,11 @@ async function seedCourses() {
 
   const db = drizzle(neon(databaseUrl));
 
-  const demoUser = await db.select().from(users).where(eq(users.email, "demo@nexus.local")).limit(1);
+  const demoEmail = (process.env.DEV_LOGIN_EMAIL ?? "vishnu.sankar@valoriz.com").toLowerCase();
+  let demoUser = await db.select().from(users).where(eq(users.email, demoEmail)).limit(1);
+  if (!demoUser[0]) {
+    demoUser = await db.select().from(users).where(eq(users.email, "demo@nexus.local")).limit(1);
+  }
   if (demoUser[0]) {
     await db
       .update(profiles)
@@ -27,17 +35,22 @@ async function seedCourses() {
       .where(eq(profiles.userId, demoUser[0].id));
   }
 
-  const existingInstructor = await db.select().from(instructors).limit(1);
-  let instructorId = existingInstructor[0]?.id;
+  const developmentFaculty = DEPARTMENT_INSTRUCTORS.development;
+  const [existingInstructor] = await db
+    .select()
+    .from(instructors)
+    .where(eq(instructors.name, developmentFaculty.name))
+    .limit(1);
+  let instructorId = existingInstructor?.id;
 
   if (!instructorId) {
     const [created] = await db
       .insert(instructors)
       .values({
-        name: "Dr. Priya Sharma",
-        avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=Priya",
-        title: "Principal Engineering Educator",
-        bio: "15+ years building scalable systems and teaching enterprise engineering practices.",
+        name: developmentFaculty.name,
+        avatar: instructorAvatar(developmentFaculty.name),
+        title: developmentFaculty.title,
+        bio: developmentFaculty.bio,
       })
       .returning();
     instructorId = created.id;

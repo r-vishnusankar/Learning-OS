@@ -7,11 +7,11 @@ import {
   countQuestions,
   getAssessmentById,
   getAttemptById,
-  getInProgressAttempt,
   getQuestionsForAssessment,
   getUserAttempts,
+  gradeInProgressAttempt,
   listAssessments,
-  scoreAnswers,
+  startAttemptForUser,
 } from "@/db/queries/assessments";
 import { assessmentAttempts, assessments, questions } from "@/db/schema";
 import { requireAdminOrInstructor, requireUserId } from "@/lib/auth-utils";
@@ -25,15 +25,6 @@ import {
   updateAssessmentSchema,
   updateQuestionSchema,
 } from "@/validators/assessment";
-
-function shuffle<T>(items: T[]): T[] {
-  const arr = [...items];
-  for (let i = arr.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
 
 function toLearnerStatus(
   assessment: typeof assessments.$inferSelect,
@@ -231,38 +222,7 @@ export async function deleteQuestionAction(id: string) {
 
 export async function startAttemptAction(assessmentId: string) {
   const userId = await requireUserId();
-  const assessment = await getAssessmentById(assessmentId);
-  if (!assessment || assessment.publishStatus !== "published") {
-    throw new Error("Assessment not available");
-  }
-
-  const existing = await getInProgressAttempt(userId, assessmentId);
-  if (existing) return existing;
-
-  const attempts = await getUserAttempts(userId, assessmentId);
-  const submitted = attempts.filter((a) => a.status !== "in_progress");
-  if (submitted.length >= assessment.maxAttempts) {
-    throw new Error("Max attempts reached");
-  }
-
-  let qs = await getQuestionsForAssessment(assessmentId);
-  if (!qs.length) throw new Error("No questions in this assessment");
-  if (assessment.randomize) qs = shuffle(qs);
-
-  const db = getDb();
-  const [attempt] = await db
-    .insert(assessmentAttempts)
-    .values({
-      assessmentId,
-      userId,
-      questionOrder: qs.map((q) => q.id),
-      answers: {},
-      status: "in_progress",
-      maxScore: qs.reduce((sum, q) => sum + q.points, 0),
-    })
-    .returning();
-
-  return attempt;
+  return startAttemptForUser(userId, assessmentId);
 }
 
 export async function fetchAttemptSessionAction(attemptId: string) {
@@ -339,34 +299,11 @@ export async function submitAttemptAction(input: unknown) {
     throw new Error("Invalid attempt");
   }
 
-  const assessment = await getAssessmentById(attempt.assessmentId);
-  if (!assessment) throw new Error("Assessment missing");
+  const graded = await gradeInProgressAttempt(data.attemptId, data.answers);
+  const { assessment, result, questions: qs } = graded;
 
-  const qs = await getQuestionsForAssessment(assessment.id);
-  const answers = { ...attempt.answers, ...(data.answers ?? {}) };
-  const result = scoreAnswers(qs, answers, assessment.negativeMarking);
-  const passed = result.percentage >= assessment.passingScore;
-  const status = result.needsManual ? "submitted" : "graded";
-
-  const db = getDb();
-  const [updated] = await db
-    .update(assessmentAttempts)
-    .set({
-      answers,
-      score: result.score,
-      maxScore: result.maxScore,
-      percentage: result.percentage,
-      passed: result.needsManual ? null : passed,
-      status,
-      submittedAt: new Date(),
-    })
-    .where(
-      and(eq(assessmentAttempts.id, data.attemptId), eq(assessmentAttempts.status, "in_progress"))
-    )
-    .returning();
-
-  if (!updated) {
-    const current = await getAttemptById(data.attemptId);
+  if (!graded.wrote) {
+    const current = graded.attempt;
     return {
       attempt: current,
       percentage: current?.percentage ?? result.percentage,
@@ -375,7 +312,10 @@ export async function submitAttemptAction(input: unknown) {
     };
   }
 
-  if (!result.needsManual && passed) {
+  const updated = graded.attempt;
+  if (!updated) throw new Error("Invalid attempt");
+
+  if (!result.needsManual && graded.passed) {
     const { mintCertificateForAssessmentPass } = await import("@/services/certification");
     await mintCertificateForAssessmentPass({
       userId,
@@ -407,7 +347,7 @@ export async function submitAttemptAction(input: unknown) {
   return {
     attempt: updated,
     percentage: result.percentage,
-    passed: result.needsManual ? null : passed,
+    passed: result.needsManual ? null : graded.passed,
     needsManual: result.needsManual,
   };
 }

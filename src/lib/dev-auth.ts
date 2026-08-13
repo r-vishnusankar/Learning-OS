@@ -1,10 +1,15 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
-import { users } from "@/db/schema";
+import { profiles, users } from "@/db/schema";
+import {
+  DEFAULT_DEV_EMAIL,
+  DEFAULT_DEV_NAME,
+  DEFAULT_DEV_PASSWORD,
+  LEGACY_DEV_EMAILS,
+  SUPERADMIN_EMAIL,
+  SUPERADMIN_NAME,
+} from "@/lib/dev-credentials";
 import { ensureProfile } from "@/lib/profile";
-
-const DEFAULT_DEV_EMAIL = "demo@nexus.local";
-const DEFAULT_DEV_PASSWORD = "nexus123";
 
 export function getDevCredentials() {
   return {
@@ -17,8 +22,12 @@ function defaultAvatar(name: string) {
   return `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(name)}`;
 }
 
+function isCompanyLoginEmail(email: string) {
+  return email.endsWith("@valoriz.com") || email.endsWith("@nexus.local");
+}
+
 /**
- * Dev auth: shared password for demo admin + any existing *@nexus.local roster user.
+ * Shared-password login for the Skillrr admin and existing Valoriz / legacy roster users.
  * Production should use Entra SSO only, unless ENABLE_DEV_LOGIN=true is set.
  */
 export async function authenticateDevUser(email: string, password: string) {
@@ -35,27 +44,60 @@ export async function authenticateDevUser(email: string, password: string) {
   }
 
   const isPrimaryAdmin = normalized === dev.email.toLowerCase();
-  const isLocalRoster = normalized.endsWith("@nexus.local");
-
-  if (!isPrimaryAdmin && !isLocalRoster) {
+  const isSuperAdmin = normalized === SUPERADMIN_EMAIL;
+  if (!isPrimaryAdmin && !isSuperAdmin && !isCompanyLoginEmail(normalized)) {
     return null;
   }
 
   if (!process.env.DATABASE_URL) {
-    if (!isPrimaryAdmin) return null;
+    if (!isPrimaryAdmin && !isSuperAdmin) return null;
+    const name = isSuperAdmin ? SUPERADMIN_NAME : DEFAULT_DEV_NAME;
+    const email = isSuperAdmin ? SUPERADMIN_EMAIL : dev.email;
     return {
-      id: "dev-local-user",
-      email: dev.email,
-      name: "Alex Rivera",
-      image: defaultAvatar("Alex Rivera"),
+      id: isSuperAdmin ? "dev-superadmin" : "dev-local-user",
+      email,
+      name,
+      image: defaultAvatar(name),
     };
   }
 
   const db = getDb();
-  const [existing] = await db.select().from(users).where(eq(users.email, normalized)).limit(1);
+  let [existing] = await db.select().from(users).where(eq(users.email, normalized)).limit(1);
+
+  // Migrate legacy demo admin to the configured primary email on first login
+  if (!existing && isPrimaryAdmin && LEGACY_DEV_EMAILS.length > 0) {
+    const [legacy] = await db
+      .select()
+      .from(users)
+      .where(inArray(users.email, [...LEGACY_DEV_EMAILS]))
+      .limit(1);
+
+    if (legacy) {
+      const [updated] = await db
+        .update(users)
+        .set({
+          email: dev.email.toLowerCase(),
+          name: DEFAULT_DEV_NAME,
+          image: defaultAvatar(DEFAULT_DEV_NAME),
+        })
+        .where(eq(users.id, legacy.id))
+        .returning();
+      existing = updated;
+    }
+  }
 
   if (existing) {
     await ensureProfile(existing.id);
+    if (isSuperAdmin || isPrimaryAdmin) {
+      await db
+        .update(profiles)
+        .set({
+          role: "admin",
+          status: "active",
+          designation: isSuperAdmin ? "Platform Super Admin" : "Platform Administrator",
+        })
+        .where(eq(profiles.userId, existing.id));
+    }
     return {
       id: existing.id,
       email: existing.email ?? normalized,
@@ -64,26 +106,34 @@ export async function authenticateDevUser(email: string, password: string) {
     };
   }
 
-  // Only auto-create the primary demo admin
-  if (!isPrimaryAdmin) {
+  if (!isPrimaryAdmin && !isSuperAdmin) {
     return null;
   }
 
-  const name = "Alex Rivera";
+  const name = isSuperAdmin ? SUPERADMIN_NAME : DEFAULT_DEV_NAME;
+  const accountEmail = isSuperAdmin ? SUPERADMIN_EMAIL : dev.email;
   const [created] = await db
     .insert(users)
     .values({
-      email: dev.email,
+      email: accountEmail,
       name,
       image: defaultAvatar(name),
     })
     .returning();
 
   await ensureProfile(created.id);
+  await db
+    .update(profiles)
+    .set({
+      role: "admin",
+      status: "active",
+      designation: isSuperAdmin ? "Platform Super Admin" : "Platform Administrator",
+    })
+    .where(eq(profiles.userId, created.id));
 
   return {
     id: created.id,
-    email: created.email ?? dev.email,
+    email: created.email ?? accountEmail,
     name: created.name ?? name,
     image: created.image ?? defaultAvatar(name),
   };

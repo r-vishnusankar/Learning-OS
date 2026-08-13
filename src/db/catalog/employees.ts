@@ -22,11 +22,74 @@ export type EmployeeRosterRow = {
 };
 
 /**
+ * Official Valoriz emails, keyed by roster display name.
+ * People not in EMPLOYEE_ROSTER are created as extra login accounts.
+ */
+export const VALORIZ_EMAIL_BY_NAME: Record<string, string> = {
+  "Rakesh Kesavan": "rakesh.kesavan@valoriz.com",
+  "Riju Thomas": "riju.thomas@valoriz.com",
+  "Mohammed Shabeer": "mohammed.shabeer@valoriz.com",
+  "Muhammad Shafeeqe D": "muhammad.shafeeqe@valoriz.com",
+  "Naseef O": "naseef.o@valoriz.com",
+  "Shibin Mepparambil": "shibin.mak@valoriz.com",
+  "Vishnu Sankar": "vishnu.sankar@valoriz.com",
+  "Indrajith C": "indrajith.chandran@valoriz.com",
+  "Shamseer B": "shamseer.balery@valoriz.com",
+  "Anagha Chandrababu": "anagha.chandrababu@valoriz.com",
+  "Vishnuprasad P S": "vishnuprasad.ps@valoriz.com",
+  "Midhun Murali": "midhun.murali@valoriz.com",
+  "Devika Thulasi": "devika.thulasi@valoriz.com",
+  "Minna Ancy Mathew": "minna.mathew@valoriz.com",
+  "Soyadha Ravindran": "soyadha.ravindran@valoriz.com",
+  "Tinoy Thomas": "tinoy.thomas@valoriz.com",
+  "Kishore kumar P": "kishore.kumar@valoriz.com",
+  "Neeraj R": "neeraj.r@valoriz.com",
+  "Nithin R": "nithin.r@valoriz.com",
+  "Sarath N": "sarath.n@valoriz.com",
+  "Sandeep Raj V R": "sandeep.raj@valoriz.com",
+  "Aarshit S L": "aarshit.sl@valoriz.com",
+  "Rameshwari Subburaman": "rameshwari.s@valoriz.com",
+  "Aju Joseph": "aju.joseph@valoriz.com",
+  "Greeshma George": "greeshma.george@valoriz.com",
+  "Midhina M B": "midhina.m.b@valoriz.com",
+  "Shaan Jess Francis": "shaan.jess.francis@valoriz.com",
+  "Unnimaya B": "unnimaya.b@valoriz.com",
+  "Sivaprasad T P": "sivaprasad.t.p@valoriz.com",
+  "Arya Devi V S": "aryadevi.v.s@valoriz.com",
+  "Vishakh B S": "vishakh.b.s@valoriz.com",
+  "Sopal Soman": "sopal.soman@valoriz.com",
+  "Janajith D": "janajith.d@valoriz.com",
+  "Shilpa S Nair": "shilpa.s.nair@valoriz.com",
+  "Kevin Millet": "kevin.millet@valoriz.com",
+  "Syamily Divakaran": "syamily.divakaran@valoriz.com",
+  "Amarnath A": "amarnath.a@valoriz.com",
+  "Gouri S Govind": "gouri.govind@valoriz.com",
+  "Archa R": "archa.r@valoriz.com",
+  "Ram S Madhav": "ram.madhav@valoriz.com",
+  "Diljith Girish": "diljith.girish@valoriz.com",
+  "Nanda Kishor V": "nanda.kishor@valoriz.com",
+  "Ashna S": "ashna.s@valoriz.com",
+  "Kalyani Sunilkumar": "kalyani.sunilkumar@valoriz.com",
+  "Rohith Mohan": "rohith.mohan@valoriz.com",
+  "Anagha Anil Kumar": "anagha.anilkumar@valoriz.com",
+  "Navaneesh Chandran R": "navaneesh.chandran@valoriz.com",
+  "Shinin Babu": "shinin.babu@valoriz.com",
+  "Dhanush S": "dhanush.s@valoriz.com",
+  "Hridya A": "hridya.a@valoriz.com",
+  "Revathi Sunitha R A": "revathi.sunitha@valoriz.com",
+  "Jeffin Jiju": "jeffin.jiju@valoriz.com",
+  "Chandana G": "chandana.g@valoriz.com",
+};
+
+/**
  * Source-of-truth employee roster for seed / level assignment.
  * Excludes Project Management and Finance & Accounting (deferred).
  */
 export const EMPLOYEE_ROSTER: EmployeeRosterRow[] = [
+  { name: "Rakesh Kesavan", orgUnit: "Development", designation: "Team Member", experienceYears: 12 },
   { name: "Riju Thomas", orgUnit: "Development", designation: "Technical Architect", experienceYears: 11.27 },
+  { name: "Mohammed Shabeer", orgUnit: "Development", designation: "Team Member", experienceYears: 10 },
+  { name: "Muhammad Shafeeqe D", orgUnit: "Development", designation: "Associate Technical Architect", experienceYears: 9.37 },
   { name: "Muhammad Shafeeqe D", orgUnit: "Development", designation: "Associate Technical Architect", experienceYears: 9.37 },
   { name: "Naseef O", orgUnit: "Development", designation: "Technical Lead", experienceYears: 7.63 },
   { name: "Shibin Mepparambil", orgUnit: "Development", designation: "Technical Lead", experienceYears: 7.48 },
@@ -42,6 +105,7 @@ export const EMPLOYEE_ROSTER: EmployeeRosterRow[] = [
   { name: "Kishore kumar P", orgUnit: "Development", designation: "Senior Software Engineer", experienceYears: 4.95 },
   { name: "Neeraj R", orgUnit: "Development", designation: "Senior Software Engineer", experienceYears: 4.88 },
   { name: "Nithin R", orgUnit: "Development", designation: "Senior Software Engineer", experienceYears: 4.83 },
+  { name: "Sarath N", orgUnit: "Development", designation: "Team Member", experienceYears: 4.6 },
   { name: "Sandeep Raj V R", orgUnit: "QA", designation: "Senior QA Engineer", experienceYears: 4.33 },
   { name: "Aarshit S L", orgUnit: "QA", designation: "Senior QA Engineer", experienceYears: 4.3 },
   { name: "Rameshwari Subburaman", orgUnit: "BA", designation: "Business Analyst", experienceYears: 4.1 },
@@ -119,14 +183,22 @@ export function inferRole(designation: string): UserRole {
   return "employee";
 }
 
-export function emailFor(name: string): string {
-  const slug = name
+export function slugFromName(name: string): string {
+  return name
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, ".")
     .replace(/^\.+|\.+$/g, "");
-  return `${slug}@nexus.local`;
+}
+
+/** Previous generated emails used before the Valoriz domain cutover. */
+export function legacyNexusEmail(name: string): string {
+  return `${slugFromName(name)}@nexus.local`;
+}
+
+export function emailFor(name: string): string {
+  return VALORIZ_EMAIL_BY_NAME[name] ?? `${slugFromName(name)}@valoriz.com`;
 }
 
 export function nextLearningLevel(level: LearningLevel): LearningLevel | null {
