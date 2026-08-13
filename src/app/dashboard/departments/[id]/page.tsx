@@ -116,11 +116,7 @@ export default function DepartmentDetailPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={department.name} description={department.description}>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/dashboard/departments">All departments</Link>
-        </Button>
-      </PageHeader>
+      <PageHeader title={department.name} description={department.description} backHref="/dashboard/departments" backLabel="Departments" />
 
       <motion.section
         {...fade}

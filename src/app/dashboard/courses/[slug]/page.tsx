@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { CheckCircle2, Clock, Lock, Play } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, Lock, Play } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,7 +28,11 @@ export default function CourseDetailPage() {
   }
 
   if (!course) {
-    return <p className="text-muted-foreground">Course not found.</p>;
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Course" description="This course could not be found." backHref="/dashboard/courses" backLabel="Courses" />
+      </div>
+    );
   }
 
   const firstLesson = course.modules.flatMap((m) => m.lessons).find((l) => !l.locked);
@@ -39,6 +43,16 @@ export default function CourseDetailPage() {
         <div className="relative aspect-[21/9] min-h-[200px]">
           <Image src={course.thumbnail} alt={course.title} fill className="object-cover" unoptimized />
           <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/30 to-transparent" />
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="absolute left-4 top-4 z-10 gap-1 bg-black/40 text-white hover:bg-black/55 hover:text-white"
+          >
+            <Link href="/dashboard/courses">
+              <ArrowLeft className="h-4 w-4" /> Courses
+            </Link>
+          </Button>
           <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
             <div className="flex flex-wrap gap-2">
               <Badge className="bg-white/20 text-white">{DEPARTMENT_LABELS[course.department]}</Badge>

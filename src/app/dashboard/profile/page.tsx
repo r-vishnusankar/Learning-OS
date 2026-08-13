@@ -47,7 +47,7 @@ export default function ProfilePage() {
   if (isLoading || !user) {
     return (
       <div className="space-y-4">
-        <PageHeader title="My Profile" description="Loading your profile…" />
+        <PageHeader title="My Profile" description="Loading your profile…" backHref="/dashboard" backLabel="Dashboard" />
         <Skeleton className="h-48 w-full" />
       </div>
     );
@@ -95,6 +95,8 @@ export default function ProfilePage() {
       <PageHeader
         title="My Profile"
         description="Your learning journey, credentials, and career progress at Skillrr."
+        backHref="/dashboard"
+        backLabel="Dashboard"
       />
 
       <motion.section

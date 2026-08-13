@@ -294,7 +294,7 @@ export default function AssessmentBuilderPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={assessment.title} description="Build the question bank for this assessment.">
+      <PageHeader title={assessment.title} description="Build the question bank for this assessment." backHref="/dashboard/admin/assessments" backLabel="Assessments">
         <div className="flex gap-2">
           <Badge>{assessment.publishStatus}</Badge>
           <Button

@@ -151,7 +151,7 @@ export default function CourseBuilderPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={c.title} description="Professional content authoring — modules, lessons, versioning.">
+      <PageHeader title={c.title} description="Professional content authoring — modules, lessons, versioning." backHref="/dashboard/admin/courses" backLabel="Courses">
         <div className="flex flex-wrap gap-2">
           <Badge variant="secondary">{c.publishStatus}</Badge>
           <Button size="sm" variant="outline" onClick={() => setStatus("draft")}>

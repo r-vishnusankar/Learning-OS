@@ -70,6 +70,8 @@ export default function NotificationsPage() {
       <PageHeader
         title="Notifications"
         description="Stay updated on assessments, assignments, courses, and learning milestones."
+        backHref="/dashboard"
+        backLabel="Dashboard"
       >
         <div className="flex flex-wrap items-center gap-2">
           {unreadCount > 0 && <Badge variant="secondary">{unreadCount} unread</Badge>}

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Clock, Target } from "lucide-react";
@@ -38,7 +37,7 @@ export default function AssessmentDetailPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={assessment.title} description={assessment.description}>
+      <PageHeader title={assessment.title} description={assessment.description} backHref="/dashboard/assessments" backLabel="Assessments">
         <StatusBadge status={assessment.status} />
       </PageHeader>
 
@@ -115,10 +114,6 @@ export default function AssessmentDetailPage() {
           </CardContent>
         </Card>
       )}
-
-      <Button variant="ghost" asChild>
-        <Link href="/dashboard/assessments">Back to list</Link>
-      </Button>
     </div>
   );
 }

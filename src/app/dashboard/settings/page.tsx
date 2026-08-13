@@ -191,7 +191,7 @@ export default function SettingsPage() {
   if (userLoading || prefsLoading) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Settings" description="Loading your preferences…" />
+        <PageHeader title="Settings" description="Loading your preferences…" backHref="/dashboard" backLabel="Dashboard" />
         <Skeleton className="h-72 w-full" />
       </div>
     );
@@ -203,6 +203,8 @@ export default function SettingsPage() {
         <PageHeader
           title="Settings"
           description="Your session is out of sync with the database (common after a DB region change)."
+          backHref="/dashboard"
+          backLabel="Dashboard"
         />
         <Card>
           <CardContent className="space-y-4 p-6">
@@ -225,6 +227,8 @@ export default function SettingsPage() {
       <PageHeader
         title="Settings"
         description="Manage your profile, notifications, appearance, and learning preferences."
+        backHref="/dashboard"
+        backLabel="Dashboard"
       />
 
       <Tabs defaultValue="profile" className="space-y-6">
