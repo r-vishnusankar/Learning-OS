@@ -26,6 +26,8 @@ import {
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useUIStore } from "@/store/ui-store";
 import { cn, isExamRoute } from "@/lib/utils";
+import { canAccessAdmin } from "@/lib/roles";
+import type { UserRole } from "@/types";
 
 const commands = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, group: "Navigate" },
@@ -51,16 +53,17 @@ const commands = [
   { label: "Settings", href: "/dashboard/settings", icon: Settings, group: "Account" },
 ];
 
-export function CommandPalette() {
+export function CommandPalette({ role }: { role?: UserRole }) {
   const { commandOpen, setCommandOpen } = useUIStore();
   const [query, setQuery] = React.useState("");
   const [active, setActive] = React.useState(0);
   const router = useRouter();
   const pathname = usePathname();
 
-  const filtered = commands.filter((c) =>
-    c.label.toLowerCase().includes(query.toLowerCase())
-  );
+  const filtered = commands.filter((c) => {
+    if (c.group === "Admin" && !canAccessAdmin(role)) return false;
+    return c.label.toLowerCase().includes(query.toLowerCase());
+  });
 
   React.useEffect(() => {
     if (commandOpen) {

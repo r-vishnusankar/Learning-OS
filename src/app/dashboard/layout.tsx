@@ -6,6 +6,7 @@ import { CommandPalette } from "@/components/layout/command-palette";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { AiAssistant, NotificationPanel } from "@/components/layout/lazy-overlays";
 import { accountMaySignIn, readAccountStatus } from "@/lib/account-status";
+import { getProfileByUserId } from "@/lib/profile";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -17,6 +18,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
     }
   }
 
+  // Fetch fresh role from DB (not JWT) so the palette filter is always accurate,
+  // even if the JWT role is stale after a role change.
+  const profile = session?.user?.id
+    ? await getProfileByUserId(session.user.id)
+    : undefined;
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
@@ -26,7 +33,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           {children}
         </main>
       </DashboardShell>
-      <CommandPalette />
+      <CommandPalette role={profile?.role} />
       <NotificationPanel />
       <AiAssistant />
     </div>
