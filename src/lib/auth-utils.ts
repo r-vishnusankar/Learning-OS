@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { getDb } from "@/db";
 import { users } from "@/db/schema";
+import { accountMaySignIn } from "@/lib/account-status";
 import { ensureProfile, getProfileByUserId } from "@/lib/profile";
 import type { UserRole } from "@/types";
 
@@ -18,27 +19,30 @@ export async function requireUserId(): Promise<string> {
 
   const db = getDb();
   const sessionId = session.user.id;
+  let userId: string | undefined;
 
   const [byId] = await db.select({ id: users.id }).from(users).where(eq(users.id, sessionId)).limit(1);
   if (byId) {
-    await ensureProfile(byId.id);
-    return byId.id;
-  }
-
-  const email = session.user.email;
-  if (email) {
+    userId = byId.id;
+  } else if (session.user.email) {
     const [byEmail] = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.email, email))
+      .where(eq(users.email, session.user.email))
       .limit(1);
-    if (byEmail) {
-      await ensureProfile(byEmail.id);
-      return byEmail.id;
-    }
+    userId = byEmail?.id;
   }
 
-  throw new Error("Unauthorized");
+  if (!userId) {
+    throw new Error("Unauthorized");
+  }
+
+  const profile = await ensureProfile(userId);
+  if (!accountMaySignIn(profile.status)) {
+    throw new Error("Unauthorized");
+  }
+
+  return userId;
 }
 
 export async function requireRole(allowed: UserRole[]): Promise<string> {

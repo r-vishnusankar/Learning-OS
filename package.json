@@ -27,6 +27,7 @@
     "db:resync-catalog": "tsx scripts/resync-catalog-courses.ts",
     "db:audit-catalog": "tsx scripts/audit-catalog-courses.ts",
     "test:course-url-audit": "tsx scripts/test-course-url-audit.ts",
+    "test:inactive-account": "tsx scripts/test-inactive-account.ts",
     "docs:course-catalog": "tsx scripts/generate-course-catalog-doc.ts",
     "db:migrate-promotions": "tsx src/db/migrate-promotions.ts",
     "db:seed-employees": "tsx scripts/seed-employees.ts",

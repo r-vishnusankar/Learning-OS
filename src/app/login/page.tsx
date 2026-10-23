@@ -208,8 +208,14 @@ function BrandIllustration() {
   );
 }
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const entraEnabled = isEntraConfigured();
+  const { error } = await searchParams;
+  const authError = typeof error === "string" ? error : undefined;
 
   return (
     <div className="min-h-dvh bg-background">
@@ -263,7 +269,7 @@ export default function LoginPage() {
             <SkillrrLogo size={32} />
           </div>
 
-          <LoginForm entraEnabled={entraEnabled} />
+          <LoginForm entraEnabled={entraEnabled} authError={authError} />
         </main>
       </div>
     </div>

@@ -11,6 +11,7 @@ import {
   users,
   verificationTokens,
 } from "@/db/schema";
+import { accountMaySignIn, readAccountStatus } from "@/lib/account-status";
 import { authenticateDevUser, isEntraConfigured } from "@/lib/dev-auth";
 import { ensureProfile } from "@/lib/profile";
 import type { DepartmentId, LearningLevel, UserRole } from "@/types";
@@ -60,6 +61,7 @@ const authConfig: NextAuthConfig = {
   providers,
   pages: {
     signIn: "/login",
+    error: "/login",
   },
   session: {
     strategy: "jwt",
@@ -79,6 +81,10 @@ const authConfig: NextAuthConfig = {
       }
 
       return true;
+    },
+    async signIn({ user }) {
+      const status = await readAccountStatus(user.id, user.email);
+      return accountMaySignIn(status);
     },
     async jwt({ token, user }) {
       if (user?.id && process.env.DATABASE_URL) {

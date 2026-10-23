@@ -26,6 +26,14 @@ const PRESETS = [
 
 const isDevLoginUi = process.env.NODE_ENV !== "production";
 
+const INACTIVE_ACCOUNT_MESSAGE = "Your account is inactive. Contact your administrator.";
+
+function messageForAuthError(code: string | undefined): string | null {
+  if (!code) return null;
+  if (code === "AccessDenied" || code === "AccountInactive") return INACTIVE_ACCOUNT_MESSAGE;
+  return "Sign-in failed. Please try again.";
+}
+
 function MicrosoftMark({ className }: { className?: string }) {
   return (
     <svg
@@ -54,12 +62,18 @@ const fieldClass = cn(
   "aria-invalid:border-destructive aria-invalid:focus-visible:ring-destructive/20"
 );
 
-export function LoginForm({ entraEnabled = false }: { entraEnabled?: boolean }) {
+export function LoginForm({
+  entraEnabled = false,
+  authError,
+}: {
+  entraEnabled?: boolean;
+  authError?: string;
+}) {
   const router = useRouter();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(() => messageForAuthError(authError));
   const [forgotHint, setForgotHint] = React.useState(false);
   const [supportHint, setSupportHint] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
@@ -80,7 +94,9 @@ export function LoginForm({ entraEnabled = false }: { entraEnabled?: boolean }) 
 
     if (result?.error) {
       setLoading(false);
-      setError("Invalid email or password.");
+      setError(
+        result.error === "AccessDenied" ? INACTIVE_ACCOUNT_MESSAGE : "Invalid email or password."
+      );
       return;
     }
 
