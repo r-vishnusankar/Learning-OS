@@ -24,13 +24,13 @@ Success for admins means: manage catalog and assignments, run assessments (inclu
 
 ## Positioning
 
-Learning is gated to a **career loop**, not open-ended course browsing alone: mandatory course assignments → lessons → knowledge-check assessment → certificate → promotion eligibility → admin approval. Neighboring LMS tools may host courses; Nexus couples certification to internal career levels (Beginner → Expert) across seven departments.
+Learning is gated to a **career loop**, not open-ended course browsing alone: mandatory course assignments → lessons → knowledge-check assessment → certificate → promotion eligibility → admin approval. Neighboring LMS tools may host courses; Nexus couples certification to internal career levels across seven departments.
 
 ## Operating Context
 
 - Authenticated web app (`/login` → `/dashboard`); Microsoft Entra SSO intended for production, with local demo credentials for development.
 - Departments: QA, Development, BA, HR, Marketing, UI/UX, DevOps.
-- Learning levels: Beginner, Associate, Intermediate, Advanced, Senior, Lead, Architect, Expert (3 catalog courses per department × level).
+- Learning levels are department-specific: Development / UI/UX / DevOps use Associate → Advanced → Senior → Lead → Architect; QA ends at QA Manager; BA ends at Product Owner; HR uses Associate → Advanced → Assistant HR Manager → HR Manager; Digital Marketing keeps Beginner → Expert (3 courses per level). Merged levels hold 6 courses.
 - Learner rituals: Dashboard career card, My Learning, Courses, Assessments, Assignments (incl. coding), Certificates, Skills, Leaderboard, AI Mentor, Help.
 - Admin rituals: course & media management, course assignments, assessments & question banks, homework assignments, certificates, promotions, employee progress, catalog audit.
 - Stack in use: Next.js App Router, React, TypeScript, Tailwind CSS, Neon Postgres, Drizzle, Auth.js, TanStack Query.
@@ -74,3 +74,26 @@ Learning is gated to a **career loop**, not open-ended course browsing alone: ma
 ## Accessibility & Inclusion
 
 [Open — no explicit WCAG target found in repo.] Default expectation for an enterprise internal tool: keyboard-usable navigation, readable contrast, and labels on interactive controls; confirm standard with stakeholders later.
+
+## Known Role-Access Mismatches (deferred, decision: leave as-is)
+
+> Decision recorded Oct 2026. The admin layout (`src/app/dashboard/admin/layout.tsx`) allows
+> `admin`, `instructor`, and `department_head` to reach all admin pages. However, several
+> server-side service actions are guarded more strictly than the layout. A `department_head`
+> (or `instructor` where noted) can navigate to the page but certain operations will fail
+> with "Forbidden". These are NOT security holes — the server rejects the call — but they
+> produce confusing UX (form renders, mutation fails). Defer tightening until role policy is
+> formally decided.
+
+| Admin page | Who reaches it (layout) | Who the server rejects | Failed operations |
+|---|---|---|---|
+| `/dashboard/admin/users` (write) | admin, instructor, dept\_head | instructor, dept\_head | Invite, update role/dept/status, delete, bulk CSV import |
+| `/dashboard/admin/courses` | admin, instructor, dept\_head | dept\_head | Create, update, archive, delete courses; manage lessons/media |
+| `/dashboard/admin/catalog-audit` | admin, instructor, dept\_head | dept\_head | Run audit (`requireAdminOrInstructor`) |
+| `/dashboard/admin/employee-progress` | admin, instructor, dept\_head | dept\_head | Load progress data (`requireAdminOrInstructor`) |
+| `/dashboard/admin/assessments` | admin, instructor, dept\_head | dept\_head | Create, update, delete assessments and questions |
+
+Options when this is revisited:
+- **(a) Tighten layout** — restrict affected pages to `admin` or `admin + instructor` only.
+- **(b) Loosen service guards** — promote `requireAdminOrInstructor` → `requireCourseAssigner` on relevant read paths, keep `requireAdmin` for destructive writes.
+- **(c) Status quo** — leave as-is (current decision).
