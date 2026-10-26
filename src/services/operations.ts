@@ -3,7 +3,7 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
-import { departments, notifications, profiles, teamMembers, teams, users } from "@/db/schema";
+import { departments, notifications, profiles, teamMembers, teams, userCredentials, users } from "@/db/schema";
 import {
   countUnreadNotifications,
   getAnalyticsSnapshot,
@@ -22,6 +22,7 @@ import {
   requireManagerOrAbove,
   requireUserId,
 } from "@/lib/auth-utils";
+import { generateTemporaryPassword, hashPassword } from "@/lib/password";
 import { ROLE_LABELS } from "@/lib/roles";
 import { getProfileByUserId } from "@/lib/profile";
 import type { DepartmentId, UserRole } from "@/types";
@@ -81,6 +82,10 @@ export async function inviteUserAction(input: unknown) {
   const existing = await db.select().from(users).where(eq(users.email, data.email)).limit(1);
   if (existing[0]) throw new Error("User with this email already exists");
 
+  // Generate and hash temporary password BEFORE any DB writes
+  const temporaryPassword = generateTemporaryPassword();
+  const passwordHash = await hashPassword(temporaryPassword);
+
   const [user] = await db
     .insert(users)
     .values({
@@ -101,14 +106,37 @@ export async function inviteUserAction(input: unknown) {
     goals: [],
   });
 
+  // Write credential. neon-http has no transactions — compensate on failure.
+  try {
+    await db.insert(userCredentials).values({
+      userId: user.id,
+      passwordHash,
+      mustChangePassword: true,
+    });
+  } catch (credErr) {
+    // Credential write failed: delete the user row so the email is not orphaned.
+    // Best-effort; if this also fails the admin will see the original error and can
+    // retry — the duplicate-email check at the top will catch the orphan on retry.
+    try {
+      await db.delete(users).where(eq(users.id, user.id));
+    } catch {
+      // Swallow: original error is more important
+    }
+    throw new Error(
+      "Account created but credential could not be saved. Please try again. " +
+        (credErr instanceof Error ? credErr.message : "")
+    );
+  }
+
   await db.insert(notifications).values({
     userId: user.id,
     title: "Welcome to Skillrr",
-    message: "Your learning account is ready. Start with My Learning or a Learning Path.",
+    message: "Your learning account is ready. You will be prompted to set your password on first login.",
     type: "success",
     href: "/dashboard/learning",
   });
 
+  // Audit: intentionally omit password hash and plaintext
   await writeAuditLog({
     userId: actorId,
     action: "user.invited",
@@ -118,7 +146,10 @@ export async function inviteUserAction(input: unknown) {
   });
 
   revalidatePath("/dashboard/admin/users");
-  return { id: user.id };
+
+  // Return the plaintext password exactly once so the admin can hand it to the user.
+  // It is not stored, logged, or included in the audit entry above.
+  return { id: user.id, temporaryPassword };
 }
 
 export async function updateUserAction(input: unknown) {

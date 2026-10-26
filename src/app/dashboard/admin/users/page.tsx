@@ -4,6 +4,8 @@ import * as React from "react";
 import { motion } from "framer-motion";
 import {
   Activity,
+  Check,
+  ClipboardCopy,
   Mail,
   MoreHorizontal,
   Search,
@@ -67,6 +69,9 @@ export default function AdminUsersPage() {
     department: "development" as DepartmentId,
     role: "employee" as UserRole,
   });
+  // Temporary password shown exactly once after a successful invite
+  const [tempPassword, setTempPassword] = React.useState<string | null>(null);
+  const [copied, setCopied] = React.useState(false);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   const { data: users = [], isLoading } = useAdminUsers({
@@ -84,7 +89,7 @@ export default function AdminUsersPage() {
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await inviteUser.mutateAsync({
+      const result = await inviteUser.mutateAsync({
         name: inviteForm.name,
         email: inviteForm.email,
         department: inviteForm.department,
@@ -92,9 +97,22 @@ export default function AdminUsersPage() {
       });
       setInviteForm({ name: "", email: "", department: "development", role: "employee" });
       setInviteOpen(false);
-      toast.success("User invited");
+      // Show the temporary password once — admin must share it with the new user
+      setTempPassword(result.temporaryPassword);
+      setCopied(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Invite failed");
+    }
+  };
+
+  const handleCopyPassword = async () => {
+    if (!tempPassword) return;
+    try {
+      await navigator.clipboard.writeText(tempPassword);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Could not copy — please select and copy manually.");
     }
   };
 
@@ -130,6 +148,35 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
+      {/* Temporary password modal — shown exactly once after a successful invite */}
+      <Dialog open={!!tempPassword} onOpenChange={(open) => { if (!open) setTempPassword(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>User created — share this password</DialogTitle>
+            <DialogDescription>
+              This temporary password is shown <strong>only once</strong>. Share it securely with
+              the new user. They will be required to change it on first login.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted px-4 py-3">
+            <code className="flex-1 select-all font-mono text-base tracking-widest text-foreground">
+              {tempPassword}
+            </code>
+            <button
+              type="button"
+              onClick={handleCopyPassword}
+              className="shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Copy password"
+            >
+              {copied ? <Check className="h-4 w-4 text-green-500" /> : <ClipboardCopy className="h-4 w-4" />}
+            </button>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setTempPassword(null)}>Done — I've saved the password</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <PageHeader
         title="User Management"
         description="Invite users, assign roles and departments, and manage access."

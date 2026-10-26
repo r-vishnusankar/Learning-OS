@@ -124,3 +124,19 @@ export const profiles = pgTable("profile", {
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
+
+/**
+ * Per-user credentials for the credentials-based login path.
+ * Rows only exist for users invited via the admin "Add User" form.
+ * Users who sign in via Entra SSO have no row here.
+ * Existing seeded/legacy users also have no row (they use the shared dev password).
+ */
+export const userCredentials = pgTable("user_credentials", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  passwordHash: text("password_hash").notNull(),
+  mustChangePassword: boolean("must_change_password").notNull().default(true),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});

@@ -3,11 +3,13 @@ import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   accounts,
   authenticators,
   sessions,
+  userCredentials,
   users,
   verificationTokens,
 } from "@/db/schema";
@@ -71,9 +73,15 @@ const authConfig: NextAuthConfig = {
       const isLoggedIn = !!session?.user;
       const isDashboard = nextUrl.pathname.startsWith("/dashboard");
       const isLogin = nextUrl.pathname.startsWith("/login");
+      const isChangePassword = nextUrl.pathname === "/dashboard/change-password";
 
       if (isDashboard) {
-        return isLoggedIn;
+        if (!isLoggedIn) return false;
+        // Force password-change screen for new invitees until they set their own password
+        if (session?.user?.mustChangePassword && !isChangePassword) {
+          return Response.redirect(new URL("/dashboard/change-password", nextUrl));
+        }
+        return true;
       }
 
       if (isLogin && isLoggedIn) {
@@ -96,8 +104,23 @@ const authConfig: NextAuthConfig = {
         token.level = profile.level;
         token.xp = profile.xp;
         token.coins = profile.coins;
+        // Read must_change_password for admin-invited users
+        const [cred] = await getDb()
+          .select({ mustChangePassword: userCredentials.mustChangePassword })
+          .from(userCredentials)
+          .where(eq(userCredentials.userId, user.id))
+          .limit(1);
+        token.mustChangePassword = cred?.mustChangePassword ?? false;
       } else if (user?.id) {
         token.id = user.id;
+      } else if (token.mustChangePassword === true && token.id && process.env.DATABASE_URL) {
+        // Re-read on every request while flag is set so it clears as soon as the user changes password
+        const [cred] = await getDb()
+          .select({ mustChangePassword: userCredentials.mustChangePassword })
+          .from(userCredentials)
+          .where(eq(userCredentials.userId, token.id as string))
+          .limit(1);
+        token.mustChangePassword = cred?.mustChangePassword ?? false;
       }
 
       return token;
@@ -111,6 +134,7 @@ const authConfig: NextAuthConfig = {
         session.user.level = token.level as LearningLevel;
         session.user.xp = (token.xp as number) ?? 0;
         session.user.coins = (token.coins as number) ?? 0;
+        session.user.mustChangePassword = (token.mustChangePassword as boolean | undefined) ?? false;
       }
 
       return session;
