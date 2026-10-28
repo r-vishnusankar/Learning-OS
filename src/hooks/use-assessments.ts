@@ -11,6 +11,7 @@ import {
   fetchAssessmentDetailAction,
   fetchAttemptSessionAction,
   fetchLearnerAssessmentsAction,
+  openOrCreateKnowledgeCheckAction,
   saveAnswersAction,
   startAttemptAction,
   submitAttemptAction,
@@ -63,7 +64,22 @@ export function useCreateAssessment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: createAssessmentAction,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-assessments"] }),
+    onSuccess: (data) => {
+      if (!data || !("ok" in data) || !data.ok) return;
+      qc.invalidateQueries({ queryKey: ["admin-assessments"] });
+    },
+  });
+}
+
+export function useOpenOrCreateKnowledgeCheck() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: openOrCreateKnowledgeCheckAction,
+    onSuccess: (data) => {
+      if (!data?.ok) return;
+      qc.invalidateQueries({ queryKey: ["admin-assessments"] });
+      qc.invalidateQueries({ queryKey: ["course-builder"] });
+    },
   });
 }
 
@@ -76,6 +92,7 @@ export function useUpdateAssessment() {
       qc.invalidateQueries({ queryKey: ["admin-assessments"] });
       qc.invalidateQueries({ queryKey: ["assessments"] });
       qc.invalidateQueries({ queryKey: ["assessment-builder"] });
+      qc.invalidateQueries({ queryKey: ["course-builder"] });
     },
   });
 }

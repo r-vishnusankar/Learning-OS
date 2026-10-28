@@ -21,6 +21,17 @@ export async function getAssessmentById(id: string) {
   return row ?? null;
 }
 
+/** Any status. At most one row once lms_assessment_course_unique is applied. */
+export async function getAssessmentByCourseId(courseId: string) {
+  const db = getDb();
+  const [row] = await db
+    .select()
+    .from(assessments)
+    .where(eq(assessments.courseId, courseId))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function getQuestionsForAssessment(assessmentId: string) {
   const db = getDb();
   return db

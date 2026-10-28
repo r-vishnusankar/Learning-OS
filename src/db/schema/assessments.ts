@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import type { DepartmentId, LearningLevel } from "@/types";
 import { departments, users } from "./auth";
 import { courses } from "./courses";
@@ -40,7 +40,11 @@ export const assessments = pgTable("lms_assessment", {
   dueDate: timestamp("due_date", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
-});
+},
+(t) => [
+  // Postgres unique indexes allow multiple NULLs, so unlinked assessments stay valid.
+  uniqueIndex("lms_assessment_course_unique").on(t.courseId),
+]);
 
 export const questions = pgTable("lms_question", {
   id: text("id")

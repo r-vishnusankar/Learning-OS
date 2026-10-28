@@ -26,25 +26,44 @@ import {
   useDeleteAssessment,
   useUpdateAssessment,
 } from "@/hooks/use-assessments";
+import { useAdminCourseOptions } from "@/hooks/use-certification";
 import type { DepartmentId } from "@/types";
 
 export default function AdminAssessmentsPage() {
   const router = useRouter();
   const { data = [], isLoading } = useAdminAssessments();
+  const { data: courses = [] } = useAdminCourseOptions();
   const createAssessment = useCreateAssessment();
   const updateAssessment = useUpdateAssessment();
   const deleteAssessment = useDeleteAssessment();
   const [open, setOpen] = React.useState(false);
+  const [courseQuery, setCourseQuery] = React.useState("");
+  const [courseError, setCourseError] = React.useState<string | null>(null);
   const [form, setForm] = React.useState({
     title: "",
     description: "",
     departmentId: "development" as DepartmentId,
+    courseId: "",
+  });
+
+  const filteredCourses = courses.filter((c) => {
+    if (c.id === form.courseId) return true;
+    return c.title.toLowerCase().includes(courseQuery.trim().toLowerCase());
   });
 
   return (
     <div className="space-y-6">
       <PageHeader title="Assessment Builder" description="Create exams, question banks, and publish for learners.">
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={(v) => {
+            setOpen(v);
+            if (!v) {
+              setCourseError(null);
+              setCourseQuery("");
+            }
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4" /> New assessment
@@ -54,15 +73,22 @@ export default function AdminAssessmentsPage() {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
+                setCourseError(null);
                 try {
-                  const created = await createAssessment.mutateAsync({
+                  const result = await createAssessment.mutateAsync({
                     title: form.title,
                     description: form.description || "Assessment description",
                     departmentId: form.departmentId,
+                    courseId: form.courseId || null,
                   });
+                  if (!result.ok) {
+                    setCourseError(result.fieldErrors?.courseId?.[0] ?? "Invalid input.");
+                    toast.error("Failed to create assessment");
+                    return;
+                  }
                   setOpen(false);
                   toast.success("Assessment created");
-                  router.push(`/dashboard/admin/assessments/${created.id}`);
+                  router.push(`/dashboard/admin/assessments/${result.id}`);
                 } catch {
                   toast.error("Failed to create assessment");
                 }
@@ -96,6 +122,34 @@ export default function AdminAssessmentsPage() {
                     </option>
                   ))}
                 </select>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium" htmlFor="create-course-link">
+                    Link a course (optional)
+                  </label>
+                  <Input
+                    placeholder="Search published courses"
+                    value={courseQuery}
+                    onChange={(e) => setCourseQuery(e.target.value)}
+                  />
+                  <select
+                    id="create-course-link"
+                    className="h-11 w-full rounded-2xl border border-input bg-card px-3 text-sm"
+                    value={form.courseId}
+                    onChange={(e) => {
+                      setCourseError(null);
+                      setForm((f) => ({ ...f, courseId: e.target.value }));
+                    }}
+                    aria-invalid={!!courseError}
+                  >
+                    <option value="">No course</option>
+                    {filteredCourses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.title}
+                      </option>
+                    ))}
+                  </select>
+                  {courseError && <p className="text-xs text-destructive">{courseError}</p>}
+                </div>
               </div>
               <DialogFooter>
                 <Button type="submit">Create draft</Button>
@@ -124,8 +178,9 @@ export default function AdminAssessmentsPage() {
                     <StatusBadge status={item.publishStatus} />
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {DEPARTMENT_LABELS[item.departmentId]} · {item.questionsCount} questions ·{" "}
-                    {item.durationMinutes}m · pass {item.passingScore}%
+                    {DEPARTMENT_LABELS[item.departmentId]}
+                    {item.courseTitle ? ` · ${item.courseTitle}` : ""} · {item.questionsCount}{" "}
+                    questions · {item.durationMinutes}m · pass {item.passingScore}%
                   </p>
                 </div>
                 {item.publishStatus !== "published" && (

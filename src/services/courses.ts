@@ -19,6 +19,7 @@ import {
   getUserCompletedLessonIdSet,
   getUserLessonProgress,
 } from "@/db/queries/courses";
+import { getAssessmentByCourseId } from "@/db/queries/assessments";
 
 import { courses, instructors, lessonResources, lessons, mediaAssets, modules } from "@/db/schema";
 import type { PublishStatus } from "@/db/schema/courses";
@@ -200,7 +201,18 @@ export async function fetchCourseBuilderAction(courseId: string) {
   const course = await getCourseById(courseId);
   if (!course) return null;
   const mods = await getCourseModulesWithLessons(courseId);
-  return { course, modules: mods };
+  const knowledgeCheck = await getAssessmentByCourseId(courseId);
+  return {
+    course,
+    modules: mods,
+    knowledgeCheck: knowledgeCheck
+      ? {
+          id: knowledgeCheck.id,
+          title: knowledgeCheck.title,
+          publishStatus: knowledgeCheck.publishStatus,
+        }
+      : null,
+  };
 }
 
 export async function createCourseAction(

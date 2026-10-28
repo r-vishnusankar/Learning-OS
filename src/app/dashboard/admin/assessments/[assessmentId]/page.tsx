@@ -24,6 +24,7 @@ import {
   useUpdateAssessment,
   useUpdateQuestion,
 } from "@/hooks/use-assessments";
+import { useAdminCourseOptions } from "@/hooks/use-certification";
 import type { QuestionType } from "@/db/schema/assessments";
 import { CodingAnswerEditor } from "@/components/assessments/coding-answer-editor";
 import { DEFAULT_CODING_CHECKS } from "@/lib/coding-checks";
@@ -186,6 +187,7 @@ export default function AssessmentBuilderPage() {
   const params = useParams<{ assessmentId: string }>();
   const id = params.assessmentId;
   const { data, isLoading, refetch } = useAssessmentBuilder(id);
+  const { data: courses = [] } = useAdminCourseOptions();
   const createQuestion = useCreateQuestion(id);
   const updateQuestion = useUpdateQuestion(id);
   const deleteQuestion = useDeleteQuestion(id);
@@ -198,7 +200,9 @@ export default function AssessmentBuilderPage() {
     durationMinutes: "",
     passingScore: "",
     maxAttempts: "",
+    courseId: "",
   });
+  const [courseQuery, setCourseQuery] = React.useState("");
   const [settingsErrors, setSettingsErrors] = React.useState<Record<string, string[]>>({});
 
   React.useEffect(() => {
@@ -207,6 +211,7 @@ export default function AssessmentBuilderPage() {
       durationMinutes: String(data.assessment.durationMinutes),
       passingScore: String(data.assessment.passingScore),
       maxAttempts: String(data.assessment.maxAttempts),
+      courseId: data.assessment.courseId ?? "",
     });
   }, [data?.assessment.id]);
 
@@ -333,6 +338,47 @@ export default function AssessmentBuilderPage() {
           <CardTitle className="text-base">Settings</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
+          <div className="space-y-1 md:col-span-3">
+            <label className="text-sm font-medium" htmlFor="linkedCourse">
+              Linked course (optional)
+            </label>
+            <Input
+              placeholder="Search published courses"
+              value={courseQuery}
+              onChange={(e) => setCourseQuery(e.target.value)}
+            />
+            <select
+              id="linkedCourse"
+              className="h-11 w-full rounded-2xl border border-input bg-card px-3 text-sm"
+              value={settings.courseId}
+              onChange={(e) => {
+                setSettingsErrors((err) => ({ ...err, courseId: [] }));
+                setSettings((s) => ({ ...s, courseId: e.target.value }));
+              }}
+              aria-invalid={!!settingsErrors.courseId?.length}
+            >
+              <option value="">No course</option>
+              {data.linkedCourse &&
+                !courses.some((c) => c.id === data.linkedCourse?.id) && (
+                  <option value={data.linkedCourse.id}>
+                    {data.linkedCourse.title} (not published)
+                  </option>
+                )}
+              {courses
+                .filter((c) => {
+                  if (c.id === settings.courseId) return true;
+                  return c.title.toLowerCase().includes(courseQuery.trim().toLowerCase());
+                })
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+            </select>
+            {settingsErrors.courseId?.[0] && (
+              <p className="text-xs text-destructive">{settingsErrors.courseId[0]}</p>
+            )}
+          </div>
           <div className="space-y-1">
             <label className="text-sm font-medium" htmlFor="durationMinutes">
               Duration (minutes)
@@ -409,6 +455,7 @@ export default function AssessmentBuilderPage() {
                   durationMinutes,
                   passingScore,
                   maxAttempts,
+                  courseId: settings.courseId || null,
                 });
                 if (!result.ok) {
                   setSettingsErrors(result.fieldErrors ?? {});

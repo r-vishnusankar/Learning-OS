@@ -1,10 +1,11 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
 import {
   countQuestions,
+  getAssessmentByCourseId,
   getAssessmentById,
   getAssessmentEligibility,
   getAttemptById,
@@ -14,7 +15,9 @@ import {
   listAssessments,
   startAttemptForUser,
 } from "@/db/queries/assessments";
+import { getCourseById } from "@/db/queries/courses";
 import { assessmentAttempts, assessments, questions } from "@/db/schema";
+import { courses } from "@/db/schema/courses";
 import { requireAdminOrInstructor, requireUserId } from "@/lib/auth-utils";
 import type { Assessment, AssessmentStatus } from "@/types";
 import type { CodingCheck } from "@/types/coding";
@@ -26,6 +29,24 @@ import {
   updateAssessmentSchema,
   updateQuestionSchema,
 } from "@/validators/assessment";
+
+const COURSE_TAKEN = "This course already has a knowledge check.";
+
+function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code: string }).code === "23505"
+  );
+}
+
+async function courseIdTaken(courseId: string, exceptAssessmentId?: string): Promise<boolean> {
+  const existing = await getAssessmentByCourseId(courseId);
+  if (!existing) return false;
+  if (exceptAssessmentId && existing.id === exceptAssessmentId) return false;
+  return true;
+}
 
 function toLearnerStatus(
   assessment: typeof assessments.$inferSelect,
@@ -84,10 +105,23 @@ export async function fetchLearnerAssessmentsAction(): Promise<Assessment[]> {
 export async function fetchAdminAssessmentsAction() {
   await requireAdminOrInstructor();
   const rows = await listAssessments();
+  const courseIds = [
+    ...new Set(rows.map((r) => r.courseId).filter((id): id is string => !!id)),
+  ];
+  const db = getDb();
+  const courseRows =
+    courseIds.length > 0
+      ? await db
+          .select({ id: courses.id, title: courses.title })
+          .from(courses)
+          .where(inArray(courses.id, courseIds))
+      : [];
+  const titleById = new Map(courseRows.map((c) => [c.id, c.title]));
   return Promise.all(
     rows.map(async (row) => ({
       ...row,
       questionsCount: await countQuestions(row.id),
+      courseTitle: row.courseId ? (titleById.get(row.courseId) ?? null) : null,
     }))
   );
 }
@@ -97,33 +131,103 @@ export async function fetchAssessmentBuilderAction(id: string) {
   const assessment = await getAssessmentById(id);
   if (!assessment) return null;
   const qs = await getQuestionsForAssessment(id);
-  return { assessment, questions: qs };
+  const linked = assessment.courseId ? await getCourseById(assessment.courseId) : null;
+  return {
+    assessment,
+    questions: qs,
+    linkedCourse: linked
+      ? {
+          id: linked.course.id,
+          title: linked.course.title,
+          publishStatus: linked.course.publishStatus,
+        }
+      : null,
+  };
 }
 
-export async function createAssessmentAction(input: unknown) {
+export async function createAssessmentAction(input: unknown): Promise<
+  | { ok: true; id: string }
+  | { ok: false; fieldErrors: Record<string, string[]> }
+> {
   await requireAdminOrInstructor();
-  const data = createAssessmentSchema.parse(input);
+  const parsed = createAssessmentSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+  const data = parsed.data;
+  const courseId = data.courseId ?? null;
+  if (courseId && (await courseIdTaken(courseId))) {
+    return { ok: false, fieldErrors: { courseId: [COURSE_TAKEN] } };
+  }
   const db = getDb();
-  const [created] = await db
-    .insert(assessments)
-    .values({
-      title: data.title,
-      description: data.description,
-      departmentId: data.departmentId,
-      level: data.level,
-      type: data.type,
-      courseId: data.courseId ?? null,
-      durationMinutes: data.durationMinutes,
-      passingScore: data.passingScore,
-      maxAttempts: data.maxAttempts,
-      negativeMarking: data.negativeMarking,
-      randomize: data.randomize,
-      dueDate: data.dueDate ? new Date(data.dueDate) : null,
-      publishStatus: "draft",
-    })
-    .returning();
-  revalidatePath("/dashboard/admin/assessments");
-  return created;
+  try {
+    const [created] = await db
+      .insert(assessments)
+      .values({
+        title: data.title,
+        description: data.description,
+        departmentId: data.departmentId,
+        level: data.level,
+        type: data.type,
+        courseId,
+        durationMinutes: data.durationMinutes,
+        passingScore: data.passingScore,
+        maxAttempts: data.maxAttempts,
+        negativeMarking: data.negativeMarking,
+        randomize: data.randomize,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        publishStatus: "draft",
+      })
+      .returning();
+    if (!created) {
+      return { ok: false, fieldErrors: { title: ["Could not create assessment"] } };
+    }
+    revalidatePath("/dashboard/admin/assessments");
+    return { ok: true, id: created.id };
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      return { ok: false, fieldErrors: { courseId: [COURSE_TAKEN] } };
+    }
+    throw err;
+  }
+}
+
+export async function openOrCreateKnowledgeCheckAction(courseId: string): Promise<
+  | { ok: true; id: string; created: boolean }
+  | { ok: false; code: "not_found"; message: string }
+> {
+  await requireAdminOrInstructor();
+  const courseRow = await getCourseById(courseId);
+  if (!courseRow) {
+    return { ok: false, code: "not_found", message: "Course not found." };
+  }
+  const existing = await getAssessmentByCourseId(courseId);
+  if (existing) return { ok: true, id: existing.id, created: false };
+
+  const title = `${courseRow.course.title} — Knowledge Check`.slice(0, 200);
+  const db = getDb();
+  try {
+    const [created] = await db
+      .insert(assessments)
+      .values({
+        title,
+        description: `Knowledge check for ${courseRow.course.title}`,
+        departmentId: courseRow.course.departmentId,
+        level: courseRow.course.level,
+        courseId,
+        publishStatus: "draft",
+      })
+      .returning();
+    revalidatePath("/dashboard/admin/assessments");
+    revalidatePath(`/dashboard/admin/courses/${courseId}`);
+    return { ok: true, id: created.id, created: true };
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      const raced = await getAssessmentByCourseId(courseId);
+      if (raced) return { ok: true, id: raced.id, created: false };
+    }
+    throw err;
+  }
 }
 
 export async function updateAssessmentAction(input: unknown): Promise<
@@ -136,32 +240,46 @@ export async function updateAssessmentAction(input: unknown): Promise<
     return { ok: false, fieldErrors: parsed.error.flatten().fieldErrors };
   }
   const data = parsed.data;
-  const db = getDb();
-  const [updated] = await db
-    .update(assessments)
-    .set({
-      ...(data.title !== undefined ? { title: data.title } : {}),
-      ...(data.description !== undefined ? { description: data.description } : {}),
-      ...(data.departmentId !== undefined ? { departmentId: data.departmentId } : {}),
-      ...(data.level !== undefined ? { level: data.level } : {}),
-      ...(data.type !== undefined ? { type: data.type } : {}),
-      ...(data.durationMinutes !== undefined ? { durationMinutes: data.durationMinutes } : {}),
-      ...(data.passingScore !== undefined ? { passingScore: data.passingScore } : {}),
-      ...(data.maxAttempts !== undefined ? { maxAttempts: data.maxAttempts } : {}),
-      ...(data.negativeMarking !== undefined ? { negativeMarking: data.negativeMarking } : {}),
-      ...(data.randomize !== undefined ? { randomize: data.randomize } : {}),
-      ...(data.publishStatus !== undefined ? { publishStatus: data.publishStatus } : {}),
-      updatedAt: new Date(),
-    })
-    .where(eq(assessments.id, data.id))
-    .returning();
-  if (!updated) {
-    return { ok: false, fieldErrors: { id: ["Assessment not found"] } };
+  if (data.courseId && (await courseIdTaken(data.courseId, data.id))) {
+    return { ok: false, fieldErrors: { courseId: [COURSE_TAKEN] } };
   }
-  revalidatePath("/dashboard/admin/assessments");
-  revalidatePath(`/dashboard/admin/assessments/${data.id}`);
-  revalidatePath("/dashboard/assessments");
-  return { ok: true, id: updated.id };
+  const db = getDb();
+  try {
+    const [updated] = await db
+      .update(assessments)
+      .set({
+        ...(data.title !== undefined ? { title: data.title } : {}),
+        ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.departmentId !== undefined ? { departmentId: data.departmentId } : {}),
+        ...(data.level !== undefined ? { level: data.level } : {}),
+        ...(data.type !== undefined ? { type: data.type } : {}),
+        ...(data.courseId !== undefined ? { courseId: data.courseId } : {}),
+        ...(data.durationMinutes !== undefined ? { durationMinutes: data.durationMinutes } : {}),
+        ...(data.passingScore !== undefined ? { passingScore: data.passingScore } : {}),
+        ...(data.maxAttempts !== undefined ? { maxAttempts: data.maxAttempts } : {}),
+        ...(data.negativeMarking !== undefined ? { negativeMarking: data.negativeMarking } : {}),
+        ...(data.randomize !== undefined ? { randomize: data.randomize } : {}),
+        ...(data.publishStatus !== undefined ? { publishStatus: data.publishStatus } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(assessments.id, data.id))
+      .returning();
+    if (!updated) {
+      return { ok: false, fieldErrors: { id: ["Assessment not found"] } };
+    }
+    revalidatePath("/dashboard/admin/assessments");
+    revalidatePath(`/dashboard/admin/assessments/${data.id}`);
+    revalidatePath("/dashboard/assessments");
+    if (updated.courseId) {
+      revalidatePath(`/dashboard/admin/courses/${updated.courseId}`);
+    }
+    return { ok: true, id: updated.id };
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      return { ok: false, fieldErrors: { courseId: [COURSE_TAKEN] } };
+    }
+    throw err;
+  }
 }
 
 export async function deleteAssessmentAction(id: string) {

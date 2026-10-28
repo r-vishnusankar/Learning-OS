@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   DndContext,
   closestCenter,
@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Edit, GripVertical, Plus, Trash2 } from "lucide-react";
+import { ClipboardCheck, Edit, GripVertical, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dialog";
 import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS, levelsForDepartment } from "@/constants/navigation";
 import { useCourseBuilder } from "@/hooks/use-courses";
+import { useOpenOrCreateKnowledgeCheck } from "@/hooks/use-assessments";
 import {
   createLessonAction,
   createModuleAction,
@@ -84,7 +85,9 @@ type LessonRow = {
 export default function CourseBuilderPage() {
   const params = useParams<{ courseId: string }>();
   const courseId = params.courseId;
+  const router = useRouter();
   const { data, isLoading, refetch } = useCourseBuilder(courseId);
+  const openKnowledgeCheck = useOpenOrCreateKnowledgeCheck();
   const [moduleTitle, setModuleTitle] = React.useState("");
   const [lessonForms, setLessonForms] = React.useState<Record<string, { title: string; type: string }>>({});
   const [editingLesson, setEditingLesson] = React.useState<(LessonRow & { moduleId: string }) | null>(null);
@@ -103,8 +106,22 @@ export default function CourseBuilderPage() {
     );
   }
 
-  const { course, modules } = data;
+  const { course, modules, knowledgeCheck } = data;
   const c = course.course;
+
+  const goToKnowledgeCheck = async () => {
+    if (knowledgeCheck) {
+      router.push(`/dashboard/admin/assessments/${knowledgeCheck.id}`);
+      return;
+    }
+    const result = await openKnowledgeCheck.mutateAsync(courseId);
+    if (!result.ok) {
+      toast.error(result.message);
+      return;
+    }
+    toast.success(result.created ? "Knowledge check created" : "Opening knowledge check");
+    router.push(`/dashboard/admin/assessments/${result.id}`);
+  };
 
   const handleModuleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -165,6 +182,15 @@ export default function CourseBuilderPage() {
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setStatus("archived")}>
             Archive
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void goToKnowledgeCheck()}
+            disabled={openKnowledgeCheck.isPending}
+          >
+            <ClipboardCheck className="h-4 w-4" />
+            {knowledgeCheck ? "Knowledge check" : "Add knowledge check"}
           </Button>
         </div>
       </PageHeader>
