@@ -132,9 +132,17 @@ export default function AdminAssessmentsPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() =>
-                      updateAssessment.mutate({ id: item.id, publishStatus: "published" })
-                    }
+                    onClick={async () => {
+                      const result = await updateAssessment.mutateAsync({
+                        id: item.id,
+                        publishStatus: "published",
+                      });
+                      if (!result.ok) {
+                        toast.error("Could not publish");
+                        return;
+                      }
+                      toast.success("Published");
+                    }}
                   >
                     Publish
                   </Button>

@@ -126,9 +126,16 @@ export async function createAssessmentAction(input: unknown) {
   return created;
 }
 
-export async function updateAssessmentAction(input: unknown) {
+export async function updateAssessmentAction(input: unknown): Promise<
+  | { ok: true; id: string }
+  | { ok: false; fieldErrors: Record<string, string[]> }
+> {
   await requireAdminOrInstructor();
-  const data = updateAssessmentSchema.parse(input);
+  const parsed = updateAssessmentSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+  const data = parsed.data;
   const db = getDb();
   const [updated] = await db
     .update(assessments)
@@ -148,10 +155,13 @@ export async function updateAssessmentAction(input: unknown) {
     })
     .where(eq(assessments.id, data.id))
     .returning();
+  if (!updated) {
+    return { ok: false, fieldErrors: { id: ["Assessment not found"] } };
+  }
   revalidatePath("/dashboard/admin/assessments");
   revalidatePath(`/dashboard/admin/assessments/${data.id}`);
   revalidatePath("/dashboard/assessments");
-  return updated;
+  return { ok: true, id: updated.id };
 }
 
 export async function deleteAssessmentAction(id: string) {

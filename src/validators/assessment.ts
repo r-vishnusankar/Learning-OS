@@ -20,7 +20,7 @@ export const createAssessmentSchema = z.object({
   level: learningLevelSchema.default("intermediate"),
   type: assessmentKindSchema.default("mixed"),
   courseId: z.string().uuid().optional().nullable(),
-  durationMinutes: z.number().int().min(5).default(60),
+  durationMinutes: z.number().int().min(1).default(60),
   passingScore: z.number().int().min(1).max(100).default(70),
   maxAttempts: z.number().int().min(1).default(3),
   negativeMarking: z.boolean().default(false),
@@ -28,8 +28,26 @@ export const createAssessmentSchema = z.object({
   dueDate: z.string().datetime().optional().nullable(),
 });
 
-export const updateAssessmentSchema = createAssessmentSchema.partial().extend({
+/**
+ * Partial update MUST NOT inherit create-schema .default() values.
+ * createAssessmentSchema.partial() still applies those defaults when a field is
+ * omitted, so Publish ({ id, publishStatus }) was rewriting duration/pass/attempts
+ * back to 60/70/3.
+ */
+export const updateAssessmentSchema = z.object({
   id: z.string().uuid(),
+  title: z.string().min(3).max(200).optional(),
+  description: z.string().max(5000).optional(),
+  departmentId: departmentIdSchema.optional(),
+  level: learningLevelSchema.optional(),
+  type: assessmentKindSchema.optional(),
+  courseId: z.string().uuid().optional().nullable(),
+  durationMinutes: z.number().int().min(1).optional(),
+  passingScore: z.number().int().min(1).max(100).optional(),
+  maxAttempts: z.number().int().min(1).optional(),
+  negativeMarking: z.boolean().optional(),
+  randomize: z.boolean().optional(),
+  dueDate: z.string().datetime().optional().nullable(),
   publishStatus: publishStatusSchema.optional(),
 });
 

@@ -71,9 +71,11 @@ export function useUpdateAssessment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: updateAssessmentAction,
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (!data || !("ok" in data) || !data.ok) return;
       qc.invalidateQueries({ queryKey: ["admin-assessments"] });
       qc.invalidateQueries({ queryKey: ["assessments"] });
+      qc.invalidateQueries({ queryKey: ["assessment-builder"] });
     },
   });
 }

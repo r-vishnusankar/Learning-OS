@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
-import { Eye, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Eye, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,13 +59,12 @@ function needsCorrectAnswers(type: QuestionType) {
 const emptyForm = {
   prompt: "",
   type: "mcq" as QuestionType,
-  options: "Option A, Option B, Option C, Option D",
-  correctAnswers: "Option A",
+  options: "",
+  correctAnswers: "",
   points: 5,
   codingLanguage: "javascript" as CodingLanguage,
-  starterCode: "// Write your solution\nfunction solve() {\n  \n}\n",
-  checksText:
-    "Has a real implementation|min_lines|3\nNo leftover TODO|not_contains|TODO\nDefines solve function|contains|function solve",
+  starterCode: "",
+  checksText: "",
 };
 
 /** lines: label|kind|value */
@@ -195,6 +194,21 @@ export default function AssessmentBuilderPage() {
   const [form, setForm] = React.useState(emptyForm);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [preview, setPreview] = React.useState<PreviewQuestion | null>(null);
+  const [settings, setSettings] = React.useState({
+    durationMinutes: "",
+    passingScore: "",
+    maxAttempts: "",
+  });
+  const [settingsErrors, setSettingsErrors] = React.useState<Record<string, string[]>>({});
+
+  React.useEffect(() => {
+    if (!data?.assessment) return;
+    setSettings({
+      durationMinutes: String(data.assessment.durationMinutes),
+      passingScore: String(data.assessment.passingScore),
+      maxAttempts: String(data.assessment.maxAttempts),
+    });
+  }, [data?.assessment.id]);
 
   const setType = (type: QuestionType) => {
     setForm((f) => ({
@@ -202,9 +216,9 @@ export default function AssessmentBuilderPage() {
       type,
       options:
         type === "true_false"
-          ? "True, False"
+          ? f.options || "True, False"
           : needsOptions(type)
-            ? f.options || "Option A, Option B, Option C, Option D"
+            ? f.options
             : "",
       correctAnswers: needsCorrectAnswers(type)
         ? type === "true_false"
@@ -299,8 +313,12 @@ export default function AssessmentBuilderPage() {
           <Badge>{assessment.publishStatus}</Badge>
           <Button
             size="sm"
-            onClick={() => {
-              updateAssessment.mutate({ id, publishStatus: "published" });
+            onClick={async () => {
+              const result = await updateAssessment.mutateAsync({ id, publishStatus: "published" });
+              if (!result.ok) {
+                toast.error("Could not publish");
+                return;
+              }
               toast.success("Published");
               refetch();
             }}
@@ -315,30 +333,95 @@ export default function AssessmentBuilderPage() {
           <CardTitle className="text-base">Settings</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
-          <Input
-            type="number"
-            defaultValue={assessment.durationMinutes}
-            onBlur={(e) =>
-              updateAssessment.mutate({ id, durationMinutes: Number(e.target.value) || 60 })
-            }
-          />
-          <Input
-            type="number"
-            defaultValue={assessment.passingScore}
-            onBlur={(e) =>
-              updateAssessment.mutate({ id, passingScore: Number(e.target.value) || 70 })
-            }
-          />
-          <Input
-            type="number"
-            defaultValue={assessment.maxAttempts}
-            onBlur={(e) =>
-              updateAssessment.mutate({ id, maxAttempts: Number(e.target.value) || 3 })
-            }
-          />
-          <p className="text-xs text-muted-foreground md:col-span-3">
-            Duration (minutes) · Passing score (%) · Max attempts
-          </p>
+          <div className="space-y-1">
+            <label className="text-sm font-medium" htmlFor="durationMinutes">
+              Duration (minutes)
+            </label>
+            <Input
+              id="durationMinutes"
+              type="number"
+              min={1}
+              step={1}
+              value={settings.durationMinutes}
+              onChange={(e) => {
+                setSettingsErrors((err) => ({ ...err, durationMinutes: [] }));
+                setSettings((s) => ({ ...s, durationMinutes: e.target.value }));
+              }}
+              aria-invalid={!!settingsErrors.durationMinutes?.length}
+            />
+            {settingsErrors.durationMinutes?.[0] && (
+              <p className="text-xs text-destructive">{settingsErrors.durationMinutes[0]}</p>
+            )}
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium" htmlFor="passingScore">
+              Passing score (%)
+            </label>
+            <Input
+              id="passingScore"
+              type="number"
+              min={1}
+              max={100}
+              step={1}
+              value={settings.passingScore}
+              onChange={(e) => {
+                setSettingsErrors((err) => ({ ...err, passingScore: [] }));
+                setSettings((s) => ({ ...s, passingScore: e.target.value }));
+              }}
+              aria-invalid={!!settingsErrors.passingScore?.length}
+            />
+            {settingsErrors.passingScore?.[0] && (
+              <p className="text-xs text-destructive">{settingsErrors.passingScore[0]}</p>
+            )}
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium" htmlFor="maxAttempts">
+              Max attempts
+            </label>
+            <Input
+              id="maxAttempts"
+              type="number"
+              min={1}
+              step={1}
+              value={settings.maxAttempts}
+              onChange={(e) => {
+                setSettingsErrors((err) => ({ ...err, maxAttempts: [] }));
+                setSettings((s) => ({ ...s, maxAttempts: e.target.value }));
+              }}
+              aria-invalid={!!settingsErrors.maxAttempts?.length}
+            />
+            {settingsErrors.maxAttempts?.[0] && (
+              <p className="text-xs text-destructive">{settingsErrors.maxAttempts[0]}</p>
+            )}
+          </div>
+          <div className="md:col-span-3">
+            <Button
+              size="sm"
+              className="gap-2"
+              disabled={updateAssessment.isPending}
+              onClick={async () => {
+                setSettingsErrors({});
+                const durationMinutes = Number(settings.durationMinutes);
+                const passingScore = Number(settings.passingScore);
+                const maxAttempts = Number(settings.maxAttempts);
+                const result = await updateAssessment.mutateAsync({
+                  id,
+                  durationMinutes,
+                  passingScore,
+                  maxAttempts,
+                });
+                if (!result.ok) {
+                  setSettingsErrors(result.fieldErrors ?? {});
+                  toast.error("Could not save settings");
+                  return;
+                }
+                toast.success("Settings saved");
+                refetch();
+              }}
+            >
+              <Save className="h-4 w-4" /> Save settings
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -381,12 +464,15 @@ export default function AssessmentBuilderPage() {
             </select>
             <Input
               type="number"
+              min={1}
+              step={1}
+              placeholder="Points"
               value={form.points}
               onChange={(e) => setForm((f) => ({ ...f, points: Number(e.target.value) || 5 }))}
             />
             {needsOptions(form.type) && (
               <Input
-                placeholder="Options (comma separated)"
+                placeholder="Options (comma separated), e.g. Option A, Option B, Option C, Option D"
                 value={form.options}
                 onChange={(e) => setForm((f) => ({ ...f, options: e.target.value }))}
               />
@@ -396,7 +482,7 @@ export default function AssessmentBuilderPage() {
                 placeholder={
                   form.type === "fill_blank"
                     ? "Accepted answer(s), comma separated"
-                    : "Correct answer(s), comma separated"
+                    : "Correct answer(s), comma separated, e.g. Option A"
                 }
                 value={form.correctAnswers}
                 onChange={(e) => setForm((f) => ({ ...f, correctAnswers: e.target.value }))}
@@ -425,7 +511,7 @@ export default function AssessmentBuilderPage() {
               </select>
               <textarea
                 className="min-h-28 w-full rounded-2xl border border-input bg-card px-4 py-3 font-mono text-sm"
-                placeholder="Starter code shown to learners"
+                placeholder="// Starter code shown to learners"
                 value={form.starterCode}
                 onChange={(e) => setForm((f) => ({ ...f, starterCode: e.target.value }))}
               />
@@ -437,6 +523,7 @@ export default function AssessmentBuilderPage() {
                 </p>
                 <textarea
                   className="min-h-28 w-full rounded-2xl border border-input bg-card px-4 py-3 font-mono text-xs"
+                  placeholder={"Has a real implementation|min_lines|3\nNo leftover TODO|not_contains|TODO"}
                   value={form.checksText}
                   onChange={(e) => setForm((f) => ({ ...f, checksText: e.target.value }))}
                 />
