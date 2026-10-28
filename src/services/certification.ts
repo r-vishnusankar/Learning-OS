@@ -103,7 +103,7 @@ export async function fetchLearnerPathsAction(): Promise<LearningPath[]> {
         department: row.departmentId,
         level: row.level,
         coursesCount: steps,
-        durationHours: Math.round(row.durationMinutes / 60) || 1,
+        durationHours: Math.round(row.durationMinutes / 60),
         progress: enrollment?.progress ?? 0,
         enrolledCount: row.enrolledCount,
         thumbnail:
@@ -153,7 +153,7 @@ export async function fetchPathDetailAction(pathId: string) {
       department: path.departmentId,
       level: path.level,
       coursesCount: steps.filter((s) => s.stepType === "course").length,
-      durationHours: Math.round(path.durationMinutes / 60) || 1,
+      durationHours: Math.round(path.durationMinutes / 60),
       progress: enrollment?.progress ?? 0,
       enrolledCount: path.enrolledCount,
       thumbnail: path.thumbnailUrl,

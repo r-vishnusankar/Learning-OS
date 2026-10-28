@@ -11,6 +11,7 @@ import { cn, formatHours } from "@/lib/utils";
 import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS } from "@/constants/navigation";
 import { learningCategoryToBadgeVariant, levelToBadgeVariant } from "@/lib/status-styles";
 import { useToggleSavedCourse } from "@/hooks/use-me";
+import { SHOW_INSTRUCTOR } from "@/lib/feature-flags";
 
 interface CourseCardProps {
   course: Course;
@@ -136,17 +137,21 @@ export function CourseCard({ course, variant = "default", className }: CourseCar
           <p className="line-clamp-2 text-sm leading-relaxed text-description">{course.description}</p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <div
-            className="h-7 w-7 shrink-0 rounded-full bg-secondary bg-cover bg-center"
-            style={{ backgroundImage: `url(${course.instructor.avatar})` }}
-            aria-hidden
-          />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-foreground">{course.instructor.name}</p>
-            <p className="truncate text-caption">{DEPARTMENT_LABELS[course.department]}</p>
+        {SHOW_INSTRUCTOR ? (
+          <div className="flex items-center gap-2.5">
+            <div
+              className="h-7 w-7 shrink-0 rounded-full bg-secondary bg-cover bg-center"
+              style={{ backgroundImage: `url(${course.instructor.avatar})` }}
+              aria-hidden
+            />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-foreground">{course.instructor.name}</p>
+              <p className="truncate text-caption">{DEPARTMENT_LABELS[course.department]}</p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <p className="truncate text-caption">{DEPARTMENT_LABELS[course.department]}</p>
+        )}
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-caption">
           <span className="inline-flex items-center gap-1.5">

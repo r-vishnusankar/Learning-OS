@@ -14,8 +14,11 @@ export function formatPercent(n: number): string {
 }
 
 export function formatHours(n: number): string {
+  if (n === 0) return "—";
   if (n < 1) return `${Math.round(n * 60)}m`;
-  return `${n.toFixed(n % 1 === 0 ? 0 : 1)}h`;
+  const h = Math.floor(n);
+  const m = Math.round((n - h) * 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 /** True for in-progress assessment attempt routes: /dashboard/assessments/:id/attempt/:attemptId */

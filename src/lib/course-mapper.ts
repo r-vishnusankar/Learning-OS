@@ -102,6 +102,15 @@ export function mapCourseToUi(
 
   const lessonsCount = modules.reduce((sum, m) => sum + m.lessons.length, 0);
 
+  // Compute duration from real lesson data when available; fall back to stored
+  // column only when no modules were loaded (lean list endpoints).
+  // Never floor at 1h — 0 means "unknown" and renders as "—".
+  const computedMinutes =
+    modules.length > 0
+      ? modules.reduce((sum, m) => sum + m.lessons.reduce((s, l) => s + l.durationMinutes, 0), 0)
+      : row.course.durationMinutes;
+  const durationHours = computedMinutes / 60;
+
   return {
     id: row.course.id,
     slug: row.course.slug,
@@ -119,7 +128,7 @@ export function mapCourseToUi(
       title: row.instructor?.title ?? "Educator",
       bio: row.instructor?.bio ?? "",
     },
-    durationHours: Math.max(1, Math.round(row.course.durationMinutes / 60)),
+    durationHours,
     lessonsCount,
     enrolledCount: row.course.enrolledCount,
     rating: row.course.rating / 10,
