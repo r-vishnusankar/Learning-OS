@@ -193,11 +193,21 @@ export async function getUserSubmission(assignmentId: string, userId: string) {
 
 export async function listSubmissionsForAssignment(assignmentId: string) {
   const db = getDb();
-  return db
-    .select()
+  const rows = await db
+    .select({
+      submission: assignmentSubmissions,
+      userName: users.name,
+      userEmail: users.email,
+    })
     .from(assignmentSubmissions)
+    .leftJoin(users, eq(users.id, assignmentSubmissions.userId))
     .where(eq(assignmentSubmissions.assignmentId, assignmentId))
     .orderBy(desc(assignmentSubmissions.createdAt));
+  return rows.map(({ submission, userName, userEmail }) => ({
+    ...submission,
+    userName: userName ?? null,
+    userEmail: userEmail ?? null,
+  }));
 }
 
 export async function getSubmissionById(id: string) {

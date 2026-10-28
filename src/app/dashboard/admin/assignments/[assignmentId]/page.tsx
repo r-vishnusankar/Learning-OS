@@ -416,9 +416,14 @@ export default function AdminAssignmentDetailPage() {
             data.submissions.map((sub) => (
               <div key={sub.id} className="space-y-3 rounded-xl border border-border p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Badge variant="outline" className="capitalize">
-                    {sub.status}
-                  </Badge>
+                  <div>
+                    <p className="text-sm font-medium">
+                      {sub.userName ?? sub.userEmail ?? sub.userId}
+                    </p>
+                    <Badge variant="outline" className="mt-1 capitalize">
+                      {sub.status}
+                    </Badge>
+                  </div>
                   <span className="text-xs text-muted-foreground">
                     {sub.submittedAt
                       ? new Date(sub.submittedAt).toLocaleString()
