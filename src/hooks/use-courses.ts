@@ -149,7 +149,8 @@ export function useCompleteLesson() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: completeLessonAction,
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (!data || !("ok" in data) || !data.ok) return;
       qc.invalidateQueries({ queryKey: ["courses"] });
       qc.invalidateQueries({ queryKey: ["lesson"] });
     },

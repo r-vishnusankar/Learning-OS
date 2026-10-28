@@ -29,9 +29,13 @@ export default function LessonPlayerPage() {
   const { data, isLoading } = useLessonPlayer(params.lessonId);
   const upsertProgress = useUpsertProgress();
   const completeLesson = useCompleteLesson();
+  const [videoEnded, setVideoEnded] = React.useState(false);
+  const [videoFailed, setVideoFailed] = React.useState(false);
 
   React.useEffect(() => {
     if (!params.lessonId) return;
+    setVideoEnded(false);
+    setVideoFailed(false);
     upsertProgress.mutate({ lessonId: params.lessonId, percentage: 10 });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- track view once per lesson
   }, [params.lessonId]);
@@ -63,6 +67,10 @@ export default function LessonPlayerPage() {
   const handleMarkComplete = async () => {
     try {
       const result = await completeLesson.mutateAsync(lesson.id);
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
       if (result.nextLessonId && result.courseSlug) {
         toast.success("Lesson completed — opening next…");
         router.push(`/dashboard/courses/${result.courseSlug}/lessons/${result.nextLessonId}`);
@@ -80,12 +88,22 @@ export default function LessonPlayerPage() {
     }
   };
 
+  const isVideo = lesson.type === "video";
+  const watchedEnough =
+    Boolean(progress?.completed) ||
+    (progress?.percentage ?? 0) >= 100 ||
+    videoEnded;
+  const completeDisabled =
+    completeLesson.isPending ||
+    Boolean(progress?.completed) ||
+    (isVideo && !watchedEnough);
+
   const actions = (
     <div className="flex shrink-0 flex-wrap items-center gap-2">
       <Button
         size="sm"
         onClick={() => void handleMarkComplete()}
-        disabled={completeLesson.isPending || Boolean(progress?.completed)}
+        disabled={completeDisabled}
       >
         {completeLesson.isPending ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -168,11 +186,33 @@ export default function LessonPlayerPage() {
             content={lesson.content}
             title={lesson.title}
             fill
+            onEnded={
+              isVideo
+                ? () => {
+                    setVideoEnded(true);
+                    upsertProgress.mutate({
+                      lessonId: lesson.id,
+                      percentage: 100,
+                      completed: false,
+                    });
+                  }
+                : undefined
+            }
+            onError={isVideo ? () => setVideoFailed(true) : undefined}
           />
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2 pr-20">
-          {objectives.length > 0 ? (
+          {isVideo && videoFailed && !watchedEnough ? (
+            <p className="min-w-0 flex-1 text-xs text-destructive">
+              This video could not be played. Contact your administrator — Mark complete stays
+              locked until playback reaches the end.
+            </p>
+          ) : isVideo && !watchedEnough ? (
+            <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+              Watch the video to the end to enable Mark complete.
+            </p>
+          ) : objectives.length > 0 ? (
             <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
               <span className="font-medium text-foreground">Focus: </span>
               {objectives[0]}

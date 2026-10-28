@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getCourseModulesWithLessons, getLessonWithContext } from "@/db/queries/courses";
+import {
+  getCourseModulesWithLessons,
+  getLessonWithContext,
+  getUserLessonProgress,
+} from "@/db/queries/courses";
 import { markLessonComplete, upsertLessonProgress } from "@/db/queries/progress";
 import { requireUserId } from "@/lib/auth-utils";
 import { upsertProgressSchema } from "@/validators/course";
@@ -61,52 +65,79 @@ export async function upsertProgressAction(input: unknown) {
   return result;
 }
 
-export async function completeLessonAction(lessonId: string) {
-  const userId = await requireUserId();
-  const result = await markLessonComplete(userId, lessonId);
-
-  const context = await getLessonWithContext(lessonId);
-  let nextLessonId: string | null = null;
-  let courseSlug: string | null = null;
-  let assessmentId: string | null = null;
-  let courseComplete = false;
-
-  if (context) {
-    courseSlug = context.course.slug;
-    const mods = await getCourseModulesWithLessons(context.course.id);
-    const orderedIds = flattenLessonIds(mods);
-    const index = orderedIds.indexOf(lessonId);
-    nextLessonId = index >= 0 && index < orderedIds.length - 1 ? orderedIds[index + 1] : null;
-
-    const { getCourseProgressPercent } = await import("@/db/queries/courses");
-    const percent = await getCourseProgressPercent(userId, context.course.id);
-    courseComplete = percent >= 100;
-
-    if (courseComplete) {
-      const { getAssessmentForCourse } = await import("@/db/queries/eligibility");
-      const assessment = await getAssessmentForCourse(context.course.id);
-      assessmentId = assessment?.id ?? null;
-
-      if (assessmentId) {
-        const { getDb } = await import("@/db");
-        const { notifications } = await import("@/db/schema");
-        const db = getDb();
-        await db.insert(notifications).values({
-          userId,
-          title: "Course complete — take assessment",
-          message: `You finished ${context.course.title}. Pass the knowledge check to certify this course.`,
-          type: "reminder",
-          href: `/dashboard/assessments/${assessmentId}`,
-          read: 0,
-        });
-      }
+export async function completeLessonAction(lessonId: string): Promise<
+  | {
+      ok: true;
+      percentage: number;
+      completed: boolean;
+      nextLessonId: string | null;
+      courseSlug: string | null;
+      courseComplete: boolean;
+      assessmentId: string | null;
     }
-
-    revalidatePath(`/dashboard/courses/${context.course.slug}`);
-    revalidatePath("/dashboard");
-    revalidatePath("/dashboard/learning");
-    revalidatePath("/dashboard/assessments");
+  | { ok: false; code: "watch_required" | "not_found"; message: string }
+> {
+  const userId = await requireUserId();
+  const context = await getLessonWithContext(lessonId);
+  if (!context) {
+    return { ok: false, code: "not_found", message: "Lesson not found." };
   }
 
-  return { ...result, nextLessonId, courseSlug, courseComplete, assessmentId };
+  // Watch evidence is lesson_progress.percentage written on the player's ended event.
+  // The client can still POST 100 without watching; there is no position column to
+  // verify further. Already-completed lessons stay completable (never re-lock).
+  if (context.lesson.type === "video") {
+    const rows = await getUserLessonProgress(userId, [lessonId]);
+    const existing = rows[0];
+    if (!existing?.completed && (existing?.percentage ?? 0) < 100) {
+      return {
+        ok: false,
+        code: "watch_required",
+        message: "Watch the video to the end before marking this lesson complete.",
+      };
+    }
+  }
+
+  const result = await markLessonComplete(userId, lessonId);
+
+  let nextLessonId: string | null = null;
+  let assessmentId: string | null = null;
+  let courseComplete = false;
+  const courseSlug = context.course.slug;
+
+  const mods = await getCourseModulesWithLessons(context.course.id);
+  const orderedIds = flattenLessonIds(mods);
+  const index = orderedIds.indexOf(lessonId);
+  nextLessonId = index >= 0 && index < orderedIds.length - 1 ? orderedIds[index + 1] : null;
+
+  const { getCourseProgressPercent } = await import("@/db/queries/courses");
+  const percent = await getCourseProgressPercent(userId, context.course.id);
+  courseComplete = percent >= 100;
+
+  if (courseComplete) {
+    const { getAssessmentForCourse } = await import("@/db/queries/eligibility");
+    const assessment = await getAssessmentForCourse(context.course.id);
+    assessmentId = assessment?.id ?? null;
+
+    if (assessmentId) {
+      const { getDb } = await import("@/db");
+      const { notifications } = await import("@/db/schema");
+      const db = getDb();
+      await db.insert(notifications).values({
+        userId,
+        title: "Course complete — take assessment",
+        message: `You finished ${context.course.title}. Pass the knowledge check to certify this course.`,
+        type: "reminder",
+        href: `/dashboard/assessments/${assessmentId}`,
+        read: 0,
+      });
+    }
+  }
+
+  revalidatePath(`/dashboard/courses/${context.course.slug}`);
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/learning");
+  revalidatePath("/dashboard/assessments");
+
+  return { ok: true, ...result, nextLessonId, courseSlug, courseComplete, assessmentId };
 }
