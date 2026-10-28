@@ -93,7 +93,9 @@ export function useCreateCourse() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: createCourseAction,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-courses"] }),
+    onSuccess: (data) => {
+      if (data?.ok !== false) qc.invalidateQueries({ queryKey: ["admin-courses"] });
+    },
   });
 }
 

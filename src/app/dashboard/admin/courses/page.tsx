@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS, LEVELS } from "@/constants/navigation";
+import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS, levelsForFilter } from "@/constants/navigation";
 import {
   useAdminCourses,
   useArchiveCourse,
@@ -74,6 +74,7 @@ export default function AdminCoursesPage() {
     learningCategory: "role" as LearningCategory,
     openToAll: true,
   });
+  const [fieldErrors, setFieldErrors] = React.useState<Record<string, string[]>>({});
 
   const { data: courses = [], isLoading } = useAdminCourses({
     search: search || undefined,
@@ -107,14 +108,19 @@ export default function AdminCoursesPage() {
 
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
+    setFieldErrors({});
     try {
-      const created = await createCourse.mutateAsync({
+      const result = await createCourse.mutateAsync({
         title: form.title,
         description: form.description || "Course description pending.",
         departmentId: form.departmentId,
         learningCategory: form.learningCategory,
         openToAll: form.openToAll,
       });
+      if (!result.ok) {
+        setFieldErrors(result.fieldErrors);
+        return;
+      }
       toast.success("Course created");
       setDialogOpen(false);
       setForm({
@@ -124,7 +130,8 @@ export default function AdminCoursesPage() {
         learningCategory: "role",
         openToAll: true,
       });
-      router.push(`/dashboard/admin/courses/${created.id}`);
+      setFieldErrors({});
+      router.push(`/dashboard/admin/courses/${result.data.id}`);
     } catch {
       toast.error("Failed to create course");
     }
@@ -136,7 +143,7 @@ export default function AdminCoursesPage() {
         title="Course Builder"
         description="Create, publish, and manage enterprise courses."
         children={
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setFieldErrors({}); }}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4" /> New Course
@@ -154,11 +161,20 @@ export default function AdminCoursesPage() {
                     onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                     required
                   />
-                  <Input
-                    placeholder="Description"
-                    value={form.description}
-                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  />
+                  <div className="space-y-1">
+                    <Input
+                      placeholder="Description (min. 10 characters — leave blank to auto-fill)"
+                      value={form.description}
+                      onChange={(e) => {
+                        setForm((f) => ({ ...f, description: e.target.value }));
+                        if (fieldErrors.description) setFieldErrors((e) => ({ ...e, description: [] }));
+                      }}
+                      aria-invalid={!!fieldErrors.description?.length}
+                    />
+                    {fieldErrors.description?.length ? (
+                      <p className="text-xs text-destructive">{fieldErrors.description[0]}</p>
+                    ) : null}
+                  </div>
                   <select
                     className="h-11 w-full rounded-2xl border border-input bg-card px-4 text-sm"
                     value={form.departmentId}
@@ -237,7 +253,13 @@ export default function AdminCoursesPage() {
             <select
               className={selectClass}
               value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value as DepartmentId | "all")}
+              onChange={(e) => {
+                const next = e.target.value as DepartmentId | "all";
+                setDepartmentFilter(next);
+                if (levelFilter !== "all" && !levelsForFilter(next).includes(levelFilter)) {
+                  setLevelFilter("all");
+                }
+              }}
               aria-label="Filter by department"
             >
               <option value="all">All departments</option>
@@ -254,7 +276,7 @@ export default function AdminCoursesPage() {
               aria-label="Filter by learning level"
             >
               <option value="all">All levels</option>
-              {LEVELS.map((level) => (
+              {levelsForFilter(departmentFilter).map((level) => (
                 <option key={level} value={level}>
                   {LEVEL_LABELS[level]}
                 </option>

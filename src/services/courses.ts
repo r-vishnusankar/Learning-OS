@@ -185,9 +185,18 @@ export async function fetchCourseBuilderAction(courseId: string) {
   return { course, modules: mods };
 }
 
-export async function createCourseAction(input: unknown) {
+export async function createCourseAction(
+  input: unknown
+): Promise<
+  | { ok: true; data: { id: string; [key: string]: unknown } }
+  | { ok: false; fieldErrors: Record<string, string[]> }
+> {
   await requireAdminOrInstructor();
-  const data = createCourseSchema.parse(input);
+  const result = createCourseSchema.safeParse(input);
+  if (!result.success) {
+    return { ok: false, fieldErrors: result.error.flatten().fieldErrors };
+  }
+  const data = result.data;
   const db = getDb();
   const slug = await uniqueSlug(data.title, (s) => courseSlugExists(s));
 
@@ -216,7 +225,7 @@ export async function createCourseAction(input: unknown) {
     .returning();
 
   revalidatePath("/dashboard/admin/courses");
-  return created;
+  return { ok: true, data: created };
 }
 
 export async function updateCourseAction(input: unknown) {
