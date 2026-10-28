@@ -147,6 +147,10 @@ export function useSubmitAttempt() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: submitAttemptAction,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["assessments"] }),
+    onSuccess: (data) => {
+      if (data && "ok" in data && data.ok) {
+        qc.invalidateQueries({ queryKey: ["assessments"] });
+      }
+    },
   });
 }

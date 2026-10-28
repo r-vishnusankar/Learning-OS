@@ -18,6 +18,7 @@ import {
 import { getCourseById } from "@/db/queries/courses";
 import { assessmentAttempts, assessments, questions } from "@/db/schema";
 import { courses } from "@/db/schema/courses";
+import { unansweredQuestionNumbers } from "@/lib/assessment-answers";
 import { requireAdminOrInstructor, requireUserId } from "@/lib/auth-utils";
 import type { Assessment, AssessmentStatus } from "@/types";
 import type { CodingCheck } from "@/types/coding";
@@ -434,12 +435,57 @@ export async function saveAnswersAction(input: unknown) {
   return { ok: true };
 }
 
-export async function submitAttemptAction(input: unknown) {
+export async function submitAttemptAction(input: unknown): Promise<
+  | {
+      ok: true;
+      percentage: number;
+      passed: boolean | null;
+      needsManual: boolean;
+    }
+  | {
+      ok: false;
+      code: "already_submitted" | "invalid" | "unanswered";
+      message: string;
+      unansweredNumbers?: number[];
+    }
+> {
   const userId = await requireUserId();
-  const data = submitAttemptSchema.parse(input);
+  const parsed = submitAttemptSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, code: "invalid", message: "Invalid submission." };
+  }
+  const data = parsed.data;
   const attempt = await getAttemptById(data.attemptId);
-  if (!attempt || attempt.userId !== userId || attempt.status !== "in_progress") {
-    throw new Error("Invalid attempt");
+  if (!attempt || attempt.userId !== userId) {
+    return { ok: false, code: "invalid", message: "Attempt not found." };
+  }
+  if (attempt.status !== "in_progress") {
+    return {
+      ok: false,
+      code: "already_submitted",
+      message: "This attempt has already been submitted.",
+    };
+  }
+
+  const assessment = await getAssessmentById(attempt.assessmentId);
+  if (!assessment) {
+    return { ok: false, code: "invalid", message: "Assessment missing." };
+  }
+
+  const mergedAnswers = { ...attempt.answers, ...(data.answers ?? {}) };
+  const deadline = new Date(attempt.startedAt).getTime() + assessment.durationMinutes * 60 * 1000;
+  const timedOut = Date.now() >= deadline;
+  // Timeout auto-submit may include blanks (existing behavior). Manual submit may not.
+  if (!timedOut) {
+    const unansweredNumbers = unansweredQuestionNumbers(attempt.questionOrder, mergedAnswers);
+    if (unansweredNumbers.length > 0) {
+      return {
+        ok: false,
+        code: "unanswered",
+        unansweredNumbers,
+        message: `Answer question${unansweredNumbers.length === 1 ? "" : "s"} ${unansweredNumbers.join(", ")} before submitting.`,
+      };
+    }
   }
 
   const graded = await gradeInProgressAttempt(data.attemptId, data.answers);
@@ -448,7 +494,7 @@ export async function submitAttemptAction(input: unknown) {
   if (!graded.wrote) {
     const current = graded.attempt;
     return {
-      attempt: current,
+      ok: true,
       percentage: current?.percentage ?? result.percentage,
       passed: current?.passed ?? null,
       needsManual: current?.status === "submitted" ? true : result.needsManual,
@@ -456,7 +502,9 @@ export async function submitAttemptAction(input: unknown) {
   }
 
   const updated = graded.attempt;
-  if (!updated) throw new Error("Invalid attempt");
+  if (!updated) {
+    return { ok: false, code: "already_submitted", message: "This attempt has already been submitted." };
+  }
 
   if (!result.needsManual && graded.passed) {
     const { mintCertificateForAssessmentPass } = await import("@/services/certification");
@@ -488,7 +536,7 @@ export async function submitAttemptAction(input: unknown) {
   revalidatePath("/dashboard/admin/promotions");
 
   return {
-    attempt: updated,
+    ok: true,
     percentage: result.percentage,
     passed: result.needsManual ? null : graded.passed,
     needsManual: result.needsManual,

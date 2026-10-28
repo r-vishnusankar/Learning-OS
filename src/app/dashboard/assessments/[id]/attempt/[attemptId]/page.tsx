@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { CodingAnswerEditor } from "@/components/assessments/coding-answer-editor";
 import { useAttemptSession, useSaveAnswers, useSubmitAttempt } from "@/hooks/use-assessments";
+import { isQuestionAnswered } from "@/lib/assessment-answers";
 import type { CodingLanguage } from "@/types/coding";
 
 function formatTime(totalSeconds: number) {
@@ -28,6 +29,7 @@ export default function AssessmentAttemptPage() {
   const [index, setIndex] = React.useState(0);
   const [secondsLeft, setSecondsLeft] = React.useState<number | null>(null);
   const [saveFailed, setSaveFailed] = React.useState(false);
+  const [advanceError, setAdvanceError] = React.useState<string | null>(null);
   const submittedRef = React.useRef(false);
   const hydratedRef = React.useRef(false);
 
@@ -53,8 +55,13 @@ export default function AssessmentAttemptPage() {
         { attemptId: params.attemptId, answers },
         {
           onSuccess: (result) => {
+            if (!result.ok) {
+              submittedRef.current = false;
+              toast.error(result.message);
+              return;
+            }
             toast.message("Time is up — assessment submitted");
-            router.push(`/dashboard/assessments/${params.id}?result=${result.percentage}`);
+            router.replace(`/dashboard/assessments/${params.id}?result=${result.percentage}`);
           },
         }
       );
@@ -91,7 +98,7 @@ export default function AssessmentAttemptPage() {
           <p className="text-sm text-muted-foreground">
             Score: {data.attempt.percentage ?? "—"}%
           </p>
-          <Button onClick={() => router.push(`/dashboard/assessments/${params.id}`)}>
+          <Button onClick={() => router.replace(`/dashboard/assessments/${params.id}`)}>
             Back to assessment
           </Button>
         </CardContent>
@@ -107,6 +114,7 @@ export default function AssessmentAttemptPage() {
     if (!question) return;
     const next = { ...answers, [question.id]: value };
     setAnswers(next);
+    setAdvanceError(null);
     saveAnswers.mutate(
       { attemptId: params.attemptId, answers: { [question.id]: value } },
       {
@@ -119,9 +127,39 @@ export default function AssessmentAttemptPage() {
     );
   };
 
+  const currentAnswered = !question || isQuestionAnswered(answers[question.id]);
+  const answeredCount = questions.filter((q) => isQuestionAnswered(answers[q.id])).length;
+
+  const goNext = () => {
+    if (!currentAnswered) {
+      setAdvanceError("Select an answer before going to the next question.");
+      return;
+    }
+    setAdvanceError(null);
+    setIndex((i) => i + 1);
+  };
+
   const onSubmit = async () => {
+    if (!currentAnswered) {
+      setAdvanceError("Select an answer before submitting.");
+      return;
+    }
+    const unanswered = questions
+      .map((q, i) => (isQuestionAnswered(answers[q.id]) ? null : i + 1))
+      .filter((n): n is number => n != null);
+    if (unanswered.length > 0) {
+      setAdvanceError(`Answer question${unanswered.length === 1 ? "" : "s"} ${unanswered.join(", ")} before submitting.`);
+      return;
+    }
     try {
       const result = await submitAttempt.mutateAsync({ attemptId: params.attemptId, answers });
+      if (!result.ok) {
+        setAdvanceError(result.message);
+        if (result.code === "already_submitted") {
+          router.replace(`/dashboard/assessments/${params.id}`);
+        }
+        return;
+      }
       toast.success(
         result.needsManual
           ? `Submitted for review (${result.percentage}% auto-scored)`
@@ -129,7 +167,7 @@ export default function AssessmentAttemptPage() {
             ? `Passed with ${result.percentage}%`
             : `Scored ${result.percentage}% — not yet passing`
       );
-      router.push(`/dashboard/assessments/${params.id}`);
+      router.replace(`/dashboard/assessments/${params.id}`);
     } catch {
       toast.error("Submit failed");
     }
@@ -155,6 +193,33 @@ export default function AssessmentAttemptPage() {
       </div>
 
       <Progress value={progress} className="h-2" />
+
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">
+          {answeredCount} of {questions.length} answered
+        </p>
+        <div className="flex flex-wrap gap-1.5" role="navigation" aria-label="Question list">
+          {questions.map((q, i) => {
+            const answered = isQuestionAnswered(answers[q.id]);
+            return (
+              <Button
+                key={q.id}
+                type="button"
+                size="icon-sm"
+                variant={i === index ? "default" : answered ? "secondary" : "outline"}
+                aria-current={i === index ? "step" : undefined}
+                aria-label={`Question ${i + 1}${answered ? ", answered" : ", not answered"}`}
+                onClick={() => {
+                  setAdvanceError(null);
+                  setIndex(i);
+                }}
+              >
+                {i + 1}
+              </Button>
+            );
+          })}
+        </div>
+      </div>
 
       {!question ? (
         <Card className="border-warning/30">
@@ -253,15 +318,23 @@ export default function AssessmentAttemptPage() {
       </Card>
       )}
 
+      {advanceError && (
+        <p className="text-sm text-destructive" role="alert">
+          {advanceError}
+        </p>
+      )}
+
       <div className="flex flex-wrap justify-between gap-2">
         <Button variant="outline" disabled={index === 0} onClick={() => setIndex((i) => i - 1)}>
           Previous
         </Button>
         <div className="flex gap-2">
           {index < questions.length - 1 ? (
-            <Button onClick={() => setIndex((i) => i + 1)}>Next</Button>
+            <Button onClick={goNext} disabled={!currentAnswered}>
+              Next
+            </Button>
           ) : (
-            <Button onClick={onSubmit} disabled={submitAttempt.isPending}>
+            <Button onClick={onSubmit} disabled={submitAttempt.isPending || !currentAnswered}>
               Submit assessment
             </Button>
           )}
