@@ -15,7 +15,11 @@ export type LearningLevel =
   | "senior"
   | "lead"
   | "architect"
-  | "expert";
+  | "expert"
+  | "qa_manager"
+  | "product_owner"
+  | "assistant_hr_manager"
+  | "hr_manager";
 
 export type CourseStatus = "not_started" | "in_progress" | "completed" | "archived";
 export type AssessmentStatus = "upcoming" | "available" | "in_progress" | "completed" | "failed" | "expired";

@@ -9,6 +9,10 @@ const learningLevel = z.enum([
   "lead",
   "architect",
   "expert",
+  "qa_manager",
+  "product_owner",
+  "assistant_hr_manager",
+  "hr_manager",
 ]);
 
 export const promotionConsoleFilterSchema = z.object({

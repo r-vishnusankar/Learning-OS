@@ -1,7 +1,7 @@
 /**
  * Seeds published "0–1 Year Journey" learning paths for every department.
- * Steps = each beginner course + its linked knowledge-check assessment.
- * Auto-enrolls active employees with experienceYears <= 1 (or beginner level).
+ * Steps = each first-level course + its linked knowledge-check assessment.
+ * Auto-enrolls active employees with experienceYears <= 1 (or first career level).
  *
  * Run: npm run db:seed-beginner-paths
  */
@@ -11,7 +11,7 @@ config({ path: ".env.local" });
 import { and, asc, eq, lte, or, sql } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { DEPARTMENT_LABELS } from "@/constants/navigation";
+import { DEPARTMENT_LABELS, firstLevelForDepartment } from "@/constants/navigation";
 import {
   assessments,
   courses,
@@ -32,8 +32,8 @@ function pathTitle(dept: DepartmentId) {
 function pathDescription(dept: DepartmentId) {
   return (
     `Onboarding track for early-career ${DEPARTMENT_LABELS[dept]} teammates (0–1 years). ` +
-    `Complete the beginner courses and pass each knowledge check to build a solid foundation. ` +
-    `These steps align with your mandatory beginner assignments and support promotion readiness.`
+    `Complete the first-level courses and pass each knowledge check to build a solid foundation. ` +
+    `These steps align with your mandatory first-level assignments and support promotion readiness.`
   );
 }
 
@@ -49,6 +49,8 @@ async function main() {
   for (const dept of DEPARTMENTS) {
     const title = pathTitle(dept);
 
+    const firstLevel = firstLevelForDepartment(dept);
+
     const beginnerCourses = await db
       .select({
         id: courses.id,
@@ -60,14 +62,14 @@ async function main() {
       .where(
         and(
           eq(courses.departmentId, dept),
-          eq(courses.level, "beginner"),
+          eq(courses.level, firstLevel),
           eq(courses.publishStatus, "published")
         )
       )
       .orderBy(asc(courses.title));
 
     if (beginnerCourses.length === 0) {
-      console.warn(`Skip ${dept}: no published beginner courses`);
+      console.warn(`Skip ${dept}: no published ${firstLevel} courses`);
       continue;
     }
 
@@ -94,7 +96,7 @@ async function main() {
           title,
           description: pathDescription(dept),
           departmentId: dept,
-          level: "beginner",
+          level: firstLevel,
           thumbnailUrl: `https://picsum.photos/seed/${encodeURIComponent(`path-0-1-${dept}`)}/800/450`,
           skills,
           durationMinutes,
@@ -110,7 +112,7 @@ async function main() {
         .update(learningPaths)
         .set({
           description: pathDescription(dept),
-          level: "beginner",
+          level: firstLevel,
           skills,
           durationMinutes,
           publishStatus: "published",
@@ -159,7 +161,7 @@ async function main() {
         and(
           eq(profiles.status, "active"),
           eq(profiles.department, dept),
-          or(lte(profiles.experienceYears, 1), eq(profiles.level, "beginner"))
+          or(lte(profiles.experienceYears, 1), eq(profiles.level, firstLevel))
         )
       );
 
@@ -184,7 +186,7 @@ async function main() {
       await db.insert(notifications).values({
         userId: person.userId,
         title: "0–1 Year Journey assigned",
-        message: `You were enrolled in ${title}. Complete the beginner courses and knowledge checks.`,
+        message: `You were enrolled in ${title}. Complete the first-level courses and knowledge checks.`,
         type: "info",
         href: `/dashboard/paths/${pathId}`,
         read: 0,

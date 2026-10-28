@@ -1,6 +1,7 @@
 import type { CatalogCourse } from "@/db/catalog/department-courses";
 import { youtubeVideoId } from "@/lib/media-embed";
 import type { DepartmentId, LearningLevel } from "@/types";
+import { LEVELS } from "@/constants/navigation";
 
 export const COURSE_URL_PREFIX = "/dashboard/courses/";
 
@@ -59,24 +60,13 @@ const DEPTS: DepartmentId[] = [
   "devops",
 ];
 
-const LEVELS: LearningLevel[] = [
-  "beginner",
-  "associate",
-  "intermediate",
-  "advanced",
-  "senior",
-  "lead",
-  "architect",
-  "expert",
-];
-
 function courseUrlForSlug(slug: string): string {
   return `${COURSE_URL_PREFIX}${slug}`;
 }
 
 function slugMatchesDeptLevel(slug: string, departmentId: string, level: string): boolean {
   const parts = slug.split("-");
-  if (!DEPTS.includes(parts[0] as DepartmentId) || !LEVELS.includes(parts[1] as LearningLevel)) {
+  if (!DEPTS.includes(parts[0] as DepartmentId) || !LEVELS.includes(parts[1] as (typeof LEVELS)[number])) {
     return false;
   }
   return parts[0] === departmentId && parts[1] === level;

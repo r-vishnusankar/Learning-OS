@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildDepartmentCourseCatalog } from "../src/db/catalog/department-courses";
-import { DEPARTMENT_LABELS, LEVEL_LABELS, LEVELS } from "../src/constants/navigation";
+import { DEPARTMENT_LABELS, DEPARTMENT_LEVELS, LEVEL_LABELS, LEVELS } from "../src/constants/navigation";
 import type { DepartmentId } from "../src/types";
 
 const catalog = buildDepartmentCourseCatalog();
@@ -13,7 +13,7 @@ let md = `# Nexus Course Catalog
 
 **Generated:** ${generatedAt}  
 **Total courses:** ${catalog.length}  
-**Formula:** 7 departments × 8 levels × 3 courses  
+**Tracks:** department-specific career levels (Digital Marketing unchanged at 8×3; most departments 5 levels with merged 6-course bands; HR 4 levels).  
 
 Source of truth in code: \`src/db/catalog/department-courses.ts\`  
 Seed / refresh: \`npm run db:seed-catalog\`  
@@ -35,7 +35,9 @@ ${depts.map((d) => `| ${DEPARTMENT_LABELS[d]} | ${catalog.filter((c) => c.depart
 
 | Level | Courses |
 |-------|---------|
-${LEVELS.map((l) => `| ${LEVEL_LABELS[l]} | ${catalog.filter((c) => c.level === l).length} |`).join("\n")}
+${LEVELS.filter((l) => catalog.some((c) => c.level === l))
+  .map((l) => `| ${LEVEL_LABELS[l]} | ${catalog.filter((c) => c.level === l).length} |`)
+  .join("\n")}
 
 ---
 
@@ -56,7 +58,7 @@ ${LEVELS.map((l) => `| ${LEVEL_LABELS[l]} | ${catalog.filter((c) => c.level === 
 
 for (const dept of depts) {
   md += `### ${DEPARTMENT_LABELS[dept]}\n\n`;
-  for (const level of LEVELS) {
+  for (const level of DEPARTMENT_LEVELS[dept]) {
     const rows = catalog.filter((c) => c.departmentId === dept && c.level === level);
     if (!rows.length) continue;
     md += `#### ${LEVEL_LABELS[level]}\n\n`;

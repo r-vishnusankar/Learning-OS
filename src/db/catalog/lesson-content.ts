@@ -1,4 +1,5 @@
 import type { DepartmentId, LearningLevel } from "@/types";
+import { LEVEL_LABELS } from "@/constants/navigation";
 
 const DEPT_LABEL: Record<DepartmentId, string> = {
   development: "Development",
@@ -10,16 +11,7 @@ const DEPT_LABEL: Record<DepartmentId, string> = {
   devops: "DevOps",
 };
 
-const LEVEL_LABEL: Record<LearningLevel, string> = {
-  beginner: "Beginner",
-  associate: "Associate",
-  intermediate: "Intermediate",
-  advanced: "Advanced",
-  senior: "Senior",
-  lead: "Lead",
-  architect: "Architect",
-  expert: "Expert",
-};
+const LEVEL_LABEL = LEVEL_LABELS;
 
 type Playbook = {
   mission: string;
@@ -156,6 +148,26 @@ const LEVEL_FOCUS: Record<LearningLevel, { outcome: string; depth: string; deliv
     outcome: "Shape org-wide strategy and executive partnerships.",
     depth: "Portfolio trade-offs, narrative for leadership, and transformation bets.",
     deliverable: "An executive brief with options, costs, and recommended path.",
+  },
+  qa_manager: {
+    outcome: "Run quality as an organizational system spanning products and teams.",
+    depth: "QE platforms, transformation bets, and executive quality narrative.",
+    deliverable: "An executive quality brief with options, costs, and recommended path.",
+  },
+  product_owner: {
+    outcome: "Own product outcomes through requirements architecture and value design.",
+    depth: "Portfolio trade-offs, capability maps, and executive decision support.",
+    deliverable: "An executive brief with options, costs, and recommended path.",
+  },
+  assistant_hr_manager: {
+    outcome: "Partner with managers and raise people-system capability.",
+    depth: "Org design, analytics, and manager enablement operating cadence.",
+    deliverable: "A people operating plan (rituals, ownership, KPIs).",
+  },
+  hr_manager: {
+    outcome: "Shape org-wide people strategy and executive partnerships.",
+    depth: "Portfolio trade-offs, transformation change, and CHRO-level narrative.",
+    deliverable: "An executive people-strategy brief with options and recommended path.",
   },
 };
 

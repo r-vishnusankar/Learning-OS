@@ -1,4 +1,4 @@
-import { LEVELS } from "@/constants/navigation";
+import { firstLevelForDepartment, nextCareerLevel } from "@/constants/navigation";
 import type { DepartmentId, LearningLevel, UserRole } from "@/types";
 
 /** Org unit labels from the HR roster (PM / Finance excluded from catalog). */
@@ -157,8 +157,9 @@ export function mapDepartment(orgUnit: RosterOrgUnit): DepartmentId {
   return ORG_TO_DEPT[orgUnit];
 }
 
-export function inferLevel(designation: string): LearningLevel {
+export function inferLevel(designation: string, department: DepartmentId): LearningLevel {
   const d = designation.toLowerCase();
+  const first = firstLevelForDepartment(department);
   if (
     d.includes("junior") ||
     d.includes("juinor") || // roster typo
@@ -166,14 +167,32 @@ export function inferLevel(designation: string): LearningLevel {
     d.includes("associate-ta") ||
     d.includes("junior executive")
   ) {
-    return "beginner";
+    return first;
   }
-  if (d.includes("architect")) return "architect";
+  if (d.includes("architect")) {
+    if (department === "qa") return "qa_manager";
+    if (department === "ba") return "product_owner";
+    if (department === "hr") return "hr_manager";
+    return "architect";
+  }
   if (d.includes(" lead") || d.endsWith("lead") || d.includes("technical lead") || d.includes("ui lead")) {
+    if (department === "hr") return "assistant_hr_manager";
     return "lead";
   }
-  if (d.includes("assistant manager") || d.includes("manager")) return "lead";
-  if (d.includes("senior")) return "senior";
+  if (d.includes("assistant manager")) {
+    if (department === "hr") return "assistant_hr_manager";
+    return "lead";
+  }
+  if (d.includes("manager")) {
+    if (department === "hr") return "hr_manager";
+    if (department === "qa") return "qa_manager";
+    if (department === "ba") return "product_owner";
+    return "lead";
+  }
+  if (d.includes("senior")) {
+    if (department === "hr") return "assistant_hr_manager";
+    return "senior";
+  }
   return "associate";
 }
 
@@ -201,10 +220,11 @@ export function emailFor(name: string): string {
   return VALORIZ_EMAIL_BY_NAME[name] ?? `${slugFromName(name)}@valoriz.com`;
 }
 
-export function nextLearningLevel(level: LearningLevel): LearningLevel | null {
-  const idx = LEVELS.indexOf(level as (typeof LEVELS)[number]);
-  if (idx < 0 || idx >= LEVELS.length - 1) return null;
-  return LEVELS[idx + 1];
+export function nextLearningLevel(
+  level: LearningLevel,
+  department: DepartmentId
+): LearningLevel | null {
+  return nextCareerLevel(level, department);
 }
 
 export type ResolvedEmployee = EmployeeRosterRow & {
@@ -220,7 +240,7 @@ export function resolveEmployee(row: EmployeeRosterRow): ResolvedEmployee {
     ...row,
     email: emailFor(row.name),
     department: mapDepartment(row.orgUnit),
-    level: inferLevel(row.designation),
+    level: inferLevel(row.designation, mapDepartment(row.orgUnit)),
     role: inferRole(row.designation),
     experienceYearsRounded: Math.round(row.experienceYears),
   };

@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DEPARTMENT_LABELS, LEVEL_LABELS, LEVELS } from "@/constants/navigation";
+import { DEPARTMENT_LABELS, LEVEL_LABELS, levelsForFilter } from "@/constants/navigation";
 import {
   useAdminAssignmentConsole,
   useBulkRevokeCourseAssignments,
@@ -482,7 +482,13 @@ export default function AdminCourseAssignmentsPage() {
           <select
             className="h-10 rounded-full border border-input bg-background px-3 text-sm"
             value={department}
-            onChange={(e) => setDepartment(e.target.value as DepartmentId | "all")}
+            onChange={(e) => {
+              const next = e.target.value as DepartmentId | "all";
+              setDepartment(next);
+              if (level !== "all" && !levelsForFilter(next).includes(level)) {
+                setLevel("all");
+              }
+            }}
           >
             <option value="all">All departments</option>
             {departments.map(([id, label]) => (
@@ -497,7 +503,7 @@ export default function AdminCourseAssignmentsPage() {
             onChange={(e) => setLevel(e.target.value as LearningLevel | "all")}
           >
             <option value="all">All levels</option>
-            {LEVELS.map((l) => (
+            {levelsForFilter(department).map((l) => (
               <option key={l} value={l}>
                 {LEVEL_LABELS[l]}
               </option>

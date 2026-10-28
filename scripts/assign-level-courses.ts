@@ -10,6 +10,7 @@ import { and, eq } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { courseAssignments, courses, notifications, profiles, users } from "@/db/schema";
+import { LEVEL_LABELS, normalizeCareerLevel } from "@/constants/navigation";
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -33,6 +34,7 @@ async function main() {
   let skipped = 0;
 
   for (const person of active) {
+    const level = normalizeCareerLevel(person.level, person.department);
     const matching = await db
       .select({
         id: courses.id,
@@ -43,7 +45,7 @@ async function main() {
       .where(
         and(
           eq(courses.departmentId, person.department),
-          eq(courses.level, person.level),
+          eq(courses.level, level),
           eq(courses.publishStatus, "published")
         )
       );
@@ -78,7 +80,7 @@ async function main() {
       await db.insert(notifications).values({
         userId: person.userId,
         title: "Mandatory course assigned",
-        message: `${course.title} was assigned for your ${person.level} learning track.`,
+        message: `${course.title} was assigned for your ${LEVEL_LABELS[level]} learning track.`,
         type: "warning",
         href: `/dashboard/courses/${course.slug}`,
         read: 0,

@@ -1,5 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { nextLearningLevel } from "@/db/catalog/employees";
+import { normalizeCareerLevel } from "@/constants/navigation";
 import { getDb } from "@/db";
 import { getCourseProgressPercent } from "@/db/queries/courses";
 import {
@@ -102,7 +103,8 @@ export async function computePromotionEligibility(
 
   if (!person || person.status !== "active") return null;
 
-  const nextLevel = nextLearningLevel(person.level);
+  const currentLevel = normalizeCareerLevel(person.level, person.department);
+  const nextLevel = nextLearningLevel(person.level, person.department);
 
   const assignmentRows = await db
     .select({
@@ -120,7 +122,7 @@ export async function computePromotionEligibility(
       and(
         eq(courseAssignments.userId, userId),
         eq(courseAssignments.mandatory, true),
-        eq(courses.level, person.level),
+        eq(courses.level, currentLevel),
         eq(courses.departmentId, person.department)
       )
     );
@@ -168,7 +170,7 @@ export async function computePromotionEligibility(
     email: person.email ?? "",
     department: person.department,
     designation: person.designation,
-    currentLevel: person.level,
+    currentLevel,
     nextLevel,
     status,
     courses: courseRows,
@@ -211,13 +213,15 @@ export async function assignLevelCoursesForUser(userId: string, assignedBy?: str
   const [profile] = await db.select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
   if (!profile) return { inserted: 0, skipped: 0 };
 
+  const level = normalizeCareerLevel(profile.level, profile.department);
+
   const matching = await db
     .select({ id: courses.id, title: courses.title, slug: courses.slug })
     .from(courses)
     .where(
       and(
         eq(courses.departmentId, profile.department),
-        eq(courses.level, profile.level),
+        eq(courses.level, level),
         eq(courses.publishStatus, "published")
       )
     );

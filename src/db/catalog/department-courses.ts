@@ -1,4 +1,5 @@
 import type { DepartmentId, Difficulty, LearningLevel } from "@/types";
+import { DEPARTMENT_LEVELS, LEVEL_LABELS } from "@/constants/navigation";
 import {
   buildCoreConceptsMarkdown,
   buildPracticeMarkdown,
@@ -62,58 +63,125 @@ function thumbnailFor(index: number, slug: string): string {
   return `https://picsum.photos/seed/${encodeURIComponent(slug)}/800/450`;
 }
 
-const LEVELS: LearningLevel[] = [
-  "beginner",
-  "associate",
-  "intermediate",
-  "advanced",
-  "senior",
-  "lead",
-  "architect",
-  "expert",
-];
-
-/** Three topic titles per department × level. */
-const TOPICS: Record<DepartmentId, Record<LearningLevel, [string, string, string]>> = {
+/** Topic titles per department × career level. Marketing keeps the original 8×3 matrix. */
+const TOPICS: Record<DepartmentId, Partial<Record<LearningLevel, readonly string[]>>> = {
   development: {
-    beginner: ["Programming Fundamentals", "Git & Team Collaboration", "HTML CSS & Web Basics"],
-    associate: ["JavaScript Essentials", "Intro to Databases", "Debugging & Code Quality"],
-    intermediate: ["TypeScript for Apps", "React Component Patterns", "REST API Design"],
-    advanced: ["System Design Essentials", "Performance Optimization", "Testing Strategies"],
+    associate: [
+      "Programming Fundamentals",
+      "Git & Team Collaboration",
+      "HTML CSS & Web Basics",
+      "JavaScript Essentials",
+      "Intro to Databases",
+      "Debugging & Code Quality",
+    ],
+    advanced: [
+      "TypeScript for Apps",
+      "React Component Patterns",
+      "REST API Design",
+      "System Design Essentials",
+      "Performance Optimization",
+      "Testing Strategies",
+    ],
     senior: ["Distributed Systems", "Domain-Driven Design", "Secure Coding Practices"],
     lead: ["Tech Leadership Craft", "Architecture Decision Records", "Mentoring Engineers"],
-    architect: ["Enterprise Architecture", "Event-Driven Systems", "Platform Reliability"],
-    expert: ["Staff Engineer Impact", "Org-Wide Technical Strategy", "Innovation Lab Projects"],
+    architect: [
+      "Enterprise Architecture",
+      "Event-Driven Systems",
+      "Platform Reliability",
+      "Staff Engineer Impact",
+      "Org-Wide Technical Strategy",
+      "Innovation Lab Projects",
+    ],
   },
   qa: {
-    beginner: ["QA Mindset & Bug Lifecycle", "Manual Test Case Design", "Exploratory Testing Basics"],
-    associate: ["Test Plans & Traceability", "API Testing Basics", "Defect Reporting Excellence"],
-    intermediate: ["Automation with Playwright", "API Automation Patterns", "Regression Strategy"],
-    advanced: ["Performance Testing Foundations", "Security Testing Essentials", "CI Test Pipelines"],
+    associate: [
+      "QA Mindset & Bug Lifecycle",
+      "Manual Test Case Design",
+      "Exploratory Testing Basics",
+      "Test Plans & Traceability",
+      "API Testing Basics",
+      "Defect Reporting Excellence",
+    ],
+    advanced: [
+      "Automation with Playwright",
+      "API Automation Patterns",
+      "Regression Strategy",
+      "Performance Testing Foundations",
+      "Security Testing Essentials",
+      "CI Test Pipelines",
+    ],
     senior: ["Test Architecture", "Risk-Based Testing", "Quality Metrics & Dashboards"],
     lead: ["QA Leadership", "Release Gate Governance", "Cross-Team Quality Rituals"],
-    architect: ["Quality Engineering Systems", "Observability for Testers", "Shift-Left Platforms"],
-    expert: ["Enterprise QE Strategy", "AI-Assisted Testing Ops", "Quality Transformation"],
+    qa_manager: [
+      "Quality Engineering Systems",
+      "Observability for Testers",
+      "Shift-Left Platforms",
+      "Enterprise QE Strategy",
+      "AI-Assisted Testing Ops",
+      "Quality Transformation",
+    ],
   },
   ba: {
-    beginner: ["Business Analysis Fundamentals", "Stakeholder Interviews", "Requirements Writing 101"],
-    associate: ["User Stories & Acceptance Criteria", "Process Mapping Basics", "Workshop Facilitation"],
-    intermediate: ["Data Analysis for BAs", "BPMN & Process Design", "Prioritization Frameworks"],
-    advanced: ["Solution Assessment", "Non-Functional Requirements", "Change Impact Analysis"],
+    associate: [
+      "Business Analysis Fundamentals",
+      "Stakeholder Interviews",
+      "Requirements Writing 101",
+      "User Stories & Acceptance Criteria",
+      "Process Mapping Basics",
+      "Workshop Facilitation",
+    ],
+    advanced: [
+      "Data Analysis for BAs",
+      "BPMN & Process Design",
+      "Prioritization Frameworks",
+      "Solution Assessment",
+      "Non-Functional Requirements",
+      "Change Impact Analysis",
+    ],
     senior: ["Product Discovery Collaboration", "Domain Modeling", "Business Case Craft"],
     lead: ["BA Practice Leadership", "Portfolio Requirements Governance", "Coaching Analysts"],
-    architect: ["Enterprise Requirements Architecture", "Capability Mapping", "Value Stream Design"],
-    expert: ["Strategic BA Partnership", "Transformation Roadmaps", "Executive Decision Support"],
+    product_owner: [
+      "Enterprise Requirements Architecture",
+      "Capability Mapping",
+      "Value Stream Design",
+      "Strategic BA Partnership",
+      "Transformation Roadmaps",
+      "Executive Decision Support",
+    ],
   },
   hr: {
-    beginner: ["People Ops Fundamentals", "Workplace Policies Overview", "Employee Lifecycle Basics"],
-    associate: ["Recruiting Essentials", "Onboarding Playbooks", "HRIS Data Hygiene"],
-    intermediate: ["Performance Conversations", "Learning Needs Analysis", "Compensation Basics"],
-    advanced: ["Talent Development Programs", "Workforce Planning", "Employee Relations"],
-    senior: ["Org Design Fundamentals", "Leadership Assessment", "Culture Systems"],
-    lead: ["HR Business Partnering", "People Analytics", "Manager Enablement"],
-    architect: ["People Systems Architecture", "Total Rewards Strategy", "DEI Program Design"],
-    expert: ["Enterprise People Strategy", "Transformation Change Mgmt", "CHRO Partnership"],
+    associate: [
+      "People Ops Fundamentals",
+      "Workplace Policies Overview",
+      "Employee Lifecycle Basics",
+      "Recruiting Essentials",
+      "Onboarding Playbooks",
+      "HRIS Data Hygiene",
+    ],
+    advanced: [
+      "Performance Conversations",
+      "Learning Needs Analysis",
+      "Compensation Basics",
+      "Talent Development Programs",
+      "Workforce Planning",
+      "Employee Relations",
+    ],
+    assistant_hr_manager: [
+      "Org Design Fundamentals",
+      "Leadership Assessment",
+      "Culture Systems",
+      "HR Business Partnering",
+      "People Analytics",
+      "Manager Enablement",
+    ],
+    hr_manager: [
+      "People Systems Architecture",
+      "Total Rewards Strategy",
+      "DEI Program Design",
+      "Enterprise People Strategy",
+      "Transformation Change Mgmt",
+      "CHRO Partnership",
+    ],
   },
   marketing: {
     beginner: ["Digital Marketing Foundations", "Brand Messaging Basics", "Content Writing 101"],
@@ -126,24 +194,60 @@ const TOPICS: Record<DepartmentId, Record<LearningLevel, [string, string, string
     expert: ["Enterprise Growth Strategy", "Category Creation", "CMO Partnership"],
   },
   uiux: {
-    beginner: ["Design Thinking Basics", "Visual Hierarchy", "Figma Foundations"],
-    associate: ["Wireframing & Flows", "Usability Heuristics", "Design Critiques"],
-    intermediate: ["Interaction Design", "Design Systems Intro", "Accessibility Fundamentals"],
-    advanced: ["Complex Product UX", "Research Synthesis", "Prototyping at Speed"],
+    associate: [
+      "Design Thinking Basics",
+      "Visual Hierarchy",
+      "Figma Foundations",
+      "Wireframing & Flows",
+      "Usability Heuristics",
+      "Design Critiques",
+    ],
+    advanced: [
+      "Interaction Design",
+      "Design Systems Intro",
+      "Accessibility Fundamentals",
+      "Complex Product UX",
+      "Research Synthesis",
+      "Prototyping at Speed",
+    ],
     senior: ["Service Design", "UX Metrics & Experiments", "Cross-Platform Patterns"],
     lead: ["Design Leadership", "Stakeholder Alignment", "Design Ops Rituals"],
-    architect: ["Enterprise Design Systems", "Multi-Product UX Architecture", "Inclusive Design at Scale"],
-    expert: ["Design Strategy", "Org Design Maturity", "Principal Designer Impact"],
+    architect: [
+      "Enterprise Design Systems",
+      "Multi-Product UX Architecture",
+      "Inclusive Design at Scale",
+      "Design Strategy",
+      "Org Design Maturity",
+      "Principal Designer Impact",
+    ],
   },
   devops: {
-    beginner: ["DevOps Culture Basics", "Linux Command Line", "Version Control for Ops"],
-    associate: ["CI Pipelines Intro", "Containers Fundamentals", "Monitoring Basics"],
-    intermediate: ["Docker Deep Dive", "Infrastructure as Code", "GitHub Actions Mastery"],
-    advanced: ["Kubernetes Foundations", "Cloud Networking", "Incident Response"],
+    associate: [
+      "DevOps Culture Basics",
+      "Linux Command Line",
+      "Version Control for Ops",
+      "CI Pipelines Intro",
+      "Containers Fundamentals",
+      "Monitoring Basics",
+    ],
+    advanced: [
+      "Docker Deep Dive",
+      "Infrastructure as Code",
+      "GitHub Actions Mastery",
+      "Kubernetes Foundations",
+      "Cloud Networking",
+      "Incident Response",
+    ],
     senior: ["SRE Principles", "Platform Engineering", "Cost & Capacity Planning"],
     lead: ["DevOps Leadership", "Reliability Governance", "Team Topologies for Ops"],
-    architect: ["Multi-Cloud Architecture", "Security & Compliance Pipelines", "Internal Developer Platforms"],
-    expert: ["Enterprise Reliability Strategy", "Org-Wide Platform Roadmaps", "CTO Ops Partnership"],
+    architect: [
+      "Multi-Cloud Architecture",
+      "Security & Compliance Pipelines",
+      "Internal Developer Platforms",
+      "Enterprise Reliability Strategy",
+      "Org-Wide Platform Roadmaps",
+      "CTO Ops Partnership",
+    ],
   },
 };
 
@@ -183,6 +287,10 @@ function hoursFor(level: LearningLevel): number {
     lead: 12,
     architect: 16,
     expert: 18,
+    qa_manager: 18,
+    product_owner: 18,
+    assistant_hr_manager: 13,
+    hr_manager: 18,
   };
   return map[level];
 }
@@ -197,6 +305,10 @@ function xpFor(level: LearningLevel, track: number): number {
     lead: 700,
     architect: 850,
     expert: 1000,
+    qa_manager: 1000,
+    product_owner: 1000,
+    assistant_hr_manager: 650,
+    hr_manager: 1000,
   };
   return base[level] + track * 40;
 }
@@ -267,15 +379,18 @@ export function buildDepartmentCourseCatalog(): CatalogCourse[] {
   const missingVideos: string[] = [];
 
   for (const dept of departments) {
-    for (const level of LEVELS) {
+    for (const level of DEPARTMENT_LEVELS[dept]) {
       const topics = TOPICS[dept][level];
+      if (!topics || topics.length === 0) {
+        throw new Error(`[catalog] Missing topics for ${dept}/${level}`);
+      }
       topics.forEach((topic, track) => {
         if (!TOPIC_VIDEO[topic]) missingVideos.push(`${dept}/${level}: ${topic}`);
         const slug = `${dept}-${level}-${slugify(topic)}`;
         courses.push({
           slug,
           title: topic,
-          description: `${topic} for the ${DEPT_LABEL[dept]} track at ${level} level. Structured lessons with video, reading, and practice.`,
+          description: `${topic} for the ${DEPT_LABEL[dept]} track at ${LEVEL_LABELS[level]} level. Structured lessons with video, reading, and practice.`,
           departmentId: dept,
           level,
           difficulty: difficultyFor(level),

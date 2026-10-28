@@ -90,7 +90,7 @@ async function main() {
         role: email === "vishnu.sankar@valoriz.com" ? "admin" : "employee",
         department: roster?.department ?? "development",
         designation: roster?.designation ?? "Team Member",
-        level: roster?.level ?? "beginner",
+        level: roster?.level ?? "associate",
         joinDate: new Date().toISOString().slice(0, 10),
         goals: [],
         preferences: { rosterSource: "career-loop" },

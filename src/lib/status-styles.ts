@@ -75,6 +75,10 @@ export function statusToBadgeVariant(status: string | null | undefined): StatusB
     case "expert":
     case "architect":
     case "lead":
+    case "qa_manager":
+    case "product_owner":
+    case "assistant_hr_manager":
+    case "hr_manager":
       return "expert";
 
     case "draft":
@@ -96,6 +100,14 @@ export function levelToBadgeVariant(level: string | null | undefined): StatusBad
   if (key === "intermediate" || key === "associate") return "intermediate";
   if (key === "advanced" || key === "senior") return "advanced";
   if (key === "expert" || key === "architect" || key === "lead") return "expert";
+  if (
+    key === "qa_manager" ||
+    key === "product_owner" ||
+    key === "assistant_hr_manager" ||
+    key === "hr_manager"
+  ) {
+    return "expert";
+  }
   return "secondary";
 }
 

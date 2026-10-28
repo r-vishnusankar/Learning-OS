@@ -34,7 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS } from "@/constants/navigation";
+import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS, levelsForDepartment } from "@/constants/navigation";
 import { useCourseBuilder } from "@/hooks/use-courses";
 import {
   createLessonAction,
@@ -219,9 +219,9 @@ export default function CourseBuilderPage() {
               refetch();
             }}
           >
-            {Object.entries(LEVEL_LABELS).map(([id, label]) => (
+            {levelsForDepartment(c.departmentId).map((id) => (
               <option key={id} value={id}>
-                {label}
+                {LEVEL_LABELS[id]}
               </option>
             ))}
           </select>

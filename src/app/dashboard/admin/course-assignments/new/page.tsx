@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS, LEVELS } from "@/constants/navigation";
+import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS, levelsForFilter } from "@/constants/navigation";
 import { useAssignableCourses } from "@/hooks/use-courses";
 import { useAdminUsers } from "@/hooks/use-operations";
 import { useAssignCourse } from "@/hooks/use-course-assignments";
@@ -173,7 +173,13 @@ export default function AssignCoursesPage() {
               </div>
               <select
                 value={filterDept}
-                onChange={(e) => setFilterDept(e.target.value as DepartmentId | "all")}
+                onChange={(e) => {
+                  const next = e.target.value as DepartmentId | "all";
+                  setFilterDept(next);
+                  if (filterLevel !== "all" && !levelsForFilter(next).includes(filterLevel)) {
+                    setFilterLevel("all");
+                  }
+                }}
                 className="h-12 rounded-full bg-secondary px-4 text-sm font-medium text-secondary-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="all">All departments</option>
@@ -189,7 +195,7 @@ export default function AssignCoursesPage() {
                 className="h-12 rounded-full bg-secondary px-4 text-sm font-medium text-secondary-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="all">All levels</option>
-                {LEVELS.map((level) => (
+                {levelsForFilter(filterDept).map((level) => (
                   <option key={level} value={level}>
                     {LEVEL_LABELS[level]}
                   </option>

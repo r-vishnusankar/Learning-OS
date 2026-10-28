@@ -21,6 +21,10 @@ export const learningLevelSchema = z.enum([
   "lead",
   "architect",
   "expert",
+  "qa_manager",
+  "product_owner",
+  "assistant_hr_manager",
+  "hr_manager",
 ]);
 export const difficultySchema = z.enum(["beginner", "intermediate", "advanced", "expert"]);
 export const learningCategorySchema = z.enum(["role", "goal"]);

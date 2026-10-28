@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS } from "@/constants/navigation";
+import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS, levelsForFilter } from "@/constants/navigation";
 import { usePublishedCourses } from "@/hooks/use-courses";
 import type { CourseStatus, DepartmentId, LearningCategory, LearningLevel } from "@/types";
 
@@ -56,7 +56,7 @@ export default function CoursesPage() {
   };
 
   const departments = Object.entries(DEPARTMENT_LABELS) as [DepartmentId, string][];
-  const levels = Object.entries(LEVEL_LABELS) as [LearningLevel, string][];
+  const levels = levelsForFilter(department);
 
   if (isLoading) {
     return (
@@ -92,7 +92,13 @@ export default function CoursesPage() {
           <select
             className="h-11 rounded-2xl border border-input bg-card px-3 text-sm"
             value={department}
-            onChange={(e) => setDepartment(e.target.value as DepartmentId | "all")}
+            onChange={(e) => {
+              const next = e.target.value as DepartmentId | "all";
+              setDepartment(next);
+              if (level !== "all" && !levelsForFilter(next).includes(level)) {
+                setLevel("all");
+              }
+            }}
           >
             <option value="all">All departments</option>
             {departments.map(([id, label]) => (
@@ -107,9 +113,9 @@ export default function CoursesPage() {
             onChange={(e) => setLevel(e.target.value as LearningLevel | "all")}
           >
             <option value="all">All levels</option>
-            {levels.map(([id, label]) => (
+            {levels.map((id) => (
               <option key={id} value={id}>
-                {label}
+                {LEVEL_LABELS[id]}
               </option>
             ))}
           </select>

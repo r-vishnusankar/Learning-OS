@@ -25,7 +25,7 @@ import { useMyActiveCourses, useRecommendedCourses } from "@/hooks/use-courses";
 import { useDashboardHome } from "@/hooks/use-me";
 import { useMyAssignmentStats, useMyCourseAssignments } from "@/hooks/use-course-assignments";
 import { useMyEligibility } from "@/hooks/use-promotions";
-import { DEPARTMENT_LABELS, LEVEL_LABELS, LEVELS } from "@/constants/navigation";
+import { DEPARTMENT_LABELS, LEVEL_LABELS, nextCareerLevel, normalizeCareerLevel } from "@/constants/navigation";
 import { cn, formatHours, formatNumber } from "@/lib/utils";
 import type { Course, LearningLevel } from "@/types";
 
@@ -268,10 +268,10 @@ export default function DashboardPage() {
     ? `/dashboard/courses/${continueCourse.slug ?? continueCourse.id}`
     : dueItems[0]?.href ?? "/dashboard/learning";
 
-  const level = (user.level ?? "beginner") as LearningLevel;
-  const levelIndex = LEVELS.indexOf(level as (typeof LEVELS)[number]);
-  const fallbackNextLevel =
-    levelIndex >= 0 && levelIndex < LEVELS.length - 1 ? LEVELS[levelIndex + 1] : null;
+  const level = (user.level
+    ? normalizeCareerLevel(user.level as LearningLevel, user.department)
+    : "associate") as LearningLevel;
+  const fallbackNextLevel = nextCareerLevel(level, user.department);
   const careerRemaining = eligibility
     ? Math.max(0, eligibility.requiredCount - eligibility.certifiedCount)
     : 0;

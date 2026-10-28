@@ -81,6 +81,84 @@ function runUnitTests(): void {
   assert(fullMd.includes("Course ↔ video check"), "full md includes video check");
 }
 
+function runCatalogStructureTests(): void {
+  const catalog = buildDepartmentCourseCatalog();
+  assert(catalog.length === 168, `catalog has 168 courses (got ${catalog.length})`);
+
+  const titles = catalog.map((c) => c.title);
+  assert(new Set(titles).size === titles.length, "no duplicate course titles");
+
+  const byDept = new Map<string, typeof catalog>();
+  for (const c of catalog) {
+    const list = byDept.get(c.departmentId) ?? [];
+    list.push(c);
+    byDept.set(c.departmentId, list);
+  }
+
+  for (const dept of ["development", "qa", "ba", "uiux", "devops"] as const) {
+    const rows = byDept.get(dept) ?? [];
+    assert(rows.length === 24, `${dept} has 24 courses (got ${rows.length})`);
+  }
+  assert((byDept.get("hr") ?? []).length === 24, "hr has 24 courses");
+  assert((byDept.get("marketing") ?? []).length === 24, "marketing has 24 courses");
+
+  const levelsOf = (dept: string) =>
+    [...new Set((byDept.get(dept) ?? []).map((c) => c.level))];
+
+  assert(
+    levelsOf("development").join(",") === "associate,advanced,senior,lead,architect",
+    "development level order"
+  );
+  assert(levelsOf("qa").join(",") === "associate,advanced,senior,lead,qa_manager", "qa level order");
+  assert(
+    levelsOf("ba").join(",") === "associate,advanced,senior,lead,product_owner",
+    "ba level order"
+  );
+  assert(
+    levelsOf("hr").join(",") === "associate,advanced,assistant_hr_manager,hr_manager",
+    "hr level order"
+  );
+  assert(
+    levelsOf("marketing").join(",") ===
+      "beginner,associate,intermediate,advanced,senior,lead,architect,expert",
+    "marketing level order unchanged"
+  );
+
+  const count = (dept: string, level: string) =>
+    (byDept.get(dept) ?? []).filter((c) => c.level === level).length;
+
+  assert(count("development", "associate") === 6, "dev associate has 6 courses");
+  assert(count("development", "advanced") === 6, "dev advanced has 6 courses");
+  assert(count("development", "senior") === 3, "dev senior has 3 courses");
+  assert(count("development", "architect") === 6, "dev architect has 6 courses");
+  assert(count("qa", "qa_manager") === 6, "qa manager has 6 courses");
+  assert(count("ba", "product_owner") === 6, "product owner has 6 courses");
+  assert(count("hr", "assistant_hr_manager") === 6, "assistant hr manager has 6 courses");
+  assert(count("hr", "hr_manager") === 6, "hr manager has 6 courses");
+  assert(count("marketing", "beginner") === 3, "marketing beginner still 3");
+  assert(count("marketing", "expert") === 3, "marketing expert still 3");
+
+  const marketingTitles = (byDept.get("marketing") ?? []).map((c) => c.title);
+  for (const title of [
+    "Digital Marketing Foundations",
+    "Brand Messaging Basics",
+    "Content Writing 101",
+    "SEO Essentials",
+    "CMO Partnership",
+  ]) {
+    assert(marketingTitles.includes(title), `marketing still has ${title}`);
+  }
+
+  assert(
+    catalog.some((c) => c.slug === "development-associate-programming-fundamentals"),
+    "Programming Fundamentals moved to associate slug"
+  );
+  assert(
+    !catalog.some((c) => c.departmentId === "development" && c.level === "beginner"),
+    "development has no beginner level"
+  );
+}
+
 async function runIntegrationTests(): Promise<void> {
   const catalog = buildDepartmentCourseCatalog();
   assert(catalog.length === 168, `catalog has 168 courses (got ${catalog.length})`);
@@ -122,6 +200,10 @@ async function runIntegrationTests(): Promise<void> {
 async function main() {
   console.log("Course URL audit — unit tests");
   runUnitTests();
+  console.log("  OK");
+
+  console.log("Course catalog — structure tests");
+  runCatalogStructureTests();
   console.log("  OK");
 
   console.log("Course URL audit — integration (DB + docs)");

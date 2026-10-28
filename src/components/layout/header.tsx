@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { useUIStore } from "@/store/ui-store";
 import { useUnreadNotificationCount } from "@/hooks/use-operations";
 import { formatNumber, isExamRoute } from "@/lib/utils";
-import { DEPARTMENT_LABELS, LEVEL_LABELS } from "@/constants/navigation";
+import { DEPARTMENT_LABELS, LEVEL_LABELS, firstLevelForDepartment, normalizeCareerLevel } from "@/constants/navigation";
 import { levelToBadgeVariant } from "@/lib/status-styles";
 import { usePathname } from "next/navigation";
 
@@ -54,7 +54,13 @@ export function Header() {
   const user = session?.user;
   const designation = user?.designation ?? "Team Member";
   const department = user?.department ? DEPARTMENT_LABELS[user.department] : "Development";
-  const level = user?.level ?? "beginner";
+  const level = user?.level
+    ? user.department
+      ? normalizeCareerLevel(user.level, user.department)
+      : user.level
+    : user?.department
+      ? firstLevelForDepartment(user.department)
+      : "associate";
   const xp = user?.xp ?? 0;
   const coins = user?.coins ?? 0;
 

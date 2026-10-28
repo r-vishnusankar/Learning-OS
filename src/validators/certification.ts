@@ -19,6 +19,10 @@ const level = z.enum([
   "lead",
   "architect",
   "expert",
+  "qa_manager",
+  "product_owner",
+  "assistant_hr_manager",
+  "hr_manager",
 ]);
 
 const publishStatus = z.enum(["draft", "review", "published", "archived"]);

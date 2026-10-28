@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { buildDepartmentCourseCatalog } from "@/db/catalog/department-courses";
+import { isFirstDepartmentLevel } from "@/constants/navigation";
 import {
   DEPARTMENT_INSTRUCTORS,
   instructorAvatar,
@@ -53,18 +54,37 @@ async function main() {
     const profile = DEPARTMENT_INSTRUCTORS[dept];
     const instructorId = instructorIds.get(profile.name) ?? null;
 
-    const [existing] = await db
+    const [existingBySlug] = await db
       .select({ id: courses.id })
       .from(courses)
       .where(eq(courses.slug, item.slug))
       .limit(1);
 
+    const [existingByTitle] = existingBySlug
+      ? [existingBySlug]
+      : await db
+          .select({ id: courses.id })
+          .from(courses)
+          .where(eq(courses.title, item.title))
+          .limit(1);
+
+    const existing = existingBySlug ?? existingByTitle;
+
     if (existing) {
       await db
         .update(courses)
         .set({
+          slug: item.slug,
+          title: item.title,
+          description: item.description,
           thumbnailUrl: item.thumbnailUrl,
           instructorId,
+          departmentId: item.departmentId,
+          level: item.level,
+          difficulty: item.difficulty,
+          durationMinutes: item.durationMinutes,
+          xpReward: item.xpReward,
+          tags: item.tags,
           updatedAt: new Date(),
         })
         .where(eq(courses.id, existing.id));
@@ -96,7 +116,7 @@ async function main() {
           "Build portfolio-ready evidence",
         ],
         prerequisites:
-          item.level === "beginner"
+          isFirstDepartmentLevel(item.level, item.departmentId)
             ? ["None — open to all"]
             : [`Complete prior ${item.departmentId} level coursework`],
       })

@@ -26,6 +26,10 @@ const updateProfileSchema = z.object({
       "lead",
       "architect",
       "expert",
+      "qa_manager",
+      "product_owner",
+      "assistant_hr_manager",
+      "hr_manager",
     ])
     .optional(),
   goals: z.array(z.string()).optional(),

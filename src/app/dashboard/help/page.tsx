@@ -234,7 +234,7 @@ const FAQS: FaqItem[] = [
     answer: (
       <p>
         Open <strong>Learning Paths</strong> and enroll in (or open) your department’s{" "}
-        <strong>0–1 Year Journey</strong> track. It sequences beginner courses and their knowledge
+        <strong>0–1 Year Journey</strong> track. It sequences first-level courses and their knowledge
         checks. You should also complete the same courses under <strong>My Learning</strong>{" "}
         (mandatory assignments) so they count toward promotion eligibility.
       </p>
@@ -252,7 +252,7 @@ const FAQS: FaqItem[] = [
       <p>
         Paths guide you through the right order. Promotion eligibility still requires completing
         mandatory <strong>assigned courses</strong> and <strong>passing</strong> each course
-        assessment. The 0–1 Year Journey paths use those same beginner courses — finish both the
+        assessment. The 0–1 Year Journey paths use those same first-level courses — finish both the
         path steps and your My Learning assignments.
       </p>
     ),

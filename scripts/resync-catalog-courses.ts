@@ -1,14 +1,14 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { buildDepartmentCourseCatalog } from "@/db/catalog/department-courses";
 import { courses, lessons, modules } from "@/db/schema";
 
 /**
- * Re-sync catalog courses: department, level, description, tags, thumbnail, lessons.
- * Fixes misplaced media / stale lesson content without changing slugs.
+ * Re-sync catalog courses: department, level, slug, description, tags, thumbnail, lessons.
+ * Matches by slug first, then by title + department so level merges can rename slugs.
  */
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -19,11 +19,23 @@ async function main() {
   let synced = 0;
 
   for (const item of catalog) {
-    const [existing] = await db
+    const [existingBySlug] = await db
       .select({ id: courses.id })
       .from(courses)
       .where(eq(courses.slug, item.slug))
       .limit(1);
+
+    const [existingByTitle] = existingBySlug
+      ? [existingBySlug]
+      : await db
+          .select({ id: courses.id })
+          .from(courses)
+          .where(
+            and(eq(courses.title, item.title), eq(courses.departmentId, item.departmentId))
+          )
+          .limit(1);
+
+    const existing = existingBySlug ?? existingByTitle;
 
     if (!existing) {
       console.warn(`Missing course (skip): ${item.slug}`);
@@ -33,6 +45,7 @@ async function main() {
     await db
       .update(courses)
       .set({
+        slug: item.slug,
         title: item.title,
         description: item.description,
         departmentId: item.departmentId,

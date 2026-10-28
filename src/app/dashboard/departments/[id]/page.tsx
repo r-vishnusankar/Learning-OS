@@ -29,7 +29,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePublishedCourses } from "@/hooks/use-courses";
 import { useDepartmentsLive, useLeaderboardLive } from "@/hooks/use-operations";
-import { LEVELS, LEVEL_LABELS } from "@/constants/navigation";
+import { LEVEL_LABELS, levelsForDepartment } from "@/constants/navigation";
 import { cn, formatNumber } from "@/lib/utils";
 import type { DepartmentId, LearningLevel } from "@/types";
 
@@ -52,13 +52,17 @@ interface LevelRoadmap {
 
 const levelRoadmaps: Record<LearningLevel, LevelRoadmap> = {
   beginner: { videos: 6, reading: 4, assignments: 2, labs: 0, assessment: "Foundations Quiz", certificate: "Foundation Certificate", xp: 200, badge: "Rising Star", unlock: "None — open to all" },
-  associate: { videos: 8, reading: 5, assignments: 3, labs: 1, assessment: "Core Skills Exam", certificate: "Associate Certificate", xp: 400, badge: "Quick Learner", unlock: "Complete Beginner level" },
+  associate: { videos: 12, reading: 8, assignments: 4, labs: 2, assessment: "Core Skills Exam", certificate: "Associate Certificate", xp: 400, badge: "Quick Learner", unlock: "Complete previous level" },
   intermediate: { videos: 10, reading: 6, assignments: 4, labs: 2, assessment: "Applied Skills Test", certificate: "Intermediate Professional", xp: 650, badge: "Skill Builder", unlock: "Associate cert + 80% avg score" },
-  advanced: { videos: 12, reading: 7, assignments: 5, labs: 3, assessment: "Advanced Case Study", certificate: "Advanced Specialist", xp: 900, badge: "Deep Diver", unlock: "Intermediate cert + 2 courses" },
+  advanced: { videos: 16, reading: 10, assignments: 6, labs: 4, assessment: "Advanced Case Study", certificate: "Advanced Specialist", xp: 900, badge: "Deep Diver", unlock: "Complete previous level" },
   senior: { videos: 14, reading: 8, assignments: 6, labs: 4, assessment: "Senior Capstone", certificate: "Senior Professional", xp: 1200, badge: "Trailblazer", unlock: "Advanced cert + mentor approval" },
   lead: { videos: 10, reading: 6, assignments: 4, labs: 2, assessment: "Leadership Assessment", certificate: "Team Lead Certificate", xp: 1000, badge: "Team Catalyst", unlock: "Senior cert + 1 year tenure" },
-  architect: { videos: 16, reading: 10, assignments: 6, labs: 5, assessment: "Architecture Review Board", certificate: "Architect Credential", xp: 1500, badge: "Visionary", unlock: "Senior cert + portfolio review" },
+  architect: { videos: 18, reading: 12, assignments: 8, labs: 6, assessment: "Architecture Review Board", certificate: "Architect Credential", xp: 1500, badge: "Visionary", unlock: "Lead cert + portfolio review" },
   expert: { videos: 8, reading: 5, assignments: 3, labs: 3, assessment: "Expert Panel Evaluation", certificate: "Expert Mastery Badge", xp: 2000, badge: "Skillrr Legend", unlock: "Architect cert + contribution score 90+" },
+  qa_manager: { videos: 18, reading: 12, assignments: 8, labs: 6, assessment: "Quality Leadership Review", certificate: "QA Manager Credential", xp: 1500, badge: "Quality Visionary", unlock: "Lead cert + portfolio review" },
+  product_owner: { videos: 18, reading: 12, assignments: 8, labs: 6, assessment: "Product Ownership Review", certificate: "Product Owner Credential", xp: 1500, badge: "Value Visionary", unlock: "Lead cert + portfolio review" },
+  assistant_hr_manager: { videos: 16, reading: 10, assignments: 6, labs: 4, assessment: "People Leadership Assessment", certificate: "Assistant HR Manager Certificate", xp: 1100, badge: "People Catalyst", unlock: "Advanced cert + manager endorsement" },
+  hr_manager: { videos: 18, reading: 12, assignments: 8, labs: 6, assessment: "People Strategy Review", certificate: "HR Manager Credential", xp: 1500, badge: "People Visionary", unlock: "Assistant HR Manager cert + portfolio review" },
 };
 
 export default function DepartmentDetailPage() {
@@ -113,6 +117,9 @@ export default function DepartmentDetailPage() {
 
   const completedCourses = deptCourses.filter((c) => c.status === "completed").length;
   const inProgressCourses = deptCourses.filter((c) => c.status === "in_progress").length;
+  const deptLevels = levelsForDepartment(department.id as DepartmentId);
+  const firstLabel = LEVEL_LABELS[deptLevels[0]!];
+  const lastLabel = LEVEL_LABELS[deptLevels[deptLevels.length - 1]!];
 
   return (
     <div className="space-y-6">
@@ -162,15 +169,19 @@ export default function DepartmentDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle>Learning roadmap</CardTitle>
-            <CardDescription>Progression path from Beginner to Expert with unlock requirements</CardDescription>
+            <CardDescription>Progression path from {firstLabel} to {lastLabel} with unlock requirements</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="relative">
               <div className="absolute left-4 top-0 hidden h-full w-px bg-border md:block" />
               <div className="space-y-6">
-                {LEVELS.map((level, i) => {
+                {deptLevels.map((level, i) => {
                   const roadmap = levelRoadmaps[level];
-                  const isUnlocked = i <= 3;
+                  const isUnlocked = i < Math.ceil(deptLevels.length / 2);
+                  const unlock =
+                    i === 0
+                      ? "None — open to all"
+                      : `Complete ${LEVEL_LABELS[deptLevels[i - 1]!]} level`;
                   return (
                     <motion.div
                       key={level}
@@ -196,7 +207,7 @@ export default function DepartmentDetailPage() {
                             </Badge>
                           </div>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Unlock: {roadmap.unlock}
+                            Unlock: {unlock}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 text-xs">
