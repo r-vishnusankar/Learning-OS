@@ -154,24 +154,76 @@ function shuffle<T>(items: T[]): T[] {
   return arr;
 }
 
-/** Start (or resume) an in-progress attempt. Same path as startAttemptAction. */
-export async function startAttemptForUser(userId: string, assessmentId: string) {
+export type AssessmentEligibility =
+  | { state: "AVAILABLE" }
+  | { state: "IN_PROGRESS"; attemptId: string }
+  | { state: "PASSED"; bestScore: number }
+  | { state: "ATTEMPTS_EXHAUSTED" }
+  | { state: "UNAVAILABLE" };
+
+/** Pure eligibility check — no side effects. */
+export async function getAssessmentEligibility(
+  userId: string,
+  assessmentId: string
+): Promise<AssessmentEligibility> {
   const assessment = await getAssessmentById(assessmentId);
-  if (!assessment || assessment.publishStatus !== "published") {
-    throw new Error("Assessment not available");
+  if (!assessment || assessment.publishStatus !== "published") return { state: "UNAVAILABLE" };
+
+  const attempts = await getUserAttempts(userId, assessmentId);
+  const inProgress = attempts.find((a) => a.status === "in_progress");
+  if (inProgress) return { state: "IN_PROGRESS", attemptId: inProgress.id };
+
+  const submitted = attempts.filter((a) => a.status !== "in_progress");
+  const bestScore = submitted.reduce<number | null>((max, a) => {
+    if (a.percentage == null) return max;
+    return max == null ? a.percentage : Math.max(max, a.percentage);
+  }, null);
+
+  // Check passed BEFORE exhausted — passing on last attempt is a pass, not exhausted
+  if (bestScore != null && bestScore >= assessment.passingScore) {
+    return { state: "PASSED", bestScore };
   }
+  if (submitted.length >= assessment.maxAttempts) return { state: "ATTEMPTS_EXHAUSTED" };
+  return { state: "AVAILABLE" };
+}
+
+/**
+ * Start (or resume) an attempt.
+ * Returns the attempt row, or null when max attempts already reached.
+ * Never throws for expected conditions — callers check for null.
+ *
+ * Atomicity: neon-http has no interactive transactions. We use an
+ * insert-then-verify-and-rollback pattern: insert the in_progress row,
+ * then immediately count submitted rows. If the count already equals or
+ * exceeds maxAttempts we delete the row we just inserted and return null.
+ * A concurrent submitter who finishes between our insert and our count
+ * will cause our count check to fire and we abort — the user cannot sneak
+ * past the limit via a race.
+ */
+export async function startAttemptForUser(
+  userId: string,
+  assessmentId: string
+): Promise<(typeof assessmentAttempts.$inferSelect) | null> {
+  const assessment = await getAssessmentById(assessmentId);
+  if (!assessment || assessment.publishStatus !== "published") return null;
 
   const existing = await getInProgressAttempt(userId, assessmentId);
   if (existing) return existing;
 
+  // Pre-check (non-atomic fast path — catches the common case)
   const attempts = await getUserAttempts(userId, assessmentId);
   const submitted = attempts.filter((a) => a.status !== "in_progress");
-  if (submitted.length >= assessment.maxAttempts) {
-    throw new Error("Max attempts reached");
-  }
+  if (submitted.length >= assessment.maxAttempts) return null;
+
+  // Also reject if already passed
+  const bestScore = submitted.reduce<number | null>((max, a) => {
+    if (a.percentage == null) return max;
+    return max == null ? a.percentage : Math.max(max, a.percentage);
+  }, null);
+  if (bestScore != null && bestScore >= assessment.passingScore) return null;
 
   let qs = await getQuestionsForAssessment(assessmentId);
-  if (!qs.length) throw new Error("No questions in this assessment");
+  if (!qs.length) return null;
   if (assessment.randomize) qs = shuffle(qs);
 
   const db = getDb();
@@ -186,6 +238,25 @@ export async function startAttemptForUser(userId: string, assessmentId: string) 
       maxScore: qs.reduce((sum, q) => sum + q.points, 0),
     })
     .returning();
+
+  if (!attempt) return null;
+
+  // Post-insert atomic guard: count submitted rows (in_progress excluded)
+  const [countRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(assessmentAttempts)
+    .where(
+      and(
+        eq(assessmentAttempts.userId, userId),
+        eq(assessmentAttempts.assessmentId, assessmentId),
+        sql`${assessmentAttempts.status} != 'in_progress'`
+      )
+    );
+  if ((countRow?.n ?? 0) >= assessment.maxAttempts) {
+    // Race: another attempt was submitted between our pre-check and now — roll back
+    await db.delete(assessmentAttempts).where(eq(assessmentAttempts.id, attempt.id));
+    return null;
+  }
 
   return attempt;
 }

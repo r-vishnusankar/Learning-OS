@@ -114,7 +114,9 @@ export function useStartAttempt() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: startAttemptAction,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["assessments"] }),
+    onSuccess: (data) => {
+      if (data?.ok) qc.invalidateQueries({ queryKey: ["assessments"] });
+    },
   });
 }
 

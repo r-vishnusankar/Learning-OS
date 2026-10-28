@@ -6,6 +6,7 @@ import { getDb } from "@/db";
 import {
   countQuestions,
   getAssessmentById,
+  getAssessmentEligibility,
   getAttemptById,
   getQuestionsForAssessment,
   getUserAttempts,
@@ -220,9 +221,23 @@ export async function deleteQuestionAction(id: string) {
   if (q) revalidatePath(`/dashboard/admin/assessments/${q.assessmentId}`);
 }
 
-export async function startAttemptAction(assessmentId: string) {
+export async function startAttemptAction(
+  assessmentId: string
+): Promise<
+  | { ok: true; attemptId: string }
+  | { ok: false; reason: "attempts_exhausted" | "already_passed" | "unavailable" }
+> {
   const userId = await requireUserId();
-  return startAttemptForUser(userId, assessmentId);
+  const eligibility = await getAssessmentEligibility(userId, assessmentId);
+
+  if (eligibility.state === "UNAVAILABLE") return { ok: false, reason: "unavailable" };
+  if (eligibility.state === "ATTEMPTS_EXHAUSTED") return { ok: false, reason: "attempts_exhausted" };
+  if (eligibility.state === "PASSED") return { ok: false, reason: "already_passed" };
+  if (eligibility.state === "IN_PROGRESS") return { ok: true, attemptId: eligibility.attemptId };
+
+  const attempt = await startAttemptForUser(userId, assessmentId);
+  if (!attempt) return { ok: false, reason: "attempts_exhausted" };
+  return { ok: true, attemptId: attempt.id };
 }
 
 export async function fetchAttemptSessionAction(attemptId: string) {
@@ -357,8 +372,11 @@ export async function fetchAssessmentDetailAction(assessmentId: string) {
   const assessment = await getAssessmentById(assessmentId);
   if (!assessment || assessment.publishStatus !== "published") return null;
 
-  const attempts = await getUserAttempts(userId, assessmentId);
-  const qCount = await countQuestions(assessmentId);
+  const [attempts, qCount, eligibility] = await Promise.all([
+    getUserAttempts(userId, assessmentId),
+    countQuestions(assessmentId),
+    getAssessmentEligibility(userId, assessmentId),
+  ]);
   const inProgress = attempts.find((a) => a.status === "in_progress");
   const submitted = attempts.filter((a) => a.status !== "in_progress");
   const best = submitted.reduce<number | null>((max, a) => {
@@ -383,6 +401,7 @@ export async function fetchAssessmentDetailAction(assessmentId: string) {
       questionsCount: qCount,
       type: assessment.type,
     } satisfies Assessment,
+    eligibility,
     inProgressAttemptId: inProgress?.id ?? null,
     recentAttempts: submitted.slice(0, 5).map((a) => ({
       id: a.id,

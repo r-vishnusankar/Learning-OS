@@ -20,20 +20,28 @@ export default function AssessmentDetailPage() {
   if (isLoading) return <Skeleton className="h-64 w-full" />;
   if (!data) return <p className="text-muted-foreground">Assessment not found.</p>;
 
-  const { assessment, inProgressAttemptId, recentAttempts } = data;
+  const { assessment, eligibility, inProgressAttemptId, recentAttempts } = data;
 
   const begin = async () => {
-    try {
-      if (inProgressAttemptId) {
-        router.push(`/dashboard/assessments/${assessment.id}/attempt/${inProgressAttemptId}`);
-        return;
-      }
-      const attempt = await startAttempt.mutateAsync(assessment.id);
-      router.push(`/dashboard/assessments/${assessment.id}/attempt/${attempt.id}`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not start attempt");
+    const result = await startAttempt.mutateAsync(assessment.id);
+    if (!result.ok) {
+      if (result.reason === "already_passed") toast.error("You have already passed this assessment.");
+      else if (result.reason === "attempts_exhausted") toast.error("No attempts remaining.");
+      else toast.error("Assessment is not available.");
+      return;
     }
+    router.push(`/dashboard/assessments/${assessment.id}/attempt/${result.attemptId}`);
   };
+
+  const canStart = eligibility.state === "AVAILABLE" || eligibility.state === "IN_PROGRESS";
+  const buttonLabel =
+    eligibility.state === "IN_PROGRESS"
+      ? "Continue attempt"
+      : eligibility.state === "PASSED"
+        ? `Passed — ${eligibility.bestScore}%`
+        : eligibility.state === "ATTEMPTS_EXHAUSTED"
+          ? "No attempts remaining"
+          : "Start assessment";
 
   return (
     <div className="space-y-6">
@@ -81,8 +89,8 @@ export default function AssessmentDetailPage() {
         </CardContent>
       </Card>
 
-      <Button onClick={begin} disabled={startAttempt.isPending || assessment.status === "expired"}>
-        {inProgressAttemptId ? "Continue attempt" : "Start assessment"}
+      <Button onClick={begin} disabled={startAttempt.isPending || !canStart}>
+        {buttonLabel}
       </Button>
 
       {recentAttempts.length > 0 && (
