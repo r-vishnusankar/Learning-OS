@@ -302,14 +302,14 @@ export default function AdminUsersPage() {
         </Card>
       </motion.section>
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <motion.section {...fade} className="xl:col-span-2">
+      <div className="grid min-w-0 gap-6 2xl:grid-cols-3">
+        <motion.section {...fade} className="min-w-0 2xl:col-span-2">
           <Card>
             {isLoading ? (
               <Skeleton className="m-4 h-64" />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[640px] text-sm">
                   <thead>
                     <tr className="border-b border-border text-left text-sm text-muted-foreground">
                       <th className="px-5 py-3.5 font-medium">User</th>
@@ -344,7 +344,7 @@ export default function AdminUsersPage() {
                               });
                               toast.success("Department updated");
                             }}
-                            className="h-8 rounded-md border border-input bg-card px-2 text-xs"
+                            className="h-8 max-w-full rounded-md border border-input bg-card px-2 text-xs"
                           >
                             {DEPTS.map((id) => (
                               <option key={id} value={id}>
@@ -363,7 +363,7 @@ export default function AdminUsersPage() {
                               });
                               toast.success("Role updated");
                             }}
-                            className="h-8 rounded-md border border-input bg-card px-2 text-xs"
+                            className="h-8 max-w-full rounded-md border border-input bg-card px-2 text-xs"
                           >
                             {ROLES.map((r) => (
                               <option key={r} value={r}>
@@ -454,7 +454,7 @@ export default function AdminUsersPage() {
           </Card>
         </motion.section>
 
-        <motion.section {...fade}>
+        <motion.section {...fade} className="min-w-0">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
