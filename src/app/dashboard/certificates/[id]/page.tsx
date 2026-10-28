@@ -101,9 +101,23 @@ export default function CertificateDetailPage() {
               size="sm"
               variant="outline"
               className="gap-1.5"
-              onClick={() => {
-                navigator.clipboard.writeText(verifyUrl);
-                toast.success("Share link copied");
+              onClick={async () => {
+                try {
+                  if (navigator.share) {
+                    await navigator.share({ title: cert.title, url: verifyUrl });
+                  } else {
+                    await navigator.clipboard.writeText(verifyUrl);
+                    toast.success("Share link copied");
+                  }
+                } catch {
+                  // User cancelled share dialog or permission denied — fallback to clipboard
+                  try {
+                    await navigator.clipboard.writeText(verifyUrl);
+                    toast.success("Share link copied");
+                  } catch {
+                    toast.error("Could not copy link");
+                  }
+                }
               }}
             >
               <Share2 className="h-3.5 w-3.5" /> Share
