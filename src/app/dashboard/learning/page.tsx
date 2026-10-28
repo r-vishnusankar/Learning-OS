@@ -70,11 +70,13 @@ function CourseRow({
   description,
   items,
   variant = "default",
+  viewAllHref,
 }: {
   title: string;
   description?: string;
   items: Course[];
   variant?: "default" | "featured";
+  viewAllHref?: string;
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [canPrev, setCanPrev] = useState(false);
@@ -138,9 +140,13 @@ function CourseRow({
           >
             <ChevronRight className="h-4 w-4 stroke-[1.75]" />
           </Button>
-          <Button variant="ghost" size="sm" className="ml-1 gap-1">
-            View all <ChevronRight className="h-4 w-4 stroke-[1.75]" />
-          </Button>
+          {viewAllHref && (
+            <Button variant="ghost" size="sm" className="ml-1 gap-1" asChild>
+              <Link href={viewAllHref}>
+                View all <ChevronRight className="h-4 w-4 stroke-[1.75]" />
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
       <div className="relative -mx-1">
@@ -531,6 +537,7 @@ export default function LearningPage() {
               description="Pick up right where you left off"
               items={continueLearning}
               variant="featured"
+              viewAllHref="/dashboard/courses"
             />
           ) : (
             <EmptyState
@@ -546,6 +553,7 @@ export default function LearningPage() {
               title="Recommended for you"
               description="AI-matched to your role and skill gaps"
               items={recommended}
+              viewAllHref="/dashboard/courses"
             />
           </div>
 
@@ -553,6 +561,7 @@ export default function LearningPage() {
             title="Trending now"
             description="Popular across your organization"
             items={trending}
+            viewAllHref="/dashboard/courses"
           />
 
           {recentlyViewed.length > 0 && (
@@ -560,6 +569,7 @@ export default function LearningPage() {
               title="Recently viewed"
               description="Courses you've opened lately"
               items={recentlyViewed}
+              viewAllHref="/dashboard/courses"
             />
           )}
 
@@ -568,6 +578,7 @@ export default function LearningPage() {
               title="Saved for later"
               description="Your bookmarked courses"
               items={saved}
+              viewAllHref="/dashboard/courses"
             />
           )}
 
@@ -576,6 +587,7 @@ export default function LearningPage() {
               title="Completed"
               description="Courses you've finished"
               items={completed}
+              viewAllHref="/dashboard/courses"
             />
           )}
         </div>
