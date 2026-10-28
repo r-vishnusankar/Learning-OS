@@ -9,6 +9,7 @@ import {
   pathEnrollments,
   pathSteps,
 } from "@/db/schema";
+import { users } from "@/db/schema/auth";
 import type { HomeworkAssignmentScope } from "@/db/schema/certification";
 import type { PublishStatus } from "@/db/schema/courses";
 import type { DepartmentId, LearningLevel } from "@/types";
@@ -220,7 +221,20 @@ export async function listUserCertificates(userId: string) {
 
 export async function listAllCertificates() {
   const db = getDb();
-  return db.select().from(certificates).orderBy(desc(certificates.createdAt));
+  const rows = await db
+    .select({
+      cert: certificates,
+      userName: users.name,
+      userEmail: users.email,
+    })
+    .from(certificates)
+    .leftJoin(users, eq(users.id, certificates.userId))
+    .orderBy(desc(certificates.createdAt));
+  return rows.map(({ cert, userName, userEmail }) => ({
+    ...cert,
+    userName: userName ?? null,
+    userEmail: userEmail ?? null,
+  }));
 }
 
 export async function getCertificateById(id: string) {

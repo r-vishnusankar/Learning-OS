@@ -33,6 +33,9 @@ export default function AdminCertificatesPage() {
               <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
                 <div>
                   <p className="font-medium">{cert.title}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {cert.userName ?? cert.userEmail ?? cert.userId}
+                  </p>
                   <p className="font-code text-xs text-muted-foreground">{cert.credentialId}</p>
                   <p className="text-xs text-muted-foreground">
                     Score {cert.score ?? "—"} · issued{" "}
