@@ -61,7 +61,8 @@ export function mapCourseToUi(
   row: DbCourseRow,
   modules: DbModule[] = [],
   progressMap: Record<string, { completed: boolean }> = {},
-  isSaved = false
+  isSaved = false,
+  realLearnerCount?: number
 ): Course {
   const progress = row.progress ?? 0;
   let lessonIndex = 0;
@@ -130,7 +131,7 @@ export function mapCourseToUi(
     },
     durationHours,
     lessonsCount,
-    enrolledCount: row.course.enrolledCount,
+    enrolledCount: realLearnerCount ?? 0,
     rating: row.course.rating / 10,
     progress,
     status: deriveCourseStatus(progress),

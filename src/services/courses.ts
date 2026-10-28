@@ -6,6 +6,7 @@ import { getDb } from "@/db";
 import {
   countLessonsForCourses,
   courseSlugExists,
+  getActiveLearnerCountsByCourse,
   getAdminCourses,
   getCourseById,
   getCourseBySlug,
@@ -61,9 +62,10 @@ export async function fetchRecommendedCoursesAction(limit = 12) {
   const profile = await (await import("@/lib/profile")).getProfileByUserId(userId);
   const userDepartmentId = profile?.department ?? undefined;
 
-  const [rows, activeIds] = await Promise.all([
+  const [rows, activeIds, learnerCounts] = await Promise.all([
     getPublishedCourses(userDepartmentId),
     getUserActiveCourseIds(userId, 24),
+    getActiveLearnerCountsByCourse(),
   ]);
 
   const busy = new Set(activeIds);
@@ -78,7 +80,9 @@ export async function fetchRecommendedCoursesAction(limit = 12) {
     })
     .slice(0, limit);
 
-  return ranked.map((row) => mapCourseToUi({ ...row, progress: 0 }, [], {}, false));
+  return ranked.map((row) =>
+    mapCourseToUi({ ...row, progress: 0 }, [], {}, false, learnerCounts.get(row.course.id) ?? 0)
+  );
 }
 
 /** Published courses for assigners (includes department_head). */
@@ -103,10 +107,11 @@ export async function fetchPublishedCoursesAction() {
   const profile = await (await import("@/lib/profile")).getProfileByUserId(userId);
   const userDepartmentId = profile?.department ?? undefined;
 
-  const [rows, prefs, completedSet] = await Promise.all([
+  const [rows, prefs, completedSet, learnerCounts] = await Promise.all([
     getPublishedCourses(userDepartmentId),
     (await import("@/services/me")).fetchMyPreferencesAction(),
     getUserCompletedLessonIdSet(userId),
+    getActiveLearnerCountsByCourse(),
   ]);
   const saved = new Set(prefs.savedCourseIds ?? []);
   const courseIds = rows.map((r) => r.course.id);
@@ -122,17 +127,24 @@ export async function fetchPublishedCoursesAction() {
     const progress =
       lessonIds.length === 0 ? 0 : Math.round((completedCount / lessonIds.length) * 100);
 
-    return mapCourseToUi({ ...row, progress }, mods, progressMap, saved.has(row.course.id));
+    return mapCourseToUi(
+      { ...row, progress },
+      mods,
+      progressMap,
+      saved.has(row.course.id),
+      learnerCounts.get(row.course.id) ?? 0
+    );
   });
 }
 
 /** Lean list for dashboard home — only courses the learner has touched. */
 export async function fetchMyActiveCoursesAction(limit = 8) {
   const userId = await requireUserId();
-  const [activeIds, prefs, completedSet] = await Promise.all([
+  const [activeIds, prefs, completedSet, learnerCounts] = await Promise.all([
     getUserActiveCourseIds(userId, limit),
     (await import("@/services/me")).fetchMyPreferencesAction(),
     getUserCompletedLessonIdSet(userId),
+    getActiveLearnerCountsByCourse(),
   ]);
   if (!activeIds.length) return [];
 
@@ -152,7 +164,13 @@ export async function fetchMyActiveCoursesAction(limit = 8) {
     const progress =
       lessonIds.length === 0 ? 0 : Math.round((completedCount / lessonIds.length) * 100);
 
-    return mapCourseToUi({ ...row, progress }, mods, progressMap, saved.has(row.course.id));
+    return mapCourseToUi(
+      { ...row, progress },
+      mods,
+      progressMap,
+      saved.has(row.course.id),
+      learnerCounts.get(row.course.id) ?? 0
+    );
   });
 }
 

@@ -7,8 +7,30 @@ import {
   lessons,
   modules,
 } from "@/db/schema";
+import { courseAssignments } from "@/db/schema/operations";
+import { profiles } from "@/db/schema/auth";
 import type { PublishStatus } from "@/db/schema/courses";
 import type { Difficulty, LearningCategory, LearningLevel } from "@/types";
+
+/**
+ * Returns a map of courseId → count of DISTINCT active learners
+ * (users with a course_assignment whose profile.status = 'active').
+ * Single query — no N+1 regardless of catalog size.
+ */
+export async function getActiveLearnerCountsByCourse(): Promise<Map<string, number>> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      courseId: courseAssignments.courseId,
+      count: sql<number>`count(distinct ${courseAssignments.userId})::int`,
+    })
+    .from(courseAssignments)
+    .innerJoin(profiles, eq(profiles.userId, courseAssignments.userId))
+    .where(eq(profiles.status, "active"))
+    .groupBy(courseAssignments.courseId);
+
+  return new Map(rows.map((r) => [r.courseId, r.count]));
+}
 
 export async function courseSlugExists(slug: string, excludeId?: string) {
   const db = getDb();
