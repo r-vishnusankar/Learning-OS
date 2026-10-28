@@ -110,19 +110,31 @@ export default function SettingsPage() {
     analyticsOptIn: true,
   });
 
+  // Track what the profile looked like when last loaded/saved so we can
+  // disable the Save button when nothing has changed.
+  const [savedProfile, setSavedProfile] = React.useState({
+    name: "",
+    designation: "",
+    dailyGoalMinutes: 45,
+  });
+
   React.useEffect(() => {
     if (!user) return;
-    setProfile({
+    const next = {
       name: user.name,
       email: user.email,
       designation: user.designation,
       department: user.department,
       level: user.level,
-    });
+    };
+    setProfile(next);
+    // Seed savedProfile name/designation from user; dailyGoalMinutes comes from prefs effect below
+    setSavedProfile((s) => ({ ...s, name: user.name, designation: user.designation }));
   }, [user]);
 
   React.useEffect(() => {
     if (!prefs) return;
+    const dailyGoal = prefs.dailyGoalMinutes ?? 45;
     setNotifications((n) => ({
       emailDigest: prefs.emailDigest ?? n.emailDigest,
       assessmentReminders: prefs.assessmentReminders ?? n.assessmentReminders,
@@ -132,7 +144,7 @@ export default function SettingsPage() {
       marketingEmails: prefs.marketingEmails ?? n.marketingEmails,
     }));
     setLearningPrefs((p) => ({
-      dailyGoalMinutes: prefs.dailyGoalMinutes ?? p.dailyGoalMinutes,
+      dailyGoalMinutes: dailyGoal,
       preferredDifficulty: prefs.preferredDifficulty ?? p.preferredDifficulty,
       autoEnrollPaths: prefs.autoEnrollPaths ?? p.autoEnrollPaths,
       showLeaderboard: prefs.showLeaderboard ?? p.showLeaderboard,
@@ -144,7 +156,13 @@ export default function SettingsPage() {
       showCertificates: prefs.showCertificates ?? p.showCertificates,
       analyticsOptIn: prefs.analyticsOptIn ?? p.analyticsOptIn,
     }));
+    setSavedProfile((s) => ({ ...s, dailyGoalMinutes: dailyGoal }));
   }, [prefs]);
+
+  const profileIsDirty =
+    profile.name !== savedProfile.name ||
+    profile.designation !== savedProfile.designation ||
+    learningPrefs.dailyGoalMinutes !== savedProfile.dailyGoalMinutes;
 
   const saveProfile = async () => {
     try {
@@ -153,6 +171,12 @@ export default function SettingsPage() {
         designation: profile.designation,
       });
       await updatePrefs.mutateAsync({
+        dailyGoalMinutes: learningPrefs.dailyGoalMinutes,
+      });
+      // Sync saved baseline so button disables again immediately
+      setSavedProfile({
+        name: profile.name,
+        designation: profile.designation,
         dailyGoalMinutes: learningPrefs.dailyGoalMinutes,
       });
       toast.success("Settings saved", { description: "Profile preferences updated successfully." });
@@ -306,7 +330,7 @@ export default function SettingsPage() {
                 <Button
                   className="gap-2"
                   onClick={() => void saveProfile()}
-                  disabled={updateProfile.isPending || updatePrefs.isPending}
+                  disabled={!profileIsDirty || updateProfile.isPending || updatePrefs.isPending}
                 >
                   <Save className="h-4 w-4" /> Save profile
                 </Button>
