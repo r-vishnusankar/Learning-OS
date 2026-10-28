@@ -41,11 +41,12 @@ export default function AdminPathsPage() {
     departmentId: "development" as DepartmentId,
     certificateTitle: "",
   });
+  const [titleError, setTitleError] = React.useState<string | null>(null);
 
   return (
     <div className="space-y-6">
       <PageHeader title="Learning Paths" description="Build career tracks that end in certification.">
-        <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setTitleError(null); }}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4" /> New path
@@ -55,17 +56,26 @@ export default function AdminPathsPage() {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
+                setTitleError(null);
+                if (!form.title.trim()) {
+                  setTitleError("Title is required.");
+                  return;
+                }
                 try {
-                  const created = await createPath.mutateAsync({
-                    title: form.title,
+                  const result = await createPath.mutateAsync({
+                    title: form.title.trim(),
                     description: form.description || "Path description",
                     departmentId: form.departmentId,
                     certificateTitle: form.certificateTitle || null,
                     skills: [],
                   });
+                  if (!result.ok) {
+                    setTitleError(result.fieldErrors?.title?.[0] ?? "Invalid input.");
+                    return;
+                  }
                   setOpen(false);
                   toast.success("Path created");
-                  router.push(`/dashboard/admin/paths/${created.id}`);
+                  router.push(`/dashboard/admin/paths/${result.id}`);
                 } catch {
                   toast.error("Failed to create path");
                 }
@@ -75,12 +85,23 @@ export default function AdminPathsPage() {
                 <DialogTitle>Create learning path</DialogTitle>
               </DialogHeader>
               <div className="space-y-3 py-4">
-                <Input
-                  placeholder="Title"
-                  value={form.title}
-                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  required
-                />
+                <div className="space-y-1">
+                  <Input
+                    placeholder="Title"
+                    value={form.title}
+                    onChange={(e) => {
+                      setTitleError(null);
+                      setForm((f) => ({ ...f, title: e.target.value }));
+                    }}
+                    aria-invalid={!!titleError}
+                    aria-describedby={titleError ? "path-title-error" : undefined}
+                  />
+                  {titleError && (
+                    <p id="path-title-error" className="text-xs text-destructive">
+                      {titleError}
+                    </p>
+                  )}
+                </div>
                 <Input
                   placeholder="Description"
                   value={form.description}

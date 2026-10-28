@@ -250,9 +250,16 @@ export async function fetchAdminPathBuilderAction(pathId: string) {
   return { path, steps };
 }
 
-export async function createPathAction(input: unknown) {
+export async function createPathAction(input: unknown): Promise<
+  | { ok: true; id: string; title: string; [key: string]: unknown }
+  | { ok: false; fieldErrors: Record<string, string[]> }
+> {
   await requireAdminOrInstructor();
-  const data = createPathSchema.parse(input);
+  const parsed = createPathSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, fieldErrors: parsed.error.flatten().fieldErrors };
+  }
+  const data = parsed.data;
   const db = getDb();
   const [created] = await db
     .insert(learningPaths)
@@ -268,7 +275,7 @@ export async function createPathAction(input: unknown) {
     })
     .returning();
   revalidatePath("/dashboard/admin/paths");
-  return created;
+  return { ok: true, ...created };
 }
 
 export async function updatePathAction(input: unknown) {

@@ -86,7 +86,11 @@ export function useCreatePath() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: createPathAction,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-paths"] }),
+    onSuccess: (data) => {
+      if (data && "ok" in data && data.ok) {
+        qc.invalidateQueries({ queryKey: ["admin-paths"] });
+      }
+    },
   });
 }
 
