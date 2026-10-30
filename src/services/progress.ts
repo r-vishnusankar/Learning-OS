@@ -135,6 +135,7 @@ export async function completeLessonAction(lessonId: string): Promise<
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/learning");
   revalidatePath("/dashboard/assessments");
+  revalidatePath("/dashboard/certificates");
 
   return { ok: true, ...result, nextLessonId, courseSlug, courseComplete, assessmentId };
 }

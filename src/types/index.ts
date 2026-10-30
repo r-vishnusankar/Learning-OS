@@ -161,6 +161,16 @@ export interface Assignment {
   maxScore: number;
 }
 
+export type CertificateRequirementStatus = "done" | "todo" | "unavailable";
+
+export interface CertificateRequirement {
+  id: string;
+  title: string;
+  type: "course" | "assessment";
+  status: CertificateRequirementStatus;
+  href: string | null;
+}
+
 export interface Certificate {
   id: string;
   title: string;
@@ -172,6 +182,10 @@ export interface Certificate {
   credentialId: string;
   score?: number;
   skills: string[];
+  assessmentId?: string;
+  courseSlug?: string;
+  takeAssessmentHref?: string;
+  requirements?: CertificateRequirement[];
 }
 
 export interface Skill {

@@ -92,8 +92,14 @@ export default function CertificateDetailPage() {
         title={cert.title}
         description={`${DEPARTMENT_LABELS[cert.department]} · ${LEVEL_LABELS[cert.level]}`}
       >
+        <div className="flex flex-wrap gap-2">
+        {cert.takeAssessmentHref && (
+          <Button asChild size="sm" className="gap-1.5">
+            <Link href={cert.takeAssessmentHref}>Take assessment</Link>
+          </Button>
+        )}
         {isEarned && (
-          <div className="flex flex-wrap gap-2">
+          <>
             <Button size="sm" variant="outline" className="gap-1.5" onClick={handleDownload}>
               <Download className="h-3.5 w-3.5" /> Download PDF
             </Button>
@@ -127,8 +133,9 @@ export default function CertificateDetailPage() {
                 <ExternalLink className="h-3.5 w-3.5" /> Verify
               </Link>
             </Button>
-          </div>
+          </>
         )}
+        </div>
       </PageHeader>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
@@ -191,7 +198,19 @@ export default function CertificateDetailPage() {
                       <>
                         <Lock className="mx-auto h-8 w-8 text-muted-foreground" />
                         <p className="mt-2 font-semibold">Certificate Locked</p>
-                        <p className="text-sm text-muted-foreground">Complete the path to unlock</p>
+                        <p className="text-sm text-muted-foreground">
+                          {cert.requirements && cert.requirements.length > 0
+                            ? `${cert.requirements.filter((r) => r.status === "done").length} of ${cert.requirements.length} requirements done`
+                            : "Complete the path to unlock"}
+                        </p>
+                      </>
+                    ) : cert.takeAssessmentHref ? (
+                      <>
+                        <Sparkles className="mx-auto h-8 w-8 text-info" />
+                        <p className="mt-2 font-semibold">Knowledge check remaining</p>
+                        <p className="text-sm text-muted-foreground">
+                          Pass the assessment to earn this certificate
+                        </p>
                       </>
                     ) : (
                       <>
@@ -261,6 +280,45 @@ export default function CertificateDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {cert.requirements && cert.requirements.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Requirements</CardTitle>
+                <CardDescription>
+                  {cert.requirements.filter((r) => r.status === "done").length} of{" "}
+                  {cert.requirements.length} done
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {cert.requirements.map((req) => {
+                  const body = (
+                    <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm transition-colors hover:bg-muted/40">
+                      {req.status === "done" ? (
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
+                      ) : (
+                        <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{req.title}</p>
+                        <p className="text-xs capitalize text-muted-foreground">
+                          {req.type}
+                          {req.status === "unavailable" ? " · unavailable" : ""}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                  return req.href ? (
+                    <Link key={req.id} href={req.href} className="block">
+                      {body}
+                    </Link>
+                  ) : (
+                    <div key={req.id}>{body}</div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

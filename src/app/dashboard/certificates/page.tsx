@@ -131,14 +131,18 @@ function CertificatePreviewCard({
             {cert.status === "locked" && (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Lock className="h-3.5 w-3.5" />
-                Complete the learning path to unlock
+                {cert.requirements && cert.requirements.length > 0
+                  ? `${cert.requirements.filter((r) => r.status === "done").length} of ${cert.requirements.length} requirements done`
+                  : "Complete the learning path to unlock"}
               </p>
             )}
 
             {cert.status === "pending" && (
               <p className="flex items-center gap-1.5 text-xs text-info">
                 <Sparkles className="h-3.5 w-3.5" />
-                Assessment in review — certificate pending
+                {cert.takeAssessmentHref
+                  ? "Pass the knowledge check to earn this certificate"
+                  : "Assessment in review — certificate pending"}
               </p>
             )}
 
@@ -190,11 +194,18 @@ function CertificatePreviewCard({
               </Button>
             </>
           ) : (
-            <Button asChild size="sm" variant="outline" className="w-full gap-1.5">
-              <Link href={`/dashboard/certificates/${cert.id}`}>
-                View details <ExternalLink className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
+            <>
+              {cert.takeAssessmentHref && (
+                <Button asChild size="sm" className="gap-1.5">
+                  <Link href={cert.takeAssessmentHref}>Take assessment</Link>
+                </Button>
+              )}
+              <Button asChild size="sm" variant="outline" className="gap-1.5">
+                <Link href={`/dashboard/certificates/${cert.id}`}>
+                  View details <ExternalLink className="h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            </>
           )}
           {isEarned && (
             <Button asChild size="sm" variant="ghost" className="ml-auto gap-1.5">
@@ -300,7 +311,7 @@ export default function CertificatesPage() {
               items={pending}
               holderName={holderName}
               emptyTitle="No pending certificates"
-              emptyDescription="Certificates awaiting review will appear here."
+              emptyDescription="When you finish a course's lessons, the knowledge check appears here until you pass it."
             />
           </TabsContent>
         </Tabs>

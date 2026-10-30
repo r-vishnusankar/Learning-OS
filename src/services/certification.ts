@@ -13,6 +13,15 @@ import {
   pathSteps,
 } from "@/db/schema/certification";
 import {
+  getCourseById,
+  getCourseProgressForUser,
+  getUserActiveCourseIds,
+} from "@/db/queries/courses";
+import { listAssignmentsForUser } from "@/db/queries/course-assignments";
+import { hasPassedAssessment } from "@/db/queries/eligibility";
+import { getAssessmentById } from "@/db/queries/assessments";
+import { courseResumePath } from "@/lib/course-progress";
+import {
   countPathSteps,
   insertCertificateForAssessmentPass,
   getCertificateByCredentialId,
@@ -37,7 +46,13 @@ import {
 import { requireAdminOrInstructor, requireUserId } from "@/lib/auth-utils";
 import { generateCredentialId } from "@/lib/credentials";
 import { getProfileByUserId } from "@/lib/profile";
-import type { Assignment, AssignmentStatus, Certificate, LearningPath } from "@/types";
+import type {
+  Assignment,
+  AssignmentStatus,
+  Certificate,
+  CertificateRequirement,
+  LearningPath,
+} from "@/types";
 import {
   createAssignmentSchema,
   createPathSchema,
@@ -618,6 +633,139 @@ export async function reviewSubmissionAction(input: unknown) {
   return updated;
 }
 
+const PENDING_COURSE_PREFIX = "pending-course-";
+const LOCKED_PATH_PREFIX = "locked-path-";
+
+async function requirementsForPath(
+  userId: string,
+  pathId: string
+): Promise<CertificateRequirement[]> {
+  const steps = await getPathSteps(pathId);
+  const items: CertificateRequirement[] = [];
+
+  for (const step of steps) {
+    if (step.stepType === "assessment" || step.assessmentId) {
+      const assessmentId = step.assessmentId;
+      if (!assessmentId) {
+        items.push({
+          id: step.id,
+          title: step.title || "Assessment",
+          type: "assessment",
+          status: "unavailable",
+          href: null,
+        });
+        continue;
+      }
+      const assessment = await getAssessmentById(assessmentId);
+      const passed = await hasPassedAssessment(userId, assessmentId);
+      const published = assessment?.publishStatus === "published";
+      items.push({
+        id: step.id,
+        title: assessment?.title || step.title || "Assessment",
+        type: "assessment",
+        status: passed ? "done" : published ? "todo" : "unavailable",
+        href: published ? `/dashboard/assessments/${assessmentId}` : null,
+      });
+      continue;
+    }
+
+    const courseId = step.courseId;
+    if (!courseId) {
+      items.push({
+        id: step.id,
+        title: step.title || "Unlinked course",
+        type: "course",
+        status: "unavailable",
+        href: null,
+      });
+      continue;
+    }
+
+    const row = await getCourseById(courseId);
+    const course = row?.course;
+    if (!course || course.publishStatus !== "published") {
+      items.push({
+        id: step.id,
+        title: course?.title || step.title || "Course",
+        type: "course",
+        status: "unavailable",
+        href: null,
+      });
+      continue;
+    }
+
+    const snap = await getCourseProgressForUser(userId, courseId);
+    items.push({
+      id: step.id,
+      title: course.title,
+      type: "course",
+      status: snap.status === "completed" ? "done" : "todo",
+      href: courseResumePath(course.slug, course.id, snap.nextAction),
+    });
+  }
+
+  return items;
+}
+
+async function pendingCourseCertificates(
+  userId: string,
+  earned: (typeof certificates.$inferSelect)[]
+): Promise<Certificate[]> {
+  const earnedAssessmentIds = new Set(
+    earned
+      .filter((c) => c.status === "earned" && c.assessmentId)
+      .map((c) => c.assessmentId as string)
+  );
+  const earnedCourseIds = new Set(
+    earned
+      .filter((c) => c.status === "earned" && c.courseId)
+      .map((c) => c.courseId as string)
+  );
+
+  const [activeIds, assignments] = await Promise.all([
+    getUserActiveCourseIds(userId, 48),
+    listAssignmentsForUser(userId),
+  ]);
+  const courseIds = [...new Set([...activeIds, ...assignments.map((a) => a.courseId)])];
+  const pending: Certificate[] = [];
+
+  for (const courseId of courseIds) {
+    if (earnedCourseIds.has(courseId)) continue;
+    const snap = await getCourseProgressForUser(userId, courseId);
+    if (snap.status !== "content_complete" || !snap.assessmentId) continue;
+    if (earnedAssessmentIds.has(snap.assessmentId)) continue;
+
+    const row = await getCourseById(courseId);
+    const course = row?.course;
+    if (!course || course.publishStatus !== "published") continue;
+
+    const href = `/dashboard/assessments/${snap.assessmentId}`;
+    pending.push({
+      id: `${PENDING_COURSE_PREFIX}${courseId}`,
+      title: `${course.title} Certificate`,
+      department: course.departmentId,
+      level: course.level,
+      status: "pending",
+      credentialId: "PENDING",
+      skills: [],
+      assessmentId: snap.assessmentId,
+      courseSlug: course.slug,
+      takeAssessmentHref: href,
+      requirements: [
+        {
+          id: snap.assessmentId,
+          title: "Knowledge check",
+          type: "assessment",
+          status: "todo",
+          href,
+        },
+      ],
+    });
+  }
+
+  return pending;
+}
+
 function mapCertificateRow(
   row: typeof certificates.$inferSelect,
   lockedFallback?: boolean
@@ -649,20 +797,27 @@ export async function fetchLearnerCertificatesAction(): Promise<Certificate[]> {
 
   // Locked opportunities: published paths with certificate titles not yet earned
   const paths = await listLearningPaths({ publishStatus: "published" });
-  const earnedPathIds = new Set(earned.map((c) => c.pathId).filter(Boolean));
-  const locked: Certificate[] = paths
-    .filter((p) => p.certificateTitle && !earnedPathIds.has(p.id))
-    .map((p) => ({
-      id: `locked-path-${p.id}`,
-      title: p.certificateTitle!,
+  const earnedPathIds = new Set(
+    earned.filter((c) => c.status === "earned").map((c) => c.pathId).filter(Boolean)
+  );
+  const locked: Certificate[] = [];
+  for (const p of paths) {
+    if (!p.certificateTitle || earnedPathIds.has(p.id)) continue;
+    const requirements = await requirementsForPath(userId, p.id);
+    locked.push({
+      id: `${LOCKED_PATH_PREFIX}${p.id}`,
+      title: p.certificateTitle,
       department: p.departmentId,
       level: p.level,
-      status: "locked" as const,
+      status: "locked",
       credentialId: "PENDING",
       skills: p.skills,
-    }));
+      requirements,
+    });
+  }
 
-  return [...mapped, ...locked];
+  const pending = await pendingCourseCertificates(userId, earned);
+  return [...mapped, ...locked, ...pending];
 }
 
 export async function fetchCertificateDetailAction(id: string): Promise<{
@@ -671,10 +826,11 @@ export async function fetchCertificateDetailAction(id: string): Promise<{
   verifyUrl: string | null;
 } | null> {
   const userId = await requireUserId();
-  if (id.startsWith("locked-path-")) {
-    const pathId = id.replace("locked-path-", "");
+  if (id.startsWith(LOCKED_PATH_PREFIX)) {
+    const pathId = id.slice(LOCKED_PATH_PREFIX.length);
     const path = await getLearningPathById(pathId);
     if (!path) return null;
+    const requirements = await requirementsForPath(userId, pathId);
     return {
       certificate: {
         id,
@@ -684,10 +840,18 @@ export async function fetchCertificateDetailAction(id: string): Promise<{
         status: "locked",
         credentialId: "PENDING",
         skills: path.skills,
+        requirements,
       },
       holderName: null,
       verifyUrl: null,
     };
+  }
+
+  if (id.startsWith(PENDING_COURSE_PREFIX)) {
+    const pending = await pendingCourseCertificates(userId, await listUserCertificates(userId));
+    const certificate = pending.find((c) => c.id === id);
+    if (!certificate) return null;
+    return { certificate, holderName: null, verifyUrl: null };
   }
 
   const row = await getCertificateById(id);
