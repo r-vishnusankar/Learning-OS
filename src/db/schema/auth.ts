@@ -112,6 +112,8 @@ export const profiles = pgTable("profile", {
   xp: integer("xp").notNull().default(0),
   coins: integer("coins").notNull().default(0),
   streak: integer("streak").notNull().default(0),
+  /** IST calendar date (YYYY-MM-DD) of last qualifying learning activity. */
+  lastActivityDate: text("last_activity_date"),
   companyRank: integer("company_rank").notNull().default(0),
   departmentRank: integer("department_rank").notNull().default(0),
   skillScore: integer("skill_score").notNull().default(0),

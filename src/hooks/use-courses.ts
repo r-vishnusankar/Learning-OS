@@ -141,6 +141,8 @@ export function useUpsertProgress() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["courses"] });
       qc.invalidateQueries({ queryKey: ["lesson"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-home"] });
+      qc.invalidateQueries({ queryKey: ["me"] });
     },
   });
 }
@@ -153,6 +155,8 @@ export function useCompleteLesson() {
       if (!data || !("ok" in data) || !data.ok) return;
       qc.invalidateQueries({ queryKey: ["courses"] });
       qc.invalidateQueries({ queryKey: ["lesson"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-home"] });
+      qc.invalidateQueries({ queryKey: ["me"] });
     },
   });
 }

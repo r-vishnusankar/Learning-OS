@@ -1,7 +1,8 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { lessonProgress, lessons } from "@/db/schema";
+import { lessonProgress, lessons, profiles } from "@/db/schema";
 import { bucketWeeklyHours } from "@/lib/ist";
+import { streakCalendarKeys } from "@/lib/streak";
 
 export async function upsertLessonProgress(input: {
   userId: string;
@@ -48,7 +49,34 @@ export async function upsertLessonProgress(input: {
       },
     });
 
+  if (completed || percentage > 0) {
+    await recordLearningActivityStreak(input.userId, now);
+  }
+
   return { percentage, completed };
+}
+
+/** Single-row UPDATE; Postgres serializes concurrent writers on the same profile. */
+export async function recordLearningActivityStreak(userId: string, now: Date = new Date()) {
+  const { todayKey, yesterdayKey } = streakCalendarKeys(now);
+  const db = getDb();
+  await db
+    .update(profiles)
+    .set({
+      streak: sql`CASE
+        WHEN ${profiles.lastActivityDate} IS NOT DISTINCT FROM ${todayKey} THEN ${profiles.streak}
+        WHEN ${profiles.lastActivityDate} IS NOT DISTINCT FROM ${yesterdayKey} THEN ${profiles.streak} + 1
+        ELSE 1
+      END`,
+      lastActivityDate: todayKey,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(profiles.userId, userId),
+        sql`${profiles.lastActivityDate} IS DISTINCT FROM ${todayKey}`
+      )
+    );
 }
 
 export async function markLessonComplete(userId: string, lessonId: string) {

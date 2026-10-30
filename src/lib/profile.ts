@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { profiles, users } from "@/db/schema";
+import { displayedStreak } from "@/lib/streak";
 import type { User } from "@/types";
 
 function todayIsoDate() {
@@ -59,7 +60,7 @@ export async function getUserWithProfile(userId: string): Promise<User | null> {
     level: profile.level,
     xp: profile.xp,
     coins: profile.coins,
-    streak: profile.streak,
+    streak: displayedStreak(profile.streak, profile.lastActivityDate),
     companyRank: profile.companyRank,
     departmentRank: profile.departmentRank,
     skillScore: profile.skillScore,

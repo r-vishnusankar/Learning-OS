@@ -29,6 +29,12 @@ export function istDateKey(date: Date): string {
   return `${p.year}-${mm}-${dd}`;
 }
 
+/** Shift a YYYY-MM-DD IST calendar key by whole days. */
+export function shiftIstDateKey(key: string, days: number): string {
+  const [year, month, day] = key.split("-").map(Number);
+  return istDateKey(new Date(Date.UTC(year, month - 1, day + days)));
+}
+
 /** UTC instant of Monday 00:00 IST for the week containing `date`. */
 export function startOfIstWeek(date: Date): Date {
   const p = toIstParts(date);

@@ -14,6 +14,7 @@ import {
   users,
   auditLogs,
 } from "@/db/schema";
+import { displayedStreak } from "@/lib/streak";
 import type { DepartmentId, UserRole } from "@/types";
 import type { EmployeeStatus } from "@/db/schema/auth";
 
@@ -38,23 +39,29 @@ export async function listUsersWithProfiles(opts?: {
       joinDate: profiles.joinDate,
       xp: profiles.xp,
       streak: profiles.streak,
+      lastActivityDate: profiles.lastActivityDate,
       level: profiles.level,
     })
     .from(users)
     .innerJoin(profiles, eq(profiles.userId, users.id))
     .orderBy(asc(users.name));
 
-  return rows.filter((row) => {
-    if (opts?.department && row.department !== opts.department) return false;
-    if (opts?.role && row.role !== opts.role) return false;
-    if (opts?.status && row.status !== opts.status) return false;
-    if (opts?.search) {
-      const q = opts.search.toLowerCase();
-      const hay = `${row.name ?? ""} ${row.email ?? ""} ${row.id} ${row.designation ?? ""} ${row.department ?? ""}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
+  return rows
+    .filter((row) => {
+      if (opts?.department && row.department !== opts.department) return false;
+      if (opts?.role && row.role !== opts.role) return false;
+      if (opts?.status && row.status !== opts.status) return false;
+      if (opts?.search) {
+        const q = opts.search.toLowerCase();
+        const hay = `${row.name ?? ""} ${row.email ?? ""} ${row.id} ${row.designation ?? ""} ${row.department ?? ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    })
+    .map(({ lastActivityDate, streak, ...row }) => ({
+      ...row,
+      streak: displayedStreak(streak, lastActivityDate),
+    }));
 }
 
 export async function listDepartments() {
@@ -125,6 +132,7 @@ export async function getAnalyticsSnapshot(scopeUserIds?: string[]) {
           .select({
             xp: profiles.xp,
             streak: profiles.streak,
+            lastActivityDate: profiles.lastActivityDate,
             status: profiles.status,
             department: profiles.department,
           })
@@ -166,7 +174,7 @@ export async function getAnalyticsSnapshot(scopeUserIds?: string[]) {
       activeUsers: profile?.status === "active" ? 1 : 0,
       totalUsers: 1,
       totalXp: profile?.xp ?? 0,
-      avgStreak: profile?.streak ?? 0,
+      avgStreak: displayedStreak(profile?.streak ?? 0, profile?.lastActivityDate),
       certificatesEarned: certRow?.count ?? 0,
       assessmentsTaken: attemptRow?.taken ?? 0,
       assessmentsPassed: attemptRow?.passed ?? 0,
@@ -189,7 +197,10 @@ export async function getAnalyticsSnapshot(scopeUserIds?: string[]) {
     scopedProfiles.length === 0
       ? 0
       : Math.round(
-          scopedProfiles.reduce((sum, p) => sum + p.streak, 0) / scopedProfiles.length
+          scopedProfiles.reduce(
+            (sum, p) => sum + displayedStreak(p.streak, p.lastActivityDate),
+            0
+          ) / scopedProfiles.length
         );
 
   const certRows = await db.select().from(certificates);
@@ -286,6 +297,7 @@ export async function getLeaderboardRows(limit = 20) {
       department: profiles.department,
       xp: profiles.xp,
       streak: profiles.streak,
+      lastActivityDate: profiles.lastActivityDate,
       companyRank: profiles.companyRank,
     })
     .from(profiles)
@@ -314,7 +326,7 @@ export async function getLeaderboardRows(limit = 20) {
       `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(row.name ?? "user")}`,
     department: row.department,
     xp: row.xp,
-    streak: row.streak,
+    streak: displayedStreak(row.streak, row.lastActivityDate),
     certificates: certMap[row.userId] ?? 0,
     badges: 0,
   }));

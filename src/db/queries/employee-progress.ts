@@ -12,6 +12,7 @@ import {
   listAssignmentsForUser,
   type LearnerAssignmentStatus,
 } from "@/db/queries/course-assignments";
+import { displayedStreak } from "@/lib/streak";
 import type { DepartmentId, LearningCategory, LearningLevel } from "@/types";
 
 export type EmployeeProgressCourse = Awaited<
@@ -271,6 +272,7 @@ export async function getEmployeeProgressDetail(
       experienceYears: profiles.experienceYears,
       xp: profiles.xp,
       streak: profiles.streak,
+      lastActivityDate: profiles.lastActivityDate,
       skillScore: profiles.skillScore,
       managerId: profiles.managerId,
     })
@@ -408,7 +410,7 @@ export async function getEmployeeProgressDetail(
       joinDate: row.joinDate,
       experienceYears: row.experienceYears,
       xp: row.xp,
-      streak: row.streak,
+      streak: displayedStreak(row.streak, row.lastActivityDate),
       skillScore: row.skillScore,
     },
     manager,
