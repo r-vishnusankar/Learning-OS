@@ -279,6 +279,12 @@ export async function fetchDepartmentsAction() {
   }));
 }
 
+export async function fetchDepartmentHubAction(departmentId: string) {
+  await requireUserId();
+  const { getDepartmentHub } = await import("@/db/queries/department-hub");
+  return getDepartmentHub(departmentId);
+}
+
 export async function createTeamAction(input: unknown) {
   const actorId = await requireManagerOrAbove();
   const data = createTeamSchema.parse(input);

@@ -9,7 +9,10 @@ import {
   profiles,
   users,
 } from "@/db/schema";
-import { courseProgress } from "@/lib/course-progress";
+import {
+  courseProgress,
+  type CourseProgressStatus,
+} from "@/lib/course-progress";
 import {
   getPassedAssessmentIds,
   getPassedAssessmentPairs,
@@ -176,10 +179,24 @@ export async function getCourseProgressMap(userId: string, courseIds: string[]) 
   return result;
 }
 
-/** Batch progress for many (user, course) pairs — used by admin console. */
-export async function getProgressMatrix(userIds: string[], courseIds: string[]) {
-  const result = new Map<string, number>();
-  if (userIds.length === 0 || courseIds.length === 0) return result;
+export type ProgressCell = {
+  percent: number;
+  status: CourseProgressStatus;
+};
+
+function emptyProgressCells(userIds: string[], courseIds: string[]): Map<string, ProgressCell> {
+  const result = new Map<string, ProgressCell>();
+  for (const userId of userIds) {
+    for (const courseId of courseIds) {
+      result.set(`${userId}:${courseId}`, { percent: 0, status: "not_started" });
+    }
+  }
+  return result;
+}
+
+/** Batch P8 percent + status for many (user, course) pairs. */
+export async function getProgressCells(userIds: string[], courseIds: string[]) {
+  if (userIds.length === 0 || courseIds.length === 0) return new Map<string, ProgressCell>();
 
   const db = getDb();
   const moduleRows = await db
@@ -188,12 +205,7 @@ export async function getProgressMatrix(userIds: string[], courseIds: string[]) 
     .where(inArray(modules.courseId, courseIds));
 
   const moduleIds = moduleRows.map((m) => m.id);
-  if (moduleIds.length === 0) {
-    for (const userId of userIds) {
-      for (const courseId of courseIds) result.set(`${userId}:${courseId}`, 0);
-    }
-    return result;
-  }
+  if (moduleIds.length === 0) return emptyProgressCells(userIds, courseIds);
 
   const lessonRows = await db
     .select({ id: lessons.id, moduleId: lessons.moduleId })
@@ -210,12 +222,7 @@ export async function getProgressMatrix(userIds: string[], courseIds: string[]) 
     lessonsByCourse.set(mod.courseId, list);
   }
 
-  if (lessonIds.length === 0) {
-    for (const userId of userIds) {
-      for (const courseId of courseIds) result.set(`${userId}:${courseId}`, 0);
-    }
-    return result;
-  }
+  if (lessonIds.length === 0) return emptyProgressCells(userIds, courseIds);
 
   const progressRows = await db
     .select({
@@ -242,28 +249,35 @@ export async function getProgressMatrix(userIds: string[], courseIds: string[]) 
     [...assessmentByCourse.values()].map((a) => a.id)
   );
 
+  const result = new Map<string, ProgressCell>();
   for (const userId of userIds) {
     const completed = completedByUser.get(userId) ?? new Set<string>();
     for (const courseId of courseIds) {
       const ids = lessonsByCourse.get(courseId) ?? [];
       const published = assessmentByCourse.get(courseId);
-      result.set(
-        `${userId}:${courseId}`,
-        courseProgress({
-          lessons: ids.map((id) => ({ id })),
-          completedLessonIds: ids.filter((id) => completed.has(id)),
-          assessment: published
-            ? {
-                id: published.id,
-                required: true,
-                passed: passedPairs.has(`${userId}:${published.id}`),
-              }
-            : null,
-        }).percent
-      );
+      const snap = courseProgress({
+        lessons: ids.map((id) => ({ id })),
+        completedLessonIds: ids.filter((id) => completed.has(id)),
+        assessment: published
+          ? {
+              id: published.id,
+              required: true,
+              passed: passedPairs.has(`${userId}:${published.id}`),
+            }
+          : null,
+      });
+      result.set(`${userId}:${courseId}`, { percent: snap.percent, status: snap.status });
     }
   }
 
+  return result;
+}
+
+/** Batch progress for many (user, course) pairs — used by admin console. */
+export async function getProgressMatrix(userIds: string[], courseIds: string[]) {
+  const cells = await getProgressCells(userIds, courseIds);
+  const result = new Map<string, number>();
+  for (const [key, cell] of cells) result.set(key, cell.percent);
   return result;
 }
 

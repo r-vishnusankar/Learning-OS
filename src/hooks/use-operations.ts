@@ -9,6 +9,7 @@ import {
   fetchAnalyticsAction,
   fetchAuditLogsAction,
   fetchDepartmentsAction,
+  fetchDepartmentHubAction,
   fetchLeaderboardAction,
   fetchNotificationsAction,
   fetchTeamsAction,
@@ -78,6 +79,14 @@ export function useDepartmentsLive() {
   return useQuery({
     queryKey: ["departments"],
     queryFn: () => fetchDepartmentsAction(),
+  });
+}
+
+export function useDepartmentHub(departmentId: string | undefined) {
+  return useQuery({
+    queryKey: ["department-hub", departmentId],
+    queryFn: () => fetchDepartmentHubAction(departmentId!),
+    enabled: Boolean(departmentId),
   });
 }
 

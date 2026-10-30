@@ -28,10 +28,9 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePublishedCourses } from "@/hooks/use-courses";
-import { useDepartmentsLive, useLeaderboardLive } from "@/hooks/use-operations";
+import { useDepartmentHub } from "@/hooks/use-operations";
 import { LEVEL_LABELS, levelsForDepartment } from "@/constants/navigation";
 import { cn, formatNumber } from "@/lib/utils";
-import { isActiveCourseStatus } from "@/lib/course-progress";
 import type { DepartmentId, LearningLevel } from "@/types";
 
 const fade = {
@@ -66,33 +65,27 @@ const levelRoadmaps: Record<LearningLevel, LevelRoadmap> = {
   hr_manager: { videos: 18, reading: 12, assignments: 8, labs: 6, assessment: "People Strategy Review", certificate: "HR Manager Credential", xp: 1500, badge: "People Visionary", unlock: "Assistant HR Manager cert + portfolio review" },
 };
 
+function dashOrNumber(value: number | null | undefined): string {
+  if (value == null) return "—";
+  return String(value);
+}
+
 export default function DepartmentDetailPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
-  const { data: departments = [], isLoading: deptsLoading } = useDepartmentsLive();
-  const { data: leaderboard = [], isLoading: lbLoading } = useLeaderboardLive();
+  const { data: hub, isLoading: hubLoading } = useDepartmentHub(id);
   const { data: allCourses = [], isLoading: coursesLoading } = usePublishedCourses();
 
-  const department = departments.find((d) => d.id === id);
-
+  const department = hub ?? null;
+  const courseIdSet = useMemo(() => new Set(hub?.courseIds ?? []), [hub?.courseIds]);
   const deptCourses = useMemo(
-    () => (department ? allCourses.filter((c) => c.department === department.id) : []),
-    [department, allCourses]
+    () => allCourses.filter((c) => courseIdSet.has(c.id)),
+    [allCourses, courseIdSet]
   );
+  const topPerformers = hub?.topPerformers ?? [];
 
-  const topPerformers = useMemo(
-    () =>
-      department
-        ? leaderboard
-            .filter((e) => e.department === department.id)
-            .sort((a, b) => b.xp - a.xp)
-            .slice(0, 5)
-        : [],
-    [department, leaderboard]
-  );
-
-  if (deptsLoading || lbLoading || coursesLoading) {
+  if (hubLoading || coursesLoading) {
     return (
       <div className="space-y-6">
         <PageHeader title="Department" description="Loading department hub…" />
@@ -116,8 +109,6 @@ export default function DepartmentDetailPage() {
     );
   }
 
-  const completedCourses = deptCourses.filter((c) => c.status === "completed").length;
-  const inProgressCourses = deptCourses.filter((c) => isActiveCourseStatus(c.status)).length;
   const deptLevels = levelsForDepartment(department.id as DepartmentId);
   const firstLabel = LEVEL_LABELS[deptLevels[0]!];
   const lastLabel = LEVEL_LABELS[deptLevels[deptLevels.length - 1]!];
@@ -141,7 +132,7 @@ export default function DepartmentDetailPage() {
             { label: "Employees", value: department.employeeCount, icon: Users },
             { label: "Courses", value: department.courseCount, icon: BookOpen },
             { label: "Avg completion", value: `${department.avgCompletion}%`, icon: CheckCircle2 },
-            { label: "Active learners", value: Math.round(department.employeeCount * 0.72), icon: Trophy },
+            { label: "Active learners", value: department.activeLearners, icon: Trophy },
           ].map((stat) => (
             <div key={stat.label} className="flex items-center gap-3">
               <div
@@ -161,9 +152,27 @@ export default function DepartmentDetailPage() {
 
       <motion.section {...fade} transition={{ delay: 0.05 }} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Dept Completion" value={`${department.avgCompletion}%`} icon={CheckCircle2} accent="primary" />
-        <StatCard title="Available Courses" value={deptCourses.length || department.courseCount} icon={BookOpen} subtitle={`${inProgressCourses} in progress`} accent="info" />
-        <StatCard title="Completed" value={completedCourses} icon={Award} subtitle="By current user" accent="warning" />
-        <StatCard title="Top XP" value={formatNumber(topPerformers[0]?.xp ?? 0)} icon={Trophy} subtitle={topPerformers[0]?.name.split(" ")[0] ?? "—"} accent="success" />
+        <StatCard
+          title="Available Courses"
+          value={department.courseCount}
+          icon={BookOpen}
+          subtitle={`${department.inProgressCount} in progress`}
+          accent="info"
+        />
+        <StatCard
+          title="Completed"
+          value={department.completedCount}
+          icon={Award}
+          subtitle="Across the department"
+          accent="warning"
+        />
+        <StatCard
+          title="Top XP"
+          value={topPerformers[0] ? formatNumber(topPerformers[0].xp) : "—"}
+          icon={Trophy}
+          subtitle={topPerformers[0]?.name.split(" ")[0] ?? "—"}
+          accent="success"
+        />
       </motion.section>
 
       <motion.section {...fade} transition={{ delay: 0.1 }}>
@@ -326,21 +335,39 @@ export default function DepartmentDetailPage() {
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {[
-                { label: "Enrollment rate", value: 84, color: department.color },
-                { label: "Course completion", value: department.avgCompletion, color: "#059669" },
-                { label: "Assessment pass rate", value: 76, color: "#0284C7" },
-                { label: "Avg weekly hours", value: 4.2, isHours: true, color: "#D97706" },
+                {
+                  label: "Enrollment rate",
+                  value: department.enrollmentRatePct,
+                  color: department.color,
+                },
+                {
+                  label: "Course completion",
+                  value: department.avgCompletion,
+                  color: "#059669",
+                },
+                {
+                  label: "Assessment pass rate",
+                  value: department.assessmentPassRatePct,
+                  color: "#0284C7",
+                },
+                {
+                  label: "Avg weekly hours",
+                  value: department.avgWeeklyHours,
+                  isHours: true,
+                  color: "#D97706",
+                },
               ].map((metric) => (
                 <div key={metric.label} className="rounded-xl border border-border p-4">
                   <p className="text-xs text-muted-foreground">{metric.label}</p>
                   <p className="mt-1 font-display text-2xl font-semibold">
-                    {metric.isHours ? `${metric.value}h` : `${metric.value}%`}
+                    {metric.value == null
+                      ? "—"
+                      : metric.isHours
+                        ? `${metric.value}h`
+                        : `${metric.value}%`}
                   </p>
-                  {!metric.isHours && <Progress value={metric.value as number} className="mt-3 h-2" />}
-                  {metric.isHours && (
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full" style={{ width: `${(metric.value / 8) * 100}%`, backgroundColor: metric.color }} />
-                    </div>
+                  {metric.value != null && !metric.isHours && (
+                    <Progress value={metric.value} className="mt-3 h-2" />
                   )}
                 </div>
               ))}
@@ -348,13 +375,13 @@ export default function DepartmentDetailPage() {
 
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               {[
-                { label: "Certificates issued", value: Math.round(department.employeeCount * 0.35) },
-                { label: "Active streaks", value: Math.round(department.employeeCount * 0.48) },
-                { label: "Mentor sessions", value: Math.round(department.employeeCount * 0.12) },
+                { label: "Certificates issued", value: department.certificatesIssued },
+                { label: "Active streaks", value: department.activeStreaks },
+                { label: "Mentor sessions", value: null as number | null },
               ].map((item) => (
                 <div key={item.label} className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
                   <span className="text-sm text-muted-foreground">{item.label}</span>
-                  <span className="font-semibold">{item.value}</span>
+                  <span className="font-semibold">{dashOrNumber(item.value)}</span>
                 </div>
               ))}
             </div>
