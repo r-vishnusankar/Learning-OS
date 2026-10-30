@@ -118,3 +118,19 @@ export function courseCtaLabel(status: string | null | undefined): string {
   if (status === "in_progress") return "Continue";
   return "Start course";
 }
+
+export type RemainingLessonTime =
+  | { kind: "done" }
+  | { kind: "unknown" }
+  | { kind: "hours"; hours: number };
+
+/** Remaining time from incomplete lesson durations. 0-minute lessons are unknown, not 0h. */
+export function remainingLessonTime(
+  lessons: { completed?: boolean; durationMinutes?: number | null }[]
+): RemainingLessonTime {
+  const incomplete = (lessons ?? []).filter((l) => !l.completed);
+  if (incomplete.length === 0) return { kind: "done" };
+  const minutes = incomplete.reduce((sum, l) => sum + (l.durationMinutes ?? 0), 0);
+  if (minutes <= 0) return { kind: "unknown" };
+  return { kind: "hours", hours: minutes / 60 };
+}

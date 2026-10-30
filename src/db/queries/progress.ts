@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { lessonProgress } from "@/db/schema";
+import { lessonProgress, lessons } from "@/db/schema";
+import { bucketWeeklyHours } from "@/lib/ist";
 
 export async function upsertLessonProgress(input: {
   userId: string;
@@ -52,4 +53,30 @@ export async function upsertLessonProgress(input: {
 
 export async function markLessonComplete(userId: string, lessonId: string) {
   return upsertLessonProgress({ userId, lessonId, percentage: 100, completed: true });
+}
+
+export async function getLearnerTimeStats(userId: string) {
+  const db = getDb();
+  const rows = await db
+    .select({
+      durationMinutes: lessons.durationMinutes,
+      completedAt: lessonProgress.completedAt,
+    })
+    .from(lessonProgress)
+    .innerJoin(lessons, eq(lessons.id, lessonProgress.lessonId))
+    .where(and(eq(lessonProgress.userId, userId), eq(lessonProgress.completed, true)));
+
+  const completions = rows.map((row) => ({
+    completedAt: row.completedAt,
+    durationMinutes: row.durationMinutes ?? 0,
+  }));
+  const learnedMinutes = completions.reduce((sum, row) => sum + row.durationMinutes, 0);
+  const weekly = bucketWeeklyHours(completions, new Date());
+
+  return {
+    learnedMinutes,
+    todayLearnedMinutes: weekly.todayMinutes,
+    weeklyHours: weekly.hours,
+    weeklyCompletedLessons: weekly.completedCount,
+  };
 }

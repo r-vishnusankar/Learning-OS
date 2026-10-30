@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
 import { profiles, users } from "@/db/schema";
 import { getAnalyticsSnapshot, getLeaderboardRows } from "@/db/queries/operations";
+import { getLearnerTimeStats } from "@/db/queries/progress";
 import { requireUserId } from "@/lib/auth-utils";
 import { getUserWithProfile } from "@/lib/profile";
 import type { DepartmentId, Skill, User } from "@/types";
@@ -125,11 +126,12 @@ export async function toggleSavedCourseAction(courseId: string) {
 
 export async function fetchDashboardHomeAction() {
   const userId = await requireUserId();
-  const [user, snapshot, leaderboard, prefs] = await Promise.all([
+  const [user, snapshot, leaderboard, prefs, time] = await Promise.all([
     getUserWithProfile(userId),
     getAnalyticsSnapshot([userId]),
     getLeaderboardRows(8),
     fetchMyPreferencesAction(),
+    getLearnerTimeStats(userId),
   ]);
   const myRank = leaderboard.find((e) => e.userId === userId)?.rank ?? user?.companyRank ?? 0;
 
@@ -137,19 +139,12 @@ export async function fetchDashboardHomeAction() {
     ? Math.max(1, Math.round(snapshot.completedLessons / 8))
     : 0;
 
-  // Derive weekly hours from lesson completions (fallback distribution)
-  const totalHours = Math.max(1, Math.round(snapshot.completedLessons * 0.35) || Math.round((user?.xp ?? 0) / 120));
-  const weeklyHours = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label, i) => ({
-    label,
-    value: Math.max(0, Math.round((totalHours / 7) * (i < 5 ? 1.2 : 0.6) * (0.7 + ((i * 17) % 5) / 10))),
-  }));
-
   return {
     user,
     prefs,
     stats: {
       coursesCompleted: Math.max(coursesCompleted, snapshot.certificatesEarned > 0 ? 1 : 0),
-      hoursLearned: totalHours,
+      hoursLearned: time.learnedMinutes / 60,
       certificates: snapshot.certificatesEarned,
       averageScore: snapshot.avgAssessmentScore || 0,
       streak: user?.streak ?? 0,
@@ -157,12 +152,10 @@ export async function fetchDashboardHomeAction() {
       departmentRank: user?.departmentRank || 0,
       skillScore: user?.skillScore || Math.min(100, Math.round((user?.xp ?? 0) / 50)),
       todayGoalMinutes: prefs.dailyGoalMinutes ?? 45,
-      todayCompletedMinutes: Math.min(
-        prefs.dailyGoalMinutes ?? 45,
-        Math.round(((snapshot.completedLessons % 5) + 1) * 12)
-      ),
+      todayCompletedMinutes: time.todayLearnedMinutes,
     },
-    weeklyHours,
+    weeklyHours: time.weeklyHours,
+    weeklyCompletedLessons: time.weeklyCompletedLessons,
     leaderboard,
   };
 }

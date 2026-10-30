@@ -3,6 +3,7 @@ import {
   courseProgress,
   courseResumePath,
   isActiveCourseStatus,
+  remainingLessonTime,
 } from "../src/lib/course-progress";
 
 function assert(condition: boolean, message: string): void {
@@ -118,6 +119,40 @@ function run(): void {
       "/dashboard/courses/git/lessons/l3",
     "resume path for next lesson"
   );
+
+  const remainingDone = remainingLessonTime([
+    { completed: true, durationMinutes: 20 },
+    { completed: true, durationMinutes: 10 },
+  ]);
+  assert(remainingDone.kind === "done", "all lessons complete → Completed");
+
+  const remainingUnknown = remainingLessonTime([
+    { completed: true, durationMinutes: 20 },
+    { completed: false, durationMinutes: 0 },
+  ]);
+  assert(remainingUnknown.kind === "unknown", "incomplete 0-minute lessons → unknown");
+
+  const remainingHours = remainingLessonTime([
+    { completed: true, durationMinutes: 20 },
+    { completed: false, durationMinutes: 15 },
+    { completed: false, durationMinutes: 15 },
+  ]);
+  assert(remainingHours.kind === "hours", "incomplete with duration → hours");
+  if (remainingHours.kind === "hours") {
+    assert(remainingHours.hours === 0.5, "15+15 minutes = 0.5h remaining");
+  }
+
+  const remainingPartialUnknown = remainingLessonTime([
+    { completed: false, durationMinutes: 0 },
+    { completed: false, durationMinutes: 12 },
+  ]);
+  assert(
+    remainingPartialUnknown.kind === "hours" && remainingPartialUnknown.hours === 0.2,
+    "sum known incomplete minutes; 0-minute lessons do not force unknown"
+  );
+
+  const remainingEmpty = remainingLessonTime([]);
+  assert(remainingEmpty.kind === "done", "no lessons → done");
 }
 
 run();

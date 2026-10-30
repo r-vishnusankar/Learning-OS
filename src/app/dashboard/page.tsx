@@ -26,10 +26,11 @@ import { useDashboardHome } from "@/hooks/use-me";
 import { useMyAssignmentStats, useMyCourseAssignments } from "@/hooks/use-course-assignments";
 import { useMyEligibility } from "@/hooks/use-promotions";
 import { DEPARTMENT_LABELS, LEVEL_LABELS, nextCareerLevel, normalizeCareerLevel } from "@/constants/navigation";
-import { cn, formatHours, formatNumber } from "@/lib/utils";
+import { cn, formatHours, formatNumber, formatTrackedHours } from "@/lib/utils";
 import {
   courseCtaLabel,
   courseResumePath,
+  remainingLessonTime,
   isActiveCourseStatus,
 } from "@/lib/course-progress";
 import type { Course, LearningLevel } from "@/types";
@@ -296,19 +297,16 @@ export default function DashboardPage() {
           }`
         : "/dashboard/learning";
 
-  const remainingHours =
-    continueCourse && continueCourse.progress < 100
-      ? Math.max(
-          0.5,
-          Math.round(
-            ((continueCourse.durationHours ?? 0) * (100 - continueCourse.progress)) / 100 * 10
-          ) / 10
-        )
-      : null;
-
   const continueLessons = continueCourse?.modules.flatMap((m) => m.lessons) ?? [];
   const lessonsTotal = continueLessons.length;
   const lessonsDone = continueLessons.filter((l) => l.completed).length;
+  const remaining = remainingLessonTime(continueLessons);
+  const remainingLabel =
+    remaining.kind === "done"
+      ? "Completed"
+      : remaining.kind === "unknown"
+        ? "—"
+        : `${formatHours(remaining.hours)} remaining`;
 
   const weekHours = home.weeklyHours ?? [];
   const weekTotal = weekHours.reduce((sum, p) => sum + (p.value ?? 0), 0);
@@ -318,8 +316,7 @@ export default function DashboardPage() {
     Math.round((((stats.todayGoalMinutes ?? 45) * 5) / 60) * 10) / 10
   );
   const activeDays = weekHours.filter((p) => (p.value ?? 0) > 0).length;
-  const completedActivities =
-    weekTotal > 0 ? Math.max(1, Math.round(weekTotal * 2)) : 0;
+  const completedActivities = home.weeklyCompletedLessons ?? 0;
 
   const nextDue = dueItems[0];
   const dueSummaryCount =
@@ -451,7 +448,9 @@ export default function DashboardPage() {
           <span className="font-medium text-foreground">{LEVEL_LABELS[level] ?? level}</span>
           <span aria-hidden>·</span>
           <span>
-            <span className="font-semibold tabular-nums text-foreground">{stats.hoursLearned}h</span>{" "}
+            <span className="font-semibold tabular-nums text-foreground">
+              {formatTrackedHours(stats.hoursLearned)}
+            </span>{" "}
             learned
           </span>
           <span aria-hidden>·</span>
@@ -557,7 +556,7 @@ export default function DashboardPage() {
                     </div>
                     <Progress value={continueCourse.progress} className="h-1.5" />
                     <p className="text-xs text-muted-foreground">
-                      {remainingHours != null ? `~${remainingHours}h remaining` : "In progress"}
+                      {remainingLabel}
                       {continueCourse.lastAccessed
                         ? ` · Last activity ${new Date(
                             continueCourse.lastAccessed
@@ -769,7 +768,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <p className="text-sm font-semibold tabular-nums tracking-tight">
-                  {weekTotal.toFixed(1)}h
+                  {formatTrackedHours(weekTotal)}
                   <span className="font-normal text-muted-foreground">
                     {" "}
                     / {weeklyGoalHours}h
@@ -793,7 +792,7 @@ export default function DashboardPage() {
                 <div
                   key={point.label}
                   className="flex min-w-0 flex-1 flex-col items-center gap-1"
-                  title={`${point.label}: ${point.value ?? 0}h`}
+                  title={`${point.label}: ${formatTrackedHours(point.value ?? 0)}`}
                 >
                   <div
                     className={cn(

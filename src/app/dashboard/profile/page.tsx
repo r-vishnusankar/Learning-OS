@@ -29,7 +29,7 @@ import { DEPARTMENT_LABELS, LEVEL_LABELS } from "@/constants/navigation";
 import { useLearnerCertificates } from "@/hooks/use-certification";
 import { usePublishedCourses } from "@/hooks/use-courses";
 import { useCurrentUser, useDashboardHome, useMySkills } from "@/hooks/use-me";
-import { cn, formatNumber } from "@/lib/utils";
+import { cn, formatNumber, formatTrackedHours } from "@/lib/utils";
 import { isActiveCourseStatus } from "@/lib/course-progress";
 import { formatDistanceToNow } from "date-fns";
 
@@ -165,9 +165,9 @@ export default function ProfilePage() {
         <StatCard title="Courses in progress" value={inProgressCourses.length} icon={BookOpen} />
         <StatCard
           title="Hours Learned"
-          value={stats?.hoursLearned ?? 0}
+          value={formatTrackedHours(stats?.hoursLearned ?? 0)}
           icon={TrendingUp}
-          subtitle="Estimated"
+          subtitle="Completed lessons"
         />
         <StatCard
           title="Certificates"

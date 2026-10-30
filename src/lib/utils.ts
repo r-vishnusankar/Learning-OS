@@ -21,6 +21,12 @@ export function formatHours(n: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
+/** Tracked time: 0 means none learned, not unknown duration. */
+export function formatTrackedHours(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return "0h";
+  return formatHours(n);
+}
+
 /** True for in-progress assessment attempt routes: /dashboard/assessments/:id/attempt/:attemptId */
 export function isExamRoute(pathname: string | null) {
   if (!pathname) return false;
