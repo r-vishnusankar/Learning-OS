@@ -19,6 +19,7 @@ import { getCourseById } from "@/db/queries/courses";
 import { assessmentAttempts, assessments, questions } from "@/db/schema";
 import { courses } from "@/db/schema/courses";
 import { unansweredQuestionNumbers } from "@/lib/assessment-answers";
+import { isGenericPrompt } from "@/lib/generic-question";
 import { requireAdminOrInstructor, requireUserId } from "@/lib/auth-utils";
 import type { Assessment, AssessmentStatus } from "@/types";
 import type { CodingCheck } from "@/types/coding";
@@ -118,10 +119,22 @@ export async function fetchAdminAssessmentsAction() {
           .where(inArray(courses.id, courseIds))
       : [];
   const titleById = new Map(courseRows.map((c) => [c.id, c.title]));
+  const promptRows = await db
+    .select({ assessmentId: questions.assessmentId, prompt: questions.prompt })
+    .from(questions);
+  const genericByAssessment = new Map<string, number>();
+  for (const q of promptRows) {
+    if (!isGenericPrompt(q.prompt)) continue;
+    genericByAssessment.set(
+      q.assessmentId,
+      (genericByAssessment.get(q.assessmentId) ?? 0) + 1
+    );
+  }
   return Promise.all(
     rows.map(async (row) => ({
       ...row,
       questionsCount: await countQuestions(row.id),
+      genericQuestionCount: genericByAssessment.get(row.id) ?? 0,
       courseTitle: row.courseId ? (titleById.get(row.courseId) ?? null) : null,
     }))
   );
@@ -489,7 +502,7 @@ export async function submitAttemptAction(input: unknown): Promise<
   }
 
   const graded = await gradeInProgressAttempt(data.attemptId, data.answers);
-  const { assessment, result, questions: qs } = graded;
+  const { result, questions: qs } = graded;
 
   if (!graded.wrote) {
     const current = graded.attempt;

@@ -28,6 +28,7 @@ import { useAdminCourseOptions } from "@/hooks/use-certification";
 import type { QuestionType } from "@/db/schema/assessments";
 import { CodingAnswerEditor } from "@/components/assessments/coding-answer-editor";
 import { DEFAULT_CODING_CHECKS } from "@/lib/coding-checks";
+import { isGenericPrompt } from "@/lib/generic-question";
 import type { CodingCheck, CodingLanguage, QuestionMeta } from "@/types/coding";
 
 const QUESTION_TYPES: { value: QuestionType; label: string }[] = [
@@ -310,6 +311,7 @@ export default function AssessmentBuilderPage() {
   }
 
   const { assessment, questions } = data;
+  const genericCount = questions.filter((q) => isGenericPrompt(q.prompt)).length;
 
   return (
     <div className="space-y-6">
@@ -332,6 +334,20 @@ export default function AssessmentBuilderPage() {
           </Button>
         </div>
       </PageHeader>
+
+      {genericCount > 0 && (
+        <Card>
+          <CardContent className="py-4 text-sm">
+            <p className="font-medium">Template question bank</p>
+            <p className="mt-1 text-muted-foreground">
+              {genericCount} of {questions.length} questions match the seeded title
+              template. Rewrite each one for this course in the form above. Edit in
+              place so question ids stay (attempts reference them). Do not delete
+              questions that may have attempts.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -628,6 +644,7 @@ export default function AssessmentBuilderPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-xs text-muted-foreground">Q{index + 1}</p>
                   <Badge variant="secondary">{TYPE_LABEL[q.type as QuestionType] ?? q.type}</Badge>
+                  {isGenericPrompt(q.prompt) && <Badge variant="warning">Template</Badge>}
                   <span className="text-xs text-muted-foreground">
                     {q.points} pts · {q.difficulty}
                   </span>

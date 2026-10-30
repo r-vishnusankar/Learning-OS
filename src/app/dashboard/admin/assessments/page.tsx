@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Edit, Plus, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -176,6 +177,9 @@ export default function AdminAssessmentsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-semibold">{item.title}</p>
                     <StatusBadge status={item.publishStatus} />
+                    {item.genericQuestionCount > 0 && (
+                      <Badge variant="warning">Template</Badge>
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {DEPARTMENT_LABELS[item.departmentId]}
