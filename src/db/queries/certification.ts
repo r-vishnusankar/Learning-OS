@@ -58,6 +58,37 @@ export async function listUserPathEnrollments(userId: string) {
   return db.select().from(pathEnrollments).where(eq(pathEnrollments.userId, userId));
 }
 
+export async function listPublishedPathsByCourseIds(courseIds: string[]) {
+  const result = new Map<string, { id: string; title: string }[]>();
+  if (courseIds.length === 0) return result;
+  const db = getDb();
+  const rows = await db
+    .select({
+      courseId: pathSteps.courseId,
+      pathId: learningPaths.id,
+      title: learningPaths.title,
+    })
+    .from(pathSteps)
+    .innerJoin(learningPaths, eq(pathSteps.pathId, learningPaths.id))
+    .where(
+      and(
+        inArray(pathSteps.courseId, courseIds),
+        eq(learningPaths.publishStatus, "published")
+      )
+    )
+    .orderBy(asc(learningPaths.title));
+
+  for (const row of rows) {
+    if (!row.courseId) continue;
+    const list = result.get(row.courseId) ?? [];
+    if (!list.some((p) => p.id === row.pathId)) {
+      list.push({ id: row.pathId, title: row.title });
+    }
+    result.set(row.courseId, list);
+  }
+  return result;
+}
+
 export async function countPathSteps(pathId: string) {
   const db = getDb();
   const [row] = await db

@@ -16,12 +16,14 @@ import {
   fetchAdminPathsAction,
   fetchAssignmentDetailAction,
   fetchCertificateDetailAction,
+  fetchAssessmentsForAdminSelectAction,
   fetchCoursesForAdminSelectAction,
   fetchLearnerAssignmentsAction,
   fetchLearnerCertificatesAction,
   fetchLearnerPathsAction,
   fetchPathDetailAction,
   reissueCertificateAction,
+  reorderPathStepsAction,
   reviewSubmissionAction,
   revokeCertificateAction,
   submitAssignmentAction,
@@ -117,9 +119,12 @@ export function useUpsertPathStep() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: upsertPathStepAction,
-    onSuccess: (_d, vars) => {
+    onSuccess: (data, vars) => {
+      if (data && "ok" in data && !data.ok) return;
       const pathId = (vars as { pathId: string }).pathId;
       qc.invalidateQueries({ queryKey: ["admin-path-builder", pathId] });
+      qc.invalidateQueries({ queryKey: ["paths"] });
+      qc.invalidateQueries({ queryKey: ["courses"] });
     },
   });
 }
@@ -128,7 +133,23 @@ export function useDeletePathStep() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: deletePathStepAction,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-path-builder"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-path-builder"] });
+      qc.invalidateQueries({ queryKey: ["paths"] });
+      qc.invalidateQueries({ queryKey: ["courses"] });
+    },
+  });
+}
+
+export function useReorderPathSteps() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: reorderPathStepsAction,
+    onSuccess: (_d, vars) => {
+      const pathId = (vars as { pathId: string }).pathId;
+      qc.invalidateQueries({ queryKey: ["admin-path-builder", pathId] });
+      qc.invalidateQueries({ queryKey: ["paths", pathId] });
+    },
   });
 }
 
@@ -269,5 +290,12 @@ export function useAdminCourseOptions() {
   return useQuery({
     queryKey: ["admin-course-options"],
     queryFn: () => fetchCoursesForAdminSelectAction(),
+  });
+}
+
+export function useAdminAssessmentOptions() {
+  return useQuery({
+    queryKey: ["admin-assessment-options"],
+    queryFn: () => fetchAssessmentsForAdminSelectAction(),
   });
 }

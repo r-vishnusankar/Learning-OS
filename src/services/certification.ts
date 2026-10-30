@@ -17,10 +17,11 @@ import {
   getCourseProgressForUser,
   getUserActiveCourseIds,
 } from "@/db/queries/courses";
-import { listAssignmentsForUser } from "@/db/queries/course-assignments";
+import { getProgressCells, listAssignmentsForUser } from "@/db/queries/course-assignments";
 import { hasPassedAssessment } from "@/db/queries/eligibility";
-import { getAssessmentById } from "@/db/queries/assessments";
+import { getAssessmentById, listAssessments } from "@/db/queries/assessments";
 import { courseResumePath } from "@/lib/course-progress";
+import { presentPathStep } from "@/lib/path-step";
 import {
   countPathSteps,
   insertCertificateForAssessmentPass,
@@ -40,6 +41,7 @@ import {
   listSubmissionsForAssignment,
   listUserCertificates,
   listUserPathEnrollments,
+  listPublishedPathsByCourseIds,
   listVisibleHomeworkForUser,
   replaceAssignmentAssignees,
 } from "@/db/queries/certification";
@@ -142,21 +144,54 @@ export async function fetchPathDetailAction(pathId: string) {
   const courseIds = steps
     .map((s) => s.courseId)
     .filter((id): id is string => Boolean(id));
+  const assessmentIds = steps
+    .map((s) => s.assessmentId)
+    .filter((id): id is string => Boolean(id));
   const courseRows =
     courseIds.length > 0
       ? await db
-          .select({ id: courses.id, slug: courses.slug, title: courses.title })
+          .select({
+            id: courses.id,
+            slug: courses.slug,
+            title: courses.title,
+            publishStatus: courses.publishStatus,
+          })
           .from(courses)
           .where(inArray(courses.id, courseIds))
       : [];
   const courseById = new Map(courseRows.map((c) => [c.id, c]));
+  const assessmentRows =
+    assessmentIds.length > 0
+      ? await Promise.all(assessmentIds.map((id) => getAssessmentById(id)))
+      : [];
+  const assessmentById = new Map(
+    assessmentRows.filter(Boolean).map((a) => [a!.id, a!])
+  );
+  const progressCells = await getProgressCells([userId], courseIds);
 
   const enrichedSteps = steps.map((step) => {
-    const course = step.courseId ? courseById.get(step.courseId) : undefined;
+    const course = step.courseId ? courseById.get(step.courseId) ?? null : null;
+    const assessment = step.assessmentId
+      ? assessmentById.get(step.assessmentId) ?? null
+      : null;
+    const presented = presentPathStep({
+      title: step.title,
+      stepType: step.stepType,
+      courseId: step.courseId,
+      assessmentId: step.assessmentId,
+      course,
+      assessment,
+    });
+    const cell = step.courseId ? progressCells.get(`${userId}:${step.courseId}`) : undefined;
     return {
       ...step,
-      courseSlug: course?.slug ?? null,
-      courseTitle: course?.title ?? null,
+      courseSlug: presented.cta === "open_course" ? course?.slug ?? null : null,
+      courseTitle: presented.title,
+      href: presented.href,
+      cta: presented.cta,
+      linked: presented.linked,
+      progressStatus: cell?.status ?? null,
+      progressPercent: cell?.percent ?? null,
     };
   });
 
@@ -262,7 +297,51 @@ export async function fetchAdminPathBuilderAction(pathId: string) {
   const path = await getLearningPathById(pathId);
   if (!path) return null;
   const steps = await getPathSteps(pathId);
-  return { path, steps };
+  const db = getDb();
+  const courseIds = steps
+    .map((s) => s.courseId)
+    .filter((id): id is string => Boolean(id));
+  const assessmentIds = steps
+    .map((s) => s.assessmentId)
+    .filter((id): id is string => Boolean(id));
+  const courseRows =
+    courseIds.length > 0
+      ? await db
+          .select({
+            id: courses.id,
+            title: courses.title,
+            publishStatus: courses.publishStatus,
+          })
+          .from(courses)
+          .where(inArray(courses.id, courseIds))
+      : [];
+  const courseById = new Map(courseRows.map((c) => [c.id, c]));
+  const assessmentRows =
+    assessmentIds.length > 0
+      ? await Promise.all(assessmentIds.map((id) => getAssessmentById(id)))
+      : [];
+  const assessmentById = new Map(
+    assessmentRows.filter(Boolean).map((a) => [a!.id, a!])
+  );
+
+  return {
+    path,
+    steps: steps.map((step) => {
+      const course = step.courseId ? courseById.get(step.courseId) : undefined;
+      const assessment = step.assessmentId
+        ? assessmentById.get(step.assessmentId)
+        : undefined;
+      return {
+        ...step,
+        linkedTitle: course?.title || assessment?.title || step.title,
+        linked: Boolean(step.courseId || step.assessmentId),
+        targetPublished:
+          step.stepType === "assessment"
+            ? assessment?.publishStatus === "published"
+            : course?.publishStatus === "published",
+      };
+    }),
+  };
 }
 
 export async function createPathAction(input: unknown): Promise<
@@ -316,45 +395,80 @@ export async function deletePathAction(pathId: string) {
   return { ok: true };
 }
 
-export async function upsertPathStepAction(input: unknown) {
+export async function upsertPathStepAction(input: unknown): Promise<
+  | { ok: true }
+  | { ok: false; code: "not_found" | "unpublished"; message: string }
+> {
   await requireAdminOrInstructor();
   const data = upsertPathStepSchema.parse(input);
   const db = getDb();
 
-  if (data.id) {
-    const [updated] = await db
-      .update(pathSteps)
-      .set({
-        title: data.title,
-        stepType: data.stepType,
-        courseId: data.courseId ?? null,
-        assessmentId: data.assessmentId ?? null,
-        orderIndex: data.orderIndex ?? 0,
-      })
-      .where(eq(pathSteps.id, data.id))
-      .returning();
-    return updated;
+  let title = data.title.trim();
+  let stepType = data.stepType;
+  let courseId = data.courseId ?? null;
+  let assessmentId = data.assessmentId ?? null;
+
+  if (courseId) {
+    const row = await getCourseById(courseId);
+    if (!row) {
+      return { ok: false, code: "not_found", message: "Course not found." };
+    }
+    if (row.course.publishStatus !== "published") {
+      return { ok: false, code: "unpublished", message: "Pick a published course." };
+    }
+    title = row.course.title;
+    stepType = "course";
+    assessmentId = null;
+  } else if (assessmentId) {
+    const assessment = await getAssessmentById(assessmentId);
+    if (!assessment) {
+      return { ok: false, code: "not_found", message: "Assessment not found." };
+    }
+    if (assessment.publishStatus !== "published") {
+      return { ok: false, code: "unpublished", message: "Pick a published assessment." };
+    }
+    title = assessment.title;
+    stepType = "assessment";
+    courseId = null;
   }
 
-  const existing = await getPathSteps(data.pathId);
-  const [created] = await db
-    .insert(pathSteps)
-    .values({
+  if (data.id) {
+    await db
+      .update(pathSteps)
+      .set({
+        title,
+        stepType,
+        courseId,
+        assessmentId,
+        ...(data.orderIndex !== undefined ? { orderIndex: data.orderIndex } : {}),
+      })
+      .where(eq(pathSteps.id, data.id));
+  } else {
+    const existing = await getPathSteps(data.pathId);
+    await db.insert(pathSteps).values({
       pathId: data.pathId,
-      title: data.title,
-      stepType: data.stepType,
-      courseId: data.courseId ?? null,
-      assessmentId: data.assessmentId ?? null,
+      title,
+      stepType,
+      courseId,
+      assessmentId,
       orderIndex: data.orderIndex ?? existing.length,
-    })
-    .returning();
-  return created;
+    });
+  }
+
+  revalidatePath("/dashboard/admin/paths");
+  revalidatePath("/dashboard/paths");
+  revalidatePath(`/dashboard/paths/${data.pathId}`);
+  revalidatePath("/dashboard/courses");
+  return { ok: true };
 }
 
 export async function deletePathStepAction(stepId: string) {
   await requireAdminOrInstructor();
   const db = getDb();
   await db.delete(pathSteps).where(eq(pathSteps.id, stepId));
+  revalidatePath("/dashboard/admin/paths");
+  revalidatePath("/dashboard/paths");
+  revalidatePath("/dashboard/courses");
   return { ok: true };
 }
 
@@ -367,6 +481,8 @@ export async function reorderPathStepsAction(input: unknown) {
       db.update(pathSteps).set({ orderIndex: index }).where(eq(pathSteps.id, id))
     )
   );
+  revalidatePath("/dashboard/admin/paths");
+  revalidatePath(`/dashboard/paths/${data.pathId}`);
   return { ok: true };
 }
 
@@ -973,4 +1089,10 @@ export async function fetchCoursesForAdminSelectAction() {
     .select({ id: courses.id, title: courses.title, slug: courses.slug })
     .from(courses)
     .where(eq(courses.publishStatus, "published"));
+}
+
+export async function fetchAssessmentsForAdminSelectAction() {
+  await requireAdminOrInstructor();
+  const rows = await listAssessments({ publishStatus: "published" });
+  return rows.map((row) => ({ id: row.id, title: row.title }));
 }

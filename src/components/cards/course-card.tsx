@@ -73,6 +73,11 @@ export function CourseCard({ course, variant = "default", className }: CourseCar
             </Badge>
           </div>
           <p className="truncate text-sm font-semibold text-foreground">{course.title}</p>
+          {course.paths?.[0] && (
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+              Part of: {course.paths[0].title}
+            </p>
+          )}
           <p className="mt-1 text-caption">
             {formatHours(course.durationHours)} · {course.lessonsCount} lessons
           </p>
@@ -137,6 +142,14 @@ export function CourseCard({ course, variant = "default", className }: CourseCar
               {course.title}
             </h3>
           </Link>
+          {course.paths?.[0] && (
+            <p className="text-caption">
+              Part of:{" "}
+              <Link href={`/dashboard/paths/${course.paths[0].id}`} className="hover:underline">
+                {course.paths[0].title}
+              </Link>
+            </p>
+          )}
           <p className="line-clamp-2 text-sm leading-relaxed text-description">{course.description}</p>
         </div>
 

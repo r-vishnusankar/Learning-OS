@@ -69,6 +69,19 @@ export default function CourseDetailPage() {
             </div>
             <h1 className="mt-3 font-display text-3xl font-semibold">{course.title}</h1>
             <p className="mt-2 max-w-2xl text-sm text-white/85">{course.description}</p>
+            {course.paths && course.paths.length > 0 && (
+              <p className="mt-2 text-sm text-white/80">
+                Part of:{" "}
+                {course.paths.map((path, i) => (
+                  <span key={path.id}>
+                    {i > 0 ? ", " : ""}
+                    <Link href={`/dashboard/paths/${path.id}`} className="underline underline-offset-2">
+                      {path.title}
+                    </Link>
+                  </span>
+                ))}
+              </p>
+            )}
             <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
               <span className="inline-flex items-center gap-1">
                 <Clock className="h-4 w-4" /> {formatHours(course.durationHours)}

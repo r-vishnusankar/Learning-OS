@@ -102,13 +102,14 @@ export default function PathDetailPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           {steps.map((step, i) => {
-            const courseHref =
-              step.stepType === "course" && step.courseSlug
-                ? `/dashboard/courses/${step.courseSlug}`
-                : null;
-            const assessmentHref = step.assessmentId
-              ? `/dashboard/assessments/${step.assessmentId}`
-              : null;
+            const href = step.href;
+            const title = step.courseTitle || step.title;
+            const statusLabel =
+              step.cta === "unlinked"
+                ? "Unlinked item"
+                : step.cta === "unavailable"
+                  ? "Unavailable"
+                  : `${step.stepType}${step.progressPercent != null ? ` · ${step.progressPercent}%` : ""}`;
 
             return (
               <div
@@ -116,34 +117,27 @@ export default function PathDetailPage() {
                 className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3"
               >
                 <div className="min-w-0">
-                  {courseHref ? (
+                  {href ? (
                     <Link
-                      href={courseHref}
+                      href={href}
                       className="text-sm font-medium text-foreground hover:text-primary hover:underline"
                     >
-                      {i + 1}. {step.title}
-                    </Link>
-                  ) : assessmentHref ? (
-                    <Link
-                      href={assessmentHref}
-                      className="text-sm font-medium text-foreground hover:text-primary hover:underline"
-                    >
-                      {i + 1}. {step.title}
+                      {i + 1}. {title}
                     </Link>
                   ) : (
                     <p className="text-sm font-medium">
-                      {i + 1}. {step.title}
+                      {i + 1}. {title}
                     </p>
                   )}
-                  <p className="text-xs capitalize text-muted-foreground">{step.stepType}</p>
+                  <p className="text-xs text-muted-foreground">{statusLabel}</p>
                 </div>
-                {courseHref ? (
+                {step.cta === "open_course" && href ? (
                   <Button asChild size="sm" variant="outline">
-                    <Link href={courseHref}>Open course</Link>
+                    <Link href={href}>Open course</Link>
                   </Button>
-                ) : assessmentHref ? (
+                ) : step.cta === "take_exam" && href ? (
                   <Button asChild size="sm" variant="outline">
-                    <Link href={assessmentHref}>Take exam</Link>
+                    <Link href={href}>Take exam</Link>
                   </Button>
                 ) : null}
               </div>

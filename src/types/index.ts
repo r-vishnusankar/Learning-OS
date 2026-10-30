@@ -91,6 +91,7 @@ export interface Course {
   isTrending: boolean;
   lastAccessed?: string;
   modules: CourseModule[];
+  paths?: { id: string; title: string }[];
 }
 
 export interface Instructor {

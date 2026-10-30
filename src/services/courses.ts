@@ -141,6 +141,8 @@ export async function fetchPublishedCoursesAction() {
     getModulesWithLessonsForCourses(courseIds),
     assessmentByCourseForUser(userId, courseIds),
   ]);
+  const { listPublishedPathsByCourseIds } = await import("@/db/queries/certification");
+  const pathMap = await listPublishedPathsByCourseIds(courseIds);
 
   return rows.map((row) => {
     const mods = modulesByCourse.get(row.course.id) ?? [];
@@ -149,14 +151,17 @@ export async function fetchPublishedCoursesAction() {
       lessonIds.map((id) => [id, { completed: completedSet.has(id) }])
     );
 
-    return mapCourseToUi(
-      row,
-      mods,
-      progressMap,
-      saved.has(row.course.id),
-      learnerCounts.get(row.course.id) ?? 0,
-      assessments.get(row.course.id)
-    );
+    return {
+      ...mapCourseToUi(
+        row,
+        mods,
+        progressMap,
+        saved.has(row.course.id),
+        learnerCounts.get(row.course.id) ?? 0,
+        assessments.get(row.course.id)
+      ),
+      paths: pathMap.get(row.course.id) ?? [],
+    };
   });
 }
 
@@ -215,7 +220,7 @@ export async function fetchCourseBySlugAction(slug: string) {
   );
   const isSaved = (prefs.savedCourseIds ?? []).includes(row.course.id);
 
-  return mapCourseToUi(
+  const mapped = mapCourseToUi(
     row,
     mods,
     progressMap,
@@ -223,6 +228,9 @@ export async function fetchCourseBySlugAction(slug: string) {
     undefined,
     assessments.get(row.course.id)
   );
+  const { listPublishedPathsByCourseIds } = await import("@/db/queries/certification");
+  const pathMap = await listPublishedPathsByCourseIds([row.course.id]);
+  return { ...mapped, paths: pathMap.get(row.course.id) ?? [] };
 }
 
 export async function fetchCourseBuilderAction(courseId: string) {
