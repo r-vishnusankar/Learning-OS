@@ -24,6 +24,7 @@ import { MarkdownMessage } from "@/components/ai/markdown-message";
 import { usePublishedCourses } from "@/hooks/use-courses";
 import { useCurrentUser } from "@/hooks/use-me";
 import { cn } from "@/lib/utils";
+import { isActiveCourseStatus } from "@/lib/course-progress";
 
 type Msg = { role: "user" | "assistant"; content: string; streaming?: boolean };
 
@@ -78,7 +79,7 @@ export default function AiMentorPage() {
   const { data: user, isLoading: userLoading } = useCurrentUser();
   const { data: courses = [] } = usePublishedCourses();
   const firstName = user?.name?.split(" ")[0] ?? "there";
-  const inProgressCount = courses.filter((c) => c.status === "in_progress").length;
+  const inProgressCount = courses.filter((c) => isActiveCourseStatus(c.status)).length;
   const streak = user?.streak ?? 0;
   const skillScore = user?.skillScore ?? 0;
 

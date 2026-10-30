@@ -2,7 +2,8 @@ import { and, eq, inArray } from "drizzle-orm";
 import { nextLearningLevel } from "@/db/catalog/employees";
 import { normalizeCareerLevel } from "@/constants/navigation";
 import { getDb } from "@/db";
-import { getCourseProgressPercent } from "@/db/queries/courses";
+import { getCourseProgressForUser } from "@/db/queries/courses";
+import type { CourseProgressStatus } from "@/lib/course-progress";
 import {
   assessmentAttempts,
   assessments,
@@ -46,13 +47,12 @@ export type PromotionEligibility = {
 };
 
 function deriveState(
-  lessonProgress: number,
-  assessmentId: string | null,
+  status: CourseProgressStatus,
   assessmentPassed: boolean
 ): CourseCareerState {
-  if (assessmentPassed && lessonProgress >= 100) return "certified";
-  if (lessonProgress >= 100) return "assessment_pending";
-  if (lessonProgress > 0) return "in_progress";
+  if (status === "completed" && assessmentPassed) return "certified";
+  if (status === "completed" || status === "content_complete") return "assessment_pending";
+  if (status === "in_progress") return "in_progress";
   return "not_started";
 }
 
@@ -130,20 +130,16 @@ export async function computePromotionEligibility(
   const courseRows: CourseEligibilityRow[] = [];
 
   for (const row of assignmentRows) {
-    const lessonProgress = await getCourseProgressPercent(userId, row.courseId);
-    const assessment = await getAssessmentForCourse(row.courseId);
-    const assessmentPassed = assessment
-      ? await hasPassedAssessment(userId, assessment.id)
-      : false;
-    const state = deriveState(lessonProgress, assessment?.id ?? null, assessmentPassed);
+    const snap = await getCourseProgressForUser(userId, row.courseId);
+    const state = deriveState(snap.status, snap.assessmentPassed);
     courseRows.push({
       courseId: row.courseId,
       courseTitle: row.courseTitle,
       courseSlug: row.courseSlug,
       assignmentId: row.assignmentId,
-      lessonProgress,
-      assessmentId: assessment?.id ?? null,
-      assessmentPassed,
+      lessonProgress: snap.percent,
+      assessmentId: snap.assessmentId,
+      assessmentPassed: snap.assessmentPassed,
       state,
     });
   }

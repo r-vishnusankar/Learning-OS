@@ -12,6 +12,11 @@ import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS } from "@/con
 import { learningCategoryToBadgeVariant, levelToBadgeVariant } from "@/lib/status-styles";
 import { useToggleSavedCourse } from "@/hooks/use-me";
 import { SHOW_INSTRUCTOR } from "@/lib/feature-flags";
+import {
+  courseCtaLabel,
+  courseResumePath,
+  isActiveCourseStatus,
+} from "@/lib/course-progress";
 
 interface CourseCardProps {
   course: Course;
@@ -21,12 +26,15 @@ interface CourseCardProps {
 
 export function CourseCard({ course, variant = "default", className }: CourseCardProps) {
   const toggleSaved = useToggleSavedCourse();
-  const href = `/dashboard/courses/${course.slug ?? course.id}`;
+  const href = courseResumePath(course.slug, course.id, course.nextAction);
   const levelVariant = levelToBadgeVariant(course.level);
   const category = course.learningCategory ?? "role";
   const categoryVariant = learningCategoryToBadgeVariant(category);
   const categoryLabel = LEARNING_CATEGORY_LABELS[category] ?? category;
-  const enrolled = course.progress > 0 || course.status === "in_progress" || course.status === "completed";
+  const enrolled =
+    course.progress > 0 ||
+    isActiveCourseStatus(course.status) ||
+    course.status === "completed";
 
   const onToggleSave = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -78,12 +86,7 @@ export function CourseCard({ course, variant = "default", className }: CourseCar
     );
   }
 
-  const ctaLabel =
-    course.status === "completed"
-      ? "Review"
-      : course.status === "in_progress" || course.progress > 0
-        ? "Continue"
-        : "Start course";
+  const ctaLabel = courseCtaLabel(course.status);
 
   return (
     <article

@@ -31,6 +31,7 @@ import { usePublishedCourses } from "@/hooks/use-courses";
 import { useDepartmentsLive, useLeaderboardLive } from "@/hooks/use-operations";
 import { LEVEL_LABELS, levelsForDepartment } from "@/constants/navigation";
 import { cn, formatNumber } from "@/lib/utils";
+import { isActiveCourseStatus } from "@/lib/course-progress";
 import type { DepartmentId, LearningLevel } from "@/types";
 
 const fade = {
@@ -116,7 +117,7 @@ export default function DepartmentDetailPage() {
   }
 
   const completedCourses = deptCourses.filter((c) => c.status === "completed").length;
-  const inProgressCourses = deptCourses.filter((c) => c.status === "in_progress").length;
+  const inProgressCourses = deptCourses.filter((c) => isActiveCourseStatus(c.status)).length;
   const deptLevels = levelsForDepartment(department.id as DepartmentId);
   const firstLabel = LEVEL_LABELS[deptLevels[0]!];
   const lastLabel = LEVEL_LABELS[deptLevels[deptLevels.length - 1]!];

@@ -50,6 +50,7 @@ export function statusToBadgeVariant(status: string | null | undefined): StatusB
     case "pending":
     case "in_progress":
     case "in-progress":
+    case "content_complete":
     case "submitted":
     case "in_review":
     case "review":

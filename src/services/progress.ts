@@ -110,28 +110,25 @@ export async function completeLessonAction(lessonId: string): Promise<
   const index = orderedIds.indexOf(lessonId);
   nextLessonId = index >= 0 && index < orderedIds.length - 1 ? orderedIds[index + 1] : null;
 
-  const { getCourseProgressPercent } = await import("@/db/queries/courses");
-  const percent = await getCourseProgressPercent(userId, context.course.id);
-  courseComplete = percent >= 100;
+  const { getCourseProgressForUser } = await import("@/db/queries/courses");
+  const snap = await getCourseProgressForUser(userId, context.course.id);
+  courseComplete =
+    snap.status === "content_complete" || snap.status === "completed";
+  assessmentId =
+    snap.nextAction.type === "assessment" ? snap.nextAction.id : null;
 
-  if (courseComplete) {
-    const { getAssessmentForCourse } = await import("@/db/queries/eligibility");
-    const assessment = await getAssessmentForCourse(context.course.id);
-    assessmentId = assessment?.id ?? null;
-
-    if (assessmentId) {
-      const { getDb } = await import("@/db");
-      const { notifications } = await import("@/db/schema");
-      const db = getDb();
-      await db.insert(notifications).values({
-        userId,
-        title: "Course complete — take assessment",
-        message: `You finished ${context.course.title}. Pass the knowledge check to certify this course.`,
-        type: "reminder",
-        href: `/dashboard/assessments/${assessmentId}`,
-        read: 0,
-      });
-    }
+  if (snap.status === "content_complete" && assessmentId) {
+    const { getDb } = await import("@/db");
+    const { notifications } = await import("@/db/schema");
+    const db = getDb();
+    await db.insert(notifications).values({
+      userId,
+      title: "Course complete — take assessment",
+      message: `You finished ${context.course.title}. Pass the knowledge check to certify this course.`,
+      type: "reminder",
+      href: `/dashboard/assessments/${assessmentId}`,
+      read: 0,
+    });
   }
 
   revalidatePath(`/dashboard/courses/${context.course.slug}`);

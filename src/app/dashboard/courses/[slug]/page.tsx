@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS } from "@/constants/navigation";
 import { useCourseBySlug } from "@/hooks/use-courses";
 import { cn, formatHours } from "@/lib/utils";
+import { courseCtaLabel, courseResumePath } from "@/lib/course-progress";
 
 export default function CourseDetailPage() {
   const params = useParams<{ slug: string }>();
@@ -35,7 +36,9 @@ export default function CourseDetailPage() {
     );
   }
 
-  const firstLesson = course.modules.flatMap((m) => m.lessons).find((l) => !l.locked);
+  const resumeHref = courseResumePath(course.slug, course.id, course.nextAction);
+  const ctaLabel = courseCtaLabel(course.status);
+  const showCta = course.nextAction?.type !== "none" || course.status === "completed";
 
   return (
     <div className="space-y-6">
@@ -85,10 +88,10 @@ export default function CourseDetailPage() {
               <Progress value={course.progress} className="mt-2 h-2" />
             </div>
             <p className="text-lg font-semibold text-primary">{course.progress}%</p>
-            {firstLesson && (
+            {showCta && (
               <Button asChild>
-                <Link href={`/dashboard/courses/${course.slug}/lessons/${firstLesson.id}`}>
-                  <Play className="h-4 w-4" /> Continue
+                <Link href={resumeHref}>
+                  <Play className="h-4 w-4" /> {ctaLabel === "Start course" ? "Start" : ctaLabel}
                 </Link>
               </Button>
             )}

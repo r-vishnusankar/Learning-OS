@@ -91,3 +91,30 @@ export function courseProgress(input: CourseProgressInput): CourseProgressResult
       : none(),
   };
 }
+
+/** in_progress + waiting on the knowledge check. */
+export function isActiveCourseStatus(status: string | null | undefined): boolean {
+  return status === "in_progress" || status === "content_complete";
+}
+
+export function courseResumePath(
+  slug: string | undefined,
+  courseId: string,
+  nextAction: CourseProgressNextAction | undefined
+): string {
+  if (nextAction?.type === "assessment" && nextAction.id) {
+    return `/dashboard/assessments/${nextAction.id}`;
+  }
+  const base = `/dashboard/courses/${slug ?? courseId}`;
+  if (nextAction?.type === "lesson" && nextAction.id) {
+    return `${base}/lessons/${nextAction.id}`;
+  }
+  return base;
+}
+
+export function courseCtaLabel(status: string | null | undefined): string {
+  if (status === "completed") return "Review";
+  if (status === "content_complete") return "Take assessment";
+  if (status === "in_progress") return "Continue";
+  return "Start course";
+}

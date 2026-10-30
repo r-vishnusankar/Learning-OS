@@ -32,6 +32,7 @@ import { useCurrentUser } from "@/hooks/use-me";
 import { useMyEligibility } from "@/hooks/use-promotions";
 import type { Course, DepartmentId, Difficulty, LearningCategory } from "@/types";
 import { cn } from "@/lib/utils";
+import { isActiveCourseStatus } from "@/lib/course-progress";
 import { format } from "date-fns";
 
 type SortOption = "recommended" | "rating" | "newest" | "duration";
@@ -242,7 +243,7 @@ export default function LearningPage() {
           const score = (c: Course) => {
             let s =
               (c.isTrending ? 2 : 0) +
-              (c.status === "in_progress" ? 3 : 0) +
+              (isActiveCourseStatus(c.status) ? 3 : 0) +
               c.rating / 10;
             if (c.learningCategory === "role" && user?.department === c.department) s += 2;
             if (c.learningCategory === "goal" && c.status === "not_started") s += 1.5;
@@ -255,7 +256,7 @@ export default function LearningPage() {
     return result;
   }, [courses, search, department, difficulty, learningCategory, sort, user?.department]);
 
-  const continueLearning = courses.filter((c) => c.status === "in_progress");
+  const continueLearning = courses.filter((c) => isActiveCourseStatus(c.status));
   const recommended = [...courses]
     .filter((c) => c.status === "not_started" || c.isTrending)
     .sort((a, b) => {

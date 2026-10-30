@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { assessmentAttempts, assessments, questions } from "@/db/schema";
 import { codingChecksSummary, evaluateCodingChecks } from "@/lib/coding-checks";
@@ -30,6 +30,74 @@ export async function getAssessmentByCourseId(courseId: string) {
     .where(eq(assessments.courseId, courseId))
     .limit(1);
   return row ?? null;
+}
+
+/** Published knowledge checks keyed by course id. One query. */
+export async function getPublishedAssessmentsByCourseIds(courseIds: string[]) {
+  const map = new Map<string, { id: string }>();
+  if (courseIds.length === 0) return map;
+  const db = getDb();
+  const rows = await db
+    .select({ id: assessments.id, courseId: assessments.courseId })
+    .from(assessments)
+    .where(
+      and(
+        inArray(assessments.courseId, courseIds),
+        eq(assessments.publishStatus, "published")
+      )
+    );
+  for (const row of rows) {
+    if (row.courseId && !map.has(row.courseId)) {
+      map.set(row.courseId, { id: row.id });
+    }
+  }
+  return map;
+}
+
+export async function getPassedAssessmentIds(userId: string, assessmentIds: string[]) {
+  const passed = new Set<string>();
+  if (assessmentIds.length === 0) return passed;
+  const db = getDb();
+  const rows = await db
+    .select({
+      assessmentId: assessmentAttempts.assessmentId,
+      passed: assessmentAttempts.passed,
+    })
+    .from(assessmentAttempts)
+    .where(
+      and(
+        eq(assessmentAttempts.userId, userId),
+        inArray(assessmentAttempts.assessmentId, assessmentIds)
+      )
+    );
+  for (const row of rows) {
+    if (row.passed === true) passed.add(row.assessmentId);
+  }
+  return passed;
+}
+
+/** Keys are `${userId}:${assessmentId}`. */
+export async function getPassedAssessmentPairs(userIds: string[], assessmentIds: string[]) {
+  const passed = new Set<string>();
+  if (userIds.length === 0 || assessmentIds.length === 0) return passed;
+  const db = getDb();
+  const rows = await db
+    .select({
+      userId: assessmentAttempts.userId,
+      assessmentId: assessmentAttempts.assessmentId,
+      passed: assessmentAttempts.passed,
+    })
+    .from(assessmentAttempts)
+    .where(
+      and(
+        inArray(assessmentAttempts.userId, userIds),
+        inArray(assessmentAttempts.assessmentId, assessmentIds)
+      )
+    );
+  for (const row of rows) {
+    if (row.passed === true) passed.add(`${row.userId}:${row.assessmentId}`);
+  }
+  return passed;
 }
 
 export async function getQuestionsForAssessment(assessmentId: string) {

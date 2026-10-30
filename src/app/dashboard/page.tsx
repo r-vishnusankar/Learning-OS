@@ -27,6 +27,11 @@ import { useMyAssignmentStats, useMyCourseAssignments } from "@/hooks/use-course
 import { useMyEligibility } from "@/hooks/use-promotions";
 import { DEPARTMENT_LABELS, LEVEL_LABELS, nextCareerLevel, normalizeCareerLevel } from "@/constants/navigation";
 import { cn, formatHours, formatNumber } from "@/lib/utils";
+import {
+  courseCtaLabel,
+  courseResumePath,
+  isActiveCourseStatus,
+} from "@/lib/course-progress";
 import type { Course, LearningLevel } from "@/types";
 
 type RecommendedItem = {
@@ -139,11 +144,13 @@ export default function DashboardPage() {
 
   const user = home?.user;
   const stats = home?.stats;
-  const continueCourse = courses.find((c) => c.status === "in_progress");
+  const continueCourse =
+    courses.find((c) => c.status === "content_complete") ??
+    courses.find((c) => c.status === "in_progress");
   const myCourses = courses
     .filter(
       (c) =>
-        (c.status === "in_progress" || c.status === "completed") &&
+        (isActiveCourseStatus(c.status) || c.status === "completed") &&
         c.id !== continueCourse?.id
     )
     .slice(0, 3);
@@ -265,7 +272,7 @@ export default function DashboardPage() {
   }
 
   const continueHref = continueCourse
-    ? `/dashboard/courses/${continueCourse.slug ?? continueCourse.id}`
+    ? courseResumePath(continueCourse.slug, continueCourse.id, continueCourse.nextAction)
     : dueItems[0]?.href ?? "/dashboard/learning";
 
   const level = (user.level
@@ -299,9 +306,9 @@ export default function DashboardPage() {
         )
       : null;
 
-  const modules = continueCourse?.modules ?? [];
-  const modulesTotal = modules.length;
-  const modulesDone = modules.filter((m) => m.completed).length;
+  const continueLessons = continueCourse?.modules.flatMap((m) => m.lessons) ?? [];
+  const lessonsTotal = continueLessons.length;
+  const lessonsDone = continueLessons.filter((l) => l.completed).length;
 
   const weekHours = home.weeklyHours ?? [];
   const weekTotal = weekHours.reduce((sum, p) => sum + (p.value ?? 0), 0);
@@ -324,8 +331,8 @@ export default function DashboardPage() {
       [
         continueCourse?.id,
         ...myCourses.map((c) => c.id),
-        ...catalog
-          .filter((c) => c.status === "in_progress" || c.status === "completed")
+        ...          catalog
+          .filter((c) => isActiveCourseStatus(c.status) || c.status === "completed")
           .map((c) => c.id),
       ].filter(Boolean) as string[]
     );
@@ -539,8 +546,8 @@ export default function DashboardPage() {
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between gap-2 text-xs">
                       <span className="text-muted-foreground">
-                        {modulesTotal > 0
-                          ? `${modulesDone} of ${modulesTotal} modules`
+                        {lessonsTotal > 0
+                          ? `${lessonsDone} of ${lessonsTotal} lessons`
                           : `${continueCourse.lessonsCount} lessons`}
                         {" · "}
                         <span className="font-semibold tabular-nums text-foreground">
@@ -565,7 +572,9 @@ export default function DashboardPage() {
                 <Button asChild className="h-10 shrink-0 gap-2 px-4">
                   <Link href={continueHref}>
                     <Play className="h-4 w-4" />
-                    Resume
+                    {continueCourse.status === "content_complete"
+                      ? "Take assessment"
+                      : "Resume"}
                   </Link>
                 </Button>
               </div>
@@ -884,13 +893,8 @@ export default function DashboardPage() {
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {myCourses.map((c) => {
-              const href = `/dashboard/courses/${c.slug ?? c.id}`;
-              const action =
-                c.status === "completed"
-                  ? "Review"
-                  : c.progress > 0
-                    ? "Continue"
-                    : "Start";
+              const href = courseResumePath(c.slug, c.id, c.nextAction);
+              const action = courseCtaLabel(c.status);
               return (
                 <li key={c.id}>
                   <Link

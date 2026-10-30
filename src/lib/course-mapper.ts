@@ -1,5 +1,9 @@
-import type { Course, CourseModule, CourseStatus, Lesson } from "@/types";
+import type { Course, CourseModule, Lesson } from "@/types";
 import type { LessonContentType } from "@/db/schema/courses";
+import {
+  courseProgress,
+  type CourseProgressAssessment,
+} from "@/lib/course-progress";
 
 type DbCourseRow = {
   course: {
@@ -51,20 +55,14 @@ function mapLessonType(type: LessonContentType): Lesson["type"] {
   return "reading";
 }
 
-function deriveCourseStatus(progress: number): CourseStatus {
-  if (progress >= 100) return "completed";
-  if (progress > 0) return "in_progress";
-  return "not_started";
-}
-
 export function mapCourseToUi(
   row: DbCourseRow,
   modules: DbModule[] = [],
   progressMap: Record<string, { completed: boolean }> = {},
   isSaved = false,
-  realLearnerCount?: number
+  realLearnerCount?: number,
+  assessment?: CourseProgressAssessment | null
 ): Course {
-  const progress = row.progress ?? 0;
   let lessonIndex = 0;
 
   const mappedModules: CourseModule[] = modules.map((mod) => {
@@ -102,6 +100,14 @@ export function mapCourseToUi(
   });
 
   const lessonsCount = modules.reduce((sum, m) => sum + m.lessons.length, 0);
+  const completedLessonIds = Object.entries(progressMap)
+    .filter(([, value]) => value.completed)
+    .map(([id]) => id);
+  const engine = courseProgress({
+    lessons: modules.flatMap((m) => m.lessons),
+    completedLessonIds,
+    assessment,
+  });
 
   // Compute duration from real lesson data when available; fall back to stored
   // column only when no modules were loaded (lean list endpoints).
@@ -133,8 +139,9 @@ export function mapCourseToUi(
     lessonsCount,
     enrolledCount: realLearnerCount ?? 0,
     rating: row.course.rating / 10,
-    progress,
-    status: deriveCourseStatus(progress),
+    progress: engine.percent,
+    status: engine.status,
+    nextAction: engine.nextAction,
     tags: row.course.tags,
     category: row.category?.name ?? "General",
     xpReward: row.course.xpReward,

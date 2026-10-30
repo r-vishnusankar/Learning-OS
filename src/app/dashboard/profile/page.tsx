@@ -30,6 +30,7 @@ import { useLearnerCertificates } from "@/hooks/use-certification";
 import { usePublishedCourses } from "@/hooks/use-courses";
 import { useCurrentUser, useDashboardHome, useMySkills } from "@/hooks/use-me";
 import { cn, formatNumber } from "@/lib/utils";
+import { isActiveCourseStatus } from "@/lib/course-progress";
 import { formatDistanceToNow } from "date-fns";
 
 const fade = {
@@ -54,7 +55,7 @@ export default function ProfilePage() {
   }
 
   const earnedCerts = certificates.filter((c) => c.status === "earned");
-  const inProgressCourses = courses.filter((c) => c.status === "in_progress");
+  const inProgressCourses = courses.filter((c) => isActiveCourseStatus(c.status));
   const skills = skillsData?.skills ?? [];
   const stats = home?.stats;
 

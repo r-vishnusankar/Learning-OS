@@ -9,6 +9,12 @@ import {
   profiles,
   users,
 } from "@/db/schema";
+import { courseProgress } from "@/lib/course-progress";
+import {
+  getPassedAssessmentIds,
+  getPassedAssessmentPairs,
+  getPublishedAssessmentsByCourseIds,
+} from "@/db/queries/assessments";
 import type { CourseAssignmentScope } from "@/db/schema/operations";
 import type { DepartmentId, LearningLevel } from "@/types";
 
@@ -146,15 +152,26 @@ export async function getCourseProgressMap(userId: string, courseIds: string[]) 
     lessonsByCourse.set(mod.courseId, list);
   }
 
+  const assessmentByCourse = await getPublishedAssessmentsByCourseIds(courseIds);
+  const passed = await getPassedAssessmentIds(
+    userId,
+    [...assessmentByCourse.values()].map((a) => a.id)
+  );
+
   const result = new Map<string, number>();
   for (const courseId of courseIds) {
     const ids = lessonsByCourse.get(courseId) ?? [];
-    if (ids.length === 0) {
-      result.set(courseId, 0);
-      continue;
-    }
-    const done = ids.filter((id) => completedSet.has(id)).length;
-    result.set(courseId, Math.round((done / ids.length) * 100));
+    const published = assessmentByCourse.get(courseId);
+    result.set(
+      courseId,
+      courseProgress({
+        lessons: ids.map((id) => ({ id })),
+        completedLessonIds: ids.filter((id) => completedSet.has(id)),
+        assessment: published
+          ? { id: published.id, required: true, passed: passed.has(published.id) }
+          : null,
+      }).percent
+    );
   }
   return result;
 }
@@ -219,16 +236,31 @@ export async function getProgressMatrix(userIds: string[], courseIds: string[]) 
     completedByUser.set(row.userId, set);
   }
 
+  const assessmentByCourse = await getPublishedAssessmentsByCourseIds(courseIds);
+  const passedPairs = await getPassedAssessmentPairs(
+    userIds,
+    [...assessmentByCourse.values()].map((a) => a.id)
+  );
+
   for (const userId of userIds) {
     const completed = completedByUser.get(userId) ?? new Set<string>();
     for (const courseId of courseIds) {
       const ids = lessonsByCourse.get(courseId) ?? [];
-      if (ids.length === 0) {
-        result.set(`${userId}:${courseId}`, 0);
-        continue;
-      }
-      const done = ids.filter((id) => completed.has(id)).length;
-      result.set(`${userId}:${courseId}`, Math.round((done / ids.length) * 100));
+      const published = assessmentByCourse.get(courseId);
+      result.set(
+        `${userId}:${courseId}`,
+        courseProgress({
+          lessons: ids.map((id) => ({ id })),
+          completedLessonIds: ids.filter((id) => completed.has(id)),
+          assessment: published
+            ? {
+                id: published.id,
+                required: true,
+                passed: passedPairs.has(`${userId}:${published.id}`),
+              }
+            : null,
+        }).percent
+      );
     }
   }
 

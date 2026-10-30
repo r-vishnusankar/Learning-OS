@@ -11,6 +11,11 @@ import { courseAssignments } from "@/db/schema/operations";
 import { profiles } from "@/db/schema/auth";
 import type { PublishStatus } from "@/db/schema/courses";
 import type { Difficulty, LearningCategory, LearningLevel } from "@/types";
+import { courseProgress } from "@/lib/course-progress";
+import {
+  getPassedAssessmentIds,
+  getPublishedAssessmentsByCourseIds,
+} from "@/db/queries/assessments";
 
 /**
  * Returns a map of courseId → count of DISTINCT active learners
@@ -209,35 +214,55 @@ export async function countLessonsForCourses(courseIds: string[]) {
   return map;
 }
 
-export async function getCourseProgressPercent(userId: string, courseId: string) {
+export async function getCourseProgressForUser(userId: string, courseId: string) {
   const db = getDb();
-  const total = await countCourseLessons(courseId);
-  if (total === 0) return 0;
-
-  const lessonIds = await db
+  const lessonRows = await db
     .select({ id: lessons.id })
     .from(lessons)
     .innerJoin(modules, eq(lessons.moduleId, modules.id))
     .where(eq(modules.courseId, courseId));
 
-  if (!lessonIds.length) return 0;
-
   const { lessonProgress } = await import("@/db/schema");
-  const completed = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(lessonProgress)
-    .where(
-      and(
-        eq(lessonProgress.userId, userId),
-        inArray(
-          lessonProgress.lessonId,
-          lessonIds.map((l) => l.id)
-        ),
-        eq(lessonProgress.completed, true)
-      )
-    );
+  const completedRows =
+    lessonRows.length === 0
+      ? []
+      : await db
+          .select({ lessonId: lessonProgress.lessonId })
+          .from(lessonProgress)
+          .where(
+            and(
+              eq(lessonProgress.userId, userId),
+              inArray(
+                lessonProgress.lessonId,
+                lessonRows.map((l) => l.id)
+              ),
+              eq(lessonProgress.completed, true)
+            )
+          );
 
-  return Math.round(((completed[0]?.count ?? 0) / total) * 100);
+  const assessmentByCourse = await getPublishedAssessmentsByCourseIds([courseId]);
+  const assessment = assessmentByCourse.get(courseId);
+  const passed = assessment
+    ? (await getPassedAssessmentIds(userId, [assessment.id])).has(assessment.id)
+    : false;
+
+  const engine = courseProgress({
+    lessons: lessonRows,
+    completedLessonIds: completedRows.map((r) => r.lessonId),
+    assessment: assessment
+      ? { id: assessment.id, required: true, passed }
+      : null,
+  });
+
+  return {
+    ...engine,
+    assessmentId: assessment?.id ?? null,
+    assessmentPassed: passed,
+  };
+}
+
+export async function getCourseProgressPercent(userId: string, courseId: string) {
+  return (await getCourseProgressForUser(userId, courseId)).percent;
 }
 
 export async function getUserLessonProgress(userId: string, lessonIds: string[]) {

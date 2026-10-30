@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS, levelsForFilter } from "@/constants/navigation";
 import { usePublishedCourses } from "@/hooks/use-courses";
 import type { CourseStatus, DepartmentId, LearningCategory, LearningLevel } from "@/types";
+import { isActiveCourseStatus } from "@/lib/course-progress";
 
 const fade = {
   initial: { opacity: 0, y: 12 },
@@ -29,7 +30,7 @@ export default function CoursesPage() {
 
   const filtered = useMemo(() => {
     let result = [...courses];
-    if (tab === "in_progress") result = result.filter((c) => c.status === "in_progress");
+    if (tab === "in_progress") result = result.filter((c) => isActiveCourseStatus(c.status));
     else if (tab === "completed") result = result.filter((c) => c.status === "completed");
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -51,7 +52,7 @@ export default function CoursesPage() {
 
   const counts = {
     all: courses.length,
-    in_progress: courses.filter((c) => c.status === "in_progress").length,
+    in_progress: courses.filter((c) => isActiveCourseStatus(c.status)).length,
     completed: courses.filter((c) => c.status === "completed").length,
   };
 

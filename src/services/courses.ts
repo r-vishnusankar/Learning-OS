@@ -11,7 +11,6 @@ import {
   getCourseById,
   getCourseBySlug,
   getCourseModulesWithLessons,
-  getCourseProgressPercent,
   getModulesWithLessonsForCourses,
   getPublishedCourses,
   getPublishedCoursesByIds,
@@ -19,7 +18,29 @@ import {
   getUserCompletedLessonIdSet,
   getUserLessonProgress,
 } from "@/db/queries/courses";
-import { getAssessmentByCourseId } from "@/db/queries/assessments";
+import {
+  getAssessmentByCourseId,
+  getPassedAssessmentIds,
+  getPublishedAssessmentsByCourseIds,
+} from "@/db/queries/assessments";
+import type { CourseProgressAssessment } from "@/lib/course-progress";
+
+async function assessmentByCourseForUser(userId: string, courseIds: string[]) {
+  const published = await getPublishedAssessmentsByCourseIds(courseIds);
+  const passed = await getPassedAssessmentIds(
+    userId,
+    [...published.values()].map((a) => a.id)
+  );
+  const map = new Map<string, CourseProgressAssessment | null>();
+  for (const courseId of courseIds) {
+    const row = published.get(courseId);
+    map.set(
+      courseId,
+      row ? { id: row.id, required: true, passed: passed.has(row.id) } : null
+    );
+  }
+  return map;
+}
 
 import { courses, instructors, lessonResources, lessons, mediaAssets, modules } from "@/db/schema";
 import type { PublishStatus } from "@/db/schema/courses";
@@ -116,7 +137,10 @@ export async function fetchPublishedCoursesAction() {
   ]);
   const saved = new Set(prefs.savedCourseIds ?? []);
   const courseIds = rows.map((r) => r.course.id);
-  const modulesByCourse = await getModulesWithLessonsForCourses(courseIds);
+  const [modulesByCourse, assessments] = await Promise.all([
+    getModulesWithLessonsForCourses(courseIds),
+    assessmentByCourseForUser(userId, courseIds),
+  ]);
 
   return rows.map((row) => {
     const mods = modulesByCourse.get(row.course.id) ?? [];
@@ -124,16 +148,14 @@ export async function fetchPublishedCoursesAction() {
     const progressMap = Object.fromEntries(
       lessonIds.map((id) => [id, { completed: completedSet.has(id) }])
     );
-    const completedCount = lessonIds.filter((id) => completedSet.has(id)).length;
-    const progress =
-      lessonIds.length === 0 ? 0 : Math.round((completedCount / lessonIds.length) * 100);
 
     return mapCourseToUi(
-      { ...row, progress },
+      row,
       mods,
       progressMap,
       saved.has(row.course.id),
-      learnerCounts.get(row.course.id) ?? 0
+      learnerCounts.get(row.course.id) ?? 0,
+      assessments.get(row.course.id)
     );
   });
 }
@@ -150,9 +172,10 @@ export async function fetchMyActiveCoursesAction(limit = 8) {
   if (!activeIds.length) return [];
 
   const saved = new Set(prefs.savedCourseIds ?? []);
-  const [rows, modulesByCourse] = await Promise.all([
+  const [rows, modulesByCourse, assessments] = await Promise.all([
     getPublishedCoursesByIds(activeIds),
     getModulesWithLessonsForCourses(activeIds),
+    assessmentByCourseForUser(userId, activeIds),
   ]);
 
   return rows.map((row) => {
@@ -161,16 +184,14 @@ export async function fetchMyActiveCoursesAction(limit = 8) {
     const progressMap = Object.fromEntries(
       lessonIds.map((id) => [id, { completed: completedSet.has(id) }])
     );
-    const completedCount = lessonIds.filter((id) => completedSet.has(id)).length;
-    const progress =
-      lessonIds.length === 0 ? 0 : Math.round((completedCount / lessonIds.length) * 100);
 
     return mapCourseToUi(
-      { ...row, progress },
+      row,
       mods,
       progressMap,
       saved.has(row.course.id),
-      learnerCounts.get(row.course.id) ?? 0
+      learnerCounts.get(row.course.id) ?? 0,
+      assessments.get(row.course.id)
     );
   });
 }
@@ -184,16 +205,24 @@ export async function fetchCourseBySlugAction(slug: string) {
 
   const mods = await getCourseModulesWithLessons(row.course.id);
   const lessonIds = mods.flatMap((m) => m.lessons.map((l) => l.id));
-  const progressRows = await getUserLessonProgress(userId, lessonIds);
+  const [progressRows, assessments, prefs] = await Promise.all([
+    getUserLessonProgress(userId, lessonIds),
+    assessmentByCourseForUser(userId, [row.course.id]),
+    (await import("@/services/me")).fetchMyPreferencesAction(),
+  ]);
   const progressMap = Object.fromEntries(
     progressRows.map((p) => [p.lessonId, { completed: p.completed }])
   );
-  const progress = await getCourseProgressPercent(userId, row.course.id);
-  const { fetchMyPreferencesAction } = await import("@/services/me");
-  const prefs = await fetchMyPreferencesAction();
   const isSaved = (prefs.savedCourseIds ?? []).includes(row.course.id);
 
-  return mapCourseToUi({ ...row, progress }, mods, progressMap, isSaved);
+  return mapCourseToUi(
+    row,
+    mods,
+    progressMap,
+    isSaved,
+    undefined,
+    assessments.get(row.course.id)
+  );
 }
 
 export async function fetchCourseBuilderAction(courseId: string) {

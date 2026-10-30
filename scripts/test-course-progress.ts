@@ -1,4 +1,9 @@
-import { courseProgress } from "../src/lib/course-progress";
+import {
+  courseCtaLabel,
+  courseProgress,
+  courseResumePath,
+  isActiveCourseStatus,
+} from "../src/lib/course-progress";
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(`Assertion failed: ${message}`);
@@ -98,6 +103,21 @@ function run(): void {
   });
   assert(notRequired.percent === 100, "optional assessment not in denominator");
   assert(notRequired.status === "completed", "optional assessment does not block completed");
+
+  assert(isActiveCourseStatus("in_progress") === true, "in_progress is active");
+  assert(isActiveCourseStatus("content_complete") === true, "content_complete is active");
+  assert(isActiveCourseStatus("completed") === false, "completed is not active");
+  assert(courseCtaLabel("content_complete") === "Take assessment", "cta for exam pending");
+  assert(
+    courseResumePath("git", "c1", { type: "assessment", id: "a1" }) ===
+      "/dashboard/assessments/a1",
+    "resume path for exam"
+  );
+  assert(
+    courseResumePath("git", "c1", { type: "lesson", id: "l3" }) ===
+      "/dashboard/courses/git/lessons/l3",
+    "resume path for next lesson"
+  );
 }
 
 run();

@@ -21,7 +21,12 @@ export type LearningLevel =
   | "assistant_hr_manager"
   | "hr_manager";
 
-export type CourseStatus = "not_started" | "in_progress" | "completed" | "archived";
+export type CourseStatus =
+  | "not_started"
+  | "in_progress"
+  | "content_complete"
+  | "completed"
+  | "archived";
 export type AssessmentStatus = "upcoming" | "available" | "in_progress" | "completed" | "failed" | "expired";
 export type AssignmentStatus = "pending" | "submitted" | "graded" | "overdue";
 export type CertificateStatus = "earned" | "locked" | "expired" | "pending";
@@ -78,6 +83,7 @@ export interface Course {
   rating: number;
   progress: number;
   status: CourseStatus;
+  nextAction?: { type: "lesson" | "assessment" | "none"; id: string | null };
   tags: string[];
   category: string;
   xpReward: number;
