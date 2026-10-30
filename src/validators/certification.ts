@@ -168,12 +168,30 @@ export const submitAssignmentSchema = z.object({
   url: z.string().url().optional().or(z.literal("")),
 });
 
-export const reviewSubmissionSchema = z.object({
-  submissionId: z.string().min(1),
-  status: z.enum(["in_review", "approved", "rejected", "graded"]),
-  score: z.number().int().min(0).max(1000).optional(),
-  feedback: z.string().max(5000).optional(),
-});
+export const reviewSubmissionSchema = z
+  .object({
+    submissionId: z.string().min(1),
+    status: z.enum(["in_review", "approved", "rejected", "graded"]),
+    score: z.number().int().min(0).max(1000).optional(),
+    feedback: z.string().max(5000).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.status !== "rejected") return;
+    const reason = data.feedback?.trim() ?? "";
+    if (!reason) {
+      ctx.addIssue({
+        code: "custom",
+        message: "A comment is required when rejecting.",
+        path: ["feedback"],
+      });
+    } else if (reason.length > 1000) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Comment must be at most 1000 characters.",
+        path: ["feedback"],
+      });
+    }
+  });
 
 export const revokeCertificateSchema = z.object({
   certificateId: z.string().min(1),

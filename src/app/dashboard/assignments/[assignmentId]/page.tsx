@@ -63,7 +63,12 @@ export default function AssignmentDetailPage() {
       <PageHeader title={assignment.title} description={assignment.description}>
         <div className="flex flex-wrap items-center gap-2">
           {isCoding && <Badge variant="secondary">Coding</Badge>}
-          {submission && <StatusBadge status={submission.status} />}
+          {submission && (
+            <StatusBadge
+              status={submission.status}
+              label={submission.status === "rejected" ? "Revision" : undefined}
+            />
+          )}
         </div>
       </PageHeader>
 
@@ -100,12 +105,17 @@ export default function AssignmentDetailPage() {
           )}
 
           {submission?.feedback && (
-            <pre className="whitespace-pre-wrap rounded-xl bg-muted/50 p-3 font-sans text-sm">
-              {submission.feedback}
-              {submission.score != null
-                ? `\n\nAuto/score: ${submission.score}/${assignment.maxScore}`
-                : ""}
-            </pre>
+            <div className="space-y-1">
+              {submission.status === "rejected" && (
+                <p className="text-xs font-medium text-muted-foreground">Reviewer comment</p>
+              )}
+              <pre className="whitespace-pre-wrap rounded-xl bg-muted/50 p-3 font-sans text-sm">
+                {submission.feedback}
+                {submission.score != null
+                  ? `\n\nAuto/score: ${submission.score}/${assignment.maxScore}`
+                  : ""}
+              </pre>
+            </div>
           )}
           {!locked && (
             <Button

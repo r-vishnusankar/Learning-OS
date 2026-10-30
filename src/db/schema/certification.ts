@@ -132,6 +132,8 @@ export const assignmentSubmissions = pgTable(
     url: text("url"),
     score: integer("score"),
     feedback: text("feedback"),
+    reviewedBy: text("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { mode: "date" }),
     submittedAt: timestamp("submitted_at", { mode: "date" }),
     gradedAt: timestamp("graded_at", { mode: "date" }),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),

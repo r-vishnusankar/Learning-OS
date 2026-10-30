@@ -227,9 +227,11 @@ export function useReviewSubmission() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: reviewSubmissionAction,
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data && "ok" in data && !data.ok) return;
       qc.invalidateQueries({ queryKey: ["admin-assignment"] });
       qc.invalidateQueries({ queryKey: ["assignments"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }

@@ -10,6 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DEPARTMENT_LABELS } from "@/constants/navigation";
 import {
   useAdminAssignmentDetail,
@@ -80,6 +88,10 @@ export default function AdminAssignmentDetailPage() {
     departmentId: "" as DepartmentId | "",
     userIds: [] as string[],
   });
+  const [rejectingId, setRejectingId] = React.useState<string | null>(null);
+  const [rejectComment, setRejectComment] = React.useState("");
+  const rejectReason = rejectComment.trim();
+  const rejectReady = rejectReason.length > 0 && rejectReason.length <= 1000;
 
   React.useEffect(() => {
     if (!data?.assignment) return;
@@ -465,6 +477,7 @@ export default function AdminAssignmentDetailPage() {
                   />
                   <Button
                     size="sm"
+                    disabled={review.isPending}
                     onClick={async () => {
                       const score = Number(scores[sub.id] ?? sub.score ?? 0);
                       await review.mutateAsync({
@@ -481,13 +494,10 @@ export default function AdminAssignmentDetailPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={async () => {
-                      await review.mutateAsync({
-                        submissionId: sub.id,
-                        status: "rejected",
-                        feedback: "Needs revision",
-                      });
-                      toast.success("Rejected");
+                    disabled={review.isPending}
+                    onClick={() => {
+                      setRejectingId(sub.id);
+                      setRejectComment("");
                     }}
                   >
                     Reject
@@ -498,6 +508,73 @@ export default function AdminAssignmentDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={rejectingId != null}
+        onOpenChange={(open) => {
+          if (!open && !review.isPending) {
+            setRejectingId(null);
+            setRejectComment("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject submission</DialogTitle>
+            <DialogDescription>
+              Tell the learner what to change. This comment is required and is stored with the
+              latest review only.
+            </DialogDescription>
+          </DialogHeader>
+          <textarea
+            className="min-h-28 w-full rounded-2xl border border-input bg-card px-4 py-3 text-sm"
+            value={rejectComment}
+            maxLength={1000}
+            disabled={review.isPending}
+            onChange={(e) => setRejectComment(e.target.value.slice(0, 1000))}
+            placeholder="Reason and required updates"
+          />
+          <p className="text-xs text-muted-foreground">{rejectComment.length}/1000</p>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={review.isPending}
+              onClick={() => {
+                setRejectingId(null);
+                setRejectComment("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={!rejectReady || review.isPending}
+              onClick={async () => {
+                if (!rejectingId || !rejectReady) return;
+                try {
+                  const result = await review.mutateAsync({
+                    submissionId: rejectingId,
+                    status: "rejected",
+                    feedback: rejectReason,
+                  });
+                  if (!result.ok) {
+                    toast.error(result.message);
+                    return;
+                  }
+                  toast.success("Rejected");
+                  setRejectingId(null);
+                  setRejectComment("");
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Reject failed");
+                }
+              }}
+            >
+              Reject
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

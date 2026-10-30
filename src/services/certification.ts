@@ -3,7 +3,7 @@
 import { eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
-import { courses, users } from "@/db/schema";
+import { courses, notifications, users } from "@/db/schema";
 import {
   assignmentSubmissions,
   certificates,
@@ -46,6 +46,7 @@ import {
   replaceAssignmentAssignees,
 } from "@/db/queries/certification";
 import { requireAdminOrInstructor, requireUserId } from "@/lib/auth-utils";
+import { toPlainTextComment } from "@/lib/plain-text";
 import { generateCredentialId } from "@/lib/credentials";
 import { getProfileByUserId } from "@/lib/profile";
 import type {
@@ -723,30 +724,63 @@ export async function deleteAssignmentAction(id: string) {
   return { ok: true };
 }
 
-export async function reviewSubmissionAction(input: unknown) {
-  await requireAdminOrInstructor();
-  const data = reviewSubmissionSchema.parse(input);
+export async function reviewSubmissionAction(input: unknown): Promise<
+  | { ok: true }
+  | { ok: false; code: "reason_required" | "not_found"; message: string }
+> {
+  const reviewerId = await requireAdminOrInstructor();
+  const parsed = reviewSubmissionSchema.safeParse(input);
+  if (!parsed.success) {
+    const message =
+      parsed.error.issues.find((issue) => issue.path[0] === "feedback")?.message ??
+      "Invalid review.";
+    return { ok: false, code: "reason_required", message };
+  }
+  const data = parsed.data;
   const submission = await getSubmissionById(data.submissionId);
-  if (!submission) throw new Error("Submission not found");
+  if (!submission) {
+    return { ok: false, code: "not_found", message: "Submission not found." };
+  }
 
+  const now = new Date();
+  const reason =
+    data.status === "rejected" ? toPlainTextComment(data.feedback ?? "") : data.feedback;
+  if (data.status === "rejected" && !reason) {
+    return { ok: false, code: "reason_required", message: "A comment is required when rejecting." };
+  }
   const db = getDb();
-  const [updated] = await db
+  await db
     .update(assignmentSubmissions)
     .set({
       status: data.status,
       score: data.score ?? submission.score,
-      feedback: data.feedback ?? submission.feedback,
+      feedback: reason ?? submission.feedback,
       gradedAt:
         data.status === "graded" || data.status === "approved" || data.status === "rejected"
-          ? new Date()
+          ? now
           : submission.gradedAt,
+      ...(data.status === "rejected"
+        ? { reviewedBy: reviewerId, reviewedAt: now }
+        : {}),
     })
-    .where(eq(assignmentSubmissions.id, data.submissionId))
-    .returning();
+    .where(eq(assignmentSubmissions.id, data.submissionId));
+
+  if (data.status === "rejected" && reason) {
+    const assignment = await getHomeworkAssignmentById(submission.assignmentId);
+    await db.insert(notifications).values({
+      userId: submission.userId,
+      title: "Assignment needs revision",
+      message: `${assignment?.title ?? "Assignment"}: ${reason}`,
+      type: "warning",
+      href: `/dashboard/assignments/${submission.assignmentId}`,
+      read: 0,
+    });
+  }
 
   revalidatePath("/dashboard/admin/assignments");
   revalidatePath("/dashboard/assignments");
-  return updated;
+  revalidatePath("/dashboard/notifications");
+  return { ok: true };
 }
 
 const PENDING_COURSE_PREFIX = "pending-course-";
