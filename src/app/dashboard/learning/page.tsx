@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type SelectHTMLAttributes } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   ArrowUpDown,
@@ -19,7 +20,7 @@ import { CourseCard } from "@/components/cards/course-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -141,13 +142,14 @@ function CourseRow({
           >
             <ChevronRight className="h-4 w-4 stroke-[1.75]" />
           </Button>
-          {viewAllHref && (
-            <Button variant="ghost" size="sm" className="ml-1 gap-1" asChild>
-              <Link href={viewAllHref}>
-                View all <ChevronRight className="h-4 w-4 stroke-[1.75]" />
-              </Link>
-            </Button>
-          )}
+          {viewAllHref ? (
+            <Link
+              href={viewAllHref}
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "ml-1 gap-1")}
+            >
+              View all <ChevronRight className="h-4 w-4 stroke-[1.75]" />
+            </Link>
+          ) : null}
         </div>
       </div>
       <div className="relative -mx-1">
@@ -188,6 +190,7 @@ function CourseRow({
 }
 
 export default function LearningPage() {
+  const router = useRouter();
   const { data: courses = [], isLoading: coursesLoading, isError: coursesError } = usePublishedCourses();
   const { data: myAssignments = [] } = useMyCourseAssignments();
   const { data: eligibility } = useMyEligibility();
@@ -546,6 +549,9 @@ export default function LearningPage() {
               title="No courses in progress"
               description="Start a course to see it here."
               actionLabel="Browse catalog"
+              onAction={() => {
+                window.location.assign("/dashboard/courses");
+              }}
             />
           )}
 
