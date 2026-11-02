@@ -549,9 +549,7 @@ export default function LearningPage() {
               title="No courses in progress"
               description="Start a course to see it here."
               actionLabel="Browse catalog"
-              onAction={() => {
-                window.location.assign("/dashboard/courses");
-              }}
+              onAction={() => router.push("/dashboard/courses")}
             />
           )}
 

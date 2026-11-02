@@ -4,3 +4,7 @@ node_modules
 .env*.local
 .impeccable
 .cursor
+scripts/seed-vishnu-demo.ts
+scripts/revert-vishnu-demo.ts
+scripts/_inspect-vishnu-readonly.ts
+scripts/_migrate-user-credentials.ts
