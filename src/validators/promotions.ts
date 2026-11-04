@@ -18,7 +18,7 @@ const learningLevel = z.enum([
 export const promotionConsoleFilterSchema = z.object({
   departmentId: z.string().optional(),
   status: z
-    .enum(["in_progress", "eligible", "blocked", "max_level", "all"])
+    .enum(["in_progress", "eligible", "blocked", "max_level", "rejected", "all"])
     .default("all"),
   search: z.string().optional(),
 });

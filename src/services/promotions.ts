@@ -69,6 +69,7 @@ export async function fetchPromotionConsoleAction(input?: unknown) {
     eligible: rows.filter((r) => r.status === "eligible").length,
     inProgress: rows.filter((r) => r.status === "in_progress").length,
     blocked: rows.filter((r) => r.status === "blocked").length,
+    rejected: rows.filter((r) => r.status === "rejected").length,
     maxLevel: rows.filter((r) => r.status === "max_level").length,
     total: rows.length,
   };
@@ -86,6 +87,9 @@ export async function approvePromotionAction(input: unknown) {
   if (!eligibility) throw new Error("User not found");
   if (actor?.role === "department_head" && eligibility.department !== actor.department) {
     throw new Error("Forbidden");
+  }
+  if (eligibility.status === "rejected") {
+    throw new Error("Promotion was rejected — employee must remain at current level until reconsidered");
   }
   if (eligibility.status !== "eligible" || !eligibility.nextLevel) {
     throw new Error("Employee is not eligible for promotion");
@@ -178,6 +182,16 @@ export async function rejectPromotionAction(input: unknown) {
   if (actor?.role === "department_head" && eligibility.department !== actor.department) {
     throw new Error("Forbidden");
   }
+
+  await db
+    .update(promotions)
+    .set({ status: "superseded", updatedAt: new Date() })
+    .where(
+      and(
+        eq(promotions.userId, data.userId),
+        inArray(promotions.status, ["eligible", "pending_approval"])
+      )
+    );
 
   await db.insert(promotions).values({
     userId: data.userId,

@@ -317,11 +317,17 @@ export default function LearningPage() {
                 {eligibility.status === "eligible" && eligibility.nextLevel
                   ? ` — awaiting approval for ${LEVEL_LABELS[eligibility.nextLevel]}`
                   : ""}
+                {eligibility.status === "rejected" && eligibility.rejectionReason
+                  ? ` — ${eligibility.rejectionReason}`
+                  : ""}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {eligibility.status === "eligible" && (
                 <Badge variant="success">Eligible for promotion</Badge>
+              )}
+              {eligibility.status === "rejected" && (
+                <Badge variant="destructive">Promotion not approved</Badge>
               )}
               <Button asChild size="sm" variant="outline">
                 <Link href="/dashboard/help">Employee guide</Link>

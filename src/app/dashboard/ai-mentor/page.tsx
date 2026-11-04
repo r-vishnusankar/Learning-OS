@@ -150,11 +150,19 @@ export default function AiMentorPage() {
 
   return (
     <div className="space-y-6">
+      <div
+        role="status"
+        className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-foreground"
+      >
+        <strong className="font-medium">Demo mode.</strong> Replies are scripted sample text, not a live
+        model or your real progress. Backend integration is not shipped (see P30).
+      </div>
+
       <PageHeader
         title="AI Mentor"
         description="Your personal learning assistant — summarize, explain, quiz, and guide your career growth."
       >
-        <Badge variant="info" className="gap-1">
+        <Badge variant="outline" className="gap-1">
           <Sparkles className="h-3 w-3" /> Enterprise secure
         </Badge>
       </PageHeader>

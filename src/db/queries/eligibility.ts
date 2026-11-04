@@ -1,4 +1,8 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import {
+  applyLatestPromotionDecision,
+  type LatestPromotionDecision,
+} from "@/lib/promotion-display-status";
 import { nextLearningLevel } from "@/db/catalog/employees";
 import { normalizeCareerLevel } from "@/constants/navigation";
 import { getDb } from "@/db";
@@ -10,6 +14,7 @@ import {
   courseAssignments,
   courses,
   profiles,
+  promotions,
   users,
 } from "@/db/schema";
 import type { DepartmentId, LearningLevel } from "@/types";
@@ -39,11 +44,14 @@ export type PromotionEligibility = {
   designation: string;
   currentLevel: LearningLevel;
   nextLevel: LearningLevel | null;
-  status: "in_progress" | "eligible" | "blocked" | "max_level";
+  status: "in_progress" | "eligible" | "blocked" | "max_level" | "rejected";
   courses: CourseEligibilityRow[];
   certifiedCount: number;
   requiredCount: number;
   eligibleAt: string | null;
+  /** Set when status is rejected (latest admin decision for this level step). */
+  rejectionReason: string | null;
+  rejectedAt: string | null;
 };
 
 function deriveState(
@@ -160,6 +168,40 @@ export async function computePromotionEligibility(
     status = "in_progress";
   }
 
+  let latestDecision: LatestPromotionDecision = null;
+  if (nextLevel) {
+    const [row] = await db
+      .select({
+        status: promotions.status,
+        reason: promotions.reason,
+        decidedAt: promotions.decidedAt,
+      })
+      .from(promotions)
+      .where(
+        and(
+          eq(promotions.userId, userId),
+          eq(promotions.fromLevel, currentLevel),
+          eq(promotions.toLevel, nextLevel),
+          inArray(promotions.status, ["rejected", "approved"])
+        )
+      )
+      .orderBy(desc(promotions.decidedAt))
+      .limit(1);
+    if (row && (row.status === "rejected" || row.status === "approved")) {
+      latestDecision = {
+        status: row.status,
+        reason: row.reason,
+        decidedAt: row.decidedAt,
+      };
+    }
+  }
+
+  const displayStatus = applyLatestPromotionDecision(status, latestDecision);
+  const rejected =
+    displayStatus === "rejected" && latestDecision?.status === "rejected"
+      ? latestDecision
+      : null;
+
   return {
     userId: person.userId,
     name: person.name ?? "Unknown",
@@ -168,11 +210,13 @@ export async function computePromotionEligibility(
     designation: person.designation,
     currentLevel,
     nextLevel,
-    status,
+    status: displayStatus,
     courses: courseRows,
     certifiedCount,
     requiredCount,
-    eligibleAt: status === "eligible" ? new Date().toISOString() : null,
+    eligibleAt: displayStatus === "eligible" ? new Date().toISOString() : null,
+    rejectionReason: rejected?.reason ?? null,
+    rejectedAt: rejected?.decidedAt?.toISOString() ?? null,
   };
 }
 

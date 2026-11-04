@@ -21,7 +21,7 @@ import {
 } from "@/hooks/use-promotions";
 import type { DepartmentId } from "@/types";
 
-type StatusFilter = "all" | "eligible" | "in_progress" | "blocked" | "max_level";
+type StatusFilter = "all" | "eligible" | "in_progress" | "blocked" | "max_level" | "rejected";
 
 export default function AdminPromotionsPage() {
   const [status, setStatus] = React.useState<StatusFilter>("eligible");
@@ -51,9 +51,9 @@ export default function AdminPromotionsPage() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: "Eligible", value: kpis?.eligible ?? 0 },
+          { label: "Rejected", value: kpis?.rejected ?? 0 },
           { label: "In progress", value: kpis?.inProgress ?? 0 },
           { label: "Blocked", value: kpis?.blocked ?? 0 },
-          { label: "Tracked", value: kpis?.total ?? 0 },
         ].map((k) => (
           <Card key={k.label}>
             <CardHeader className="pb-2">
@@ -98,6 +98,7 @@ export default function AdminPromotionsPage() {
             <option value="in_progress">In progress</option>
             <option value="blocked">Blocked</option>
             <option value="max_level">Max level</option>
+            <option value="rejected">Rejected</option>
             <option value="all">All</option>
           </select>
         </CardContent>
@@ -134,7 +135,7 @@ export default function AdminPromotionsPage() {
                           variant={
                             row.status === "eligible"
                               ? "success"
-                              : row.status === "blocked"
+                              : row.status === "rejected" || row.status === "blocked"
                                 ? "destructive"
                                 : "secondary"
                           }
@@ -150,6 +151,11 @@ export default function AdminPromotionsPage() {
                           ? `${LEVEL_LABELS[row.currentLevel]} → ${LEVEL_LABELS[row.nextLevel]}`
                           : "At highest learning level"}
                       </p>
+                      {row.status === "rejected" && row.rejectionReason ? (
+                        <p className="text-sm text-destructive">
+                          Rejection reason: {row.rejectionReason}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {row.status === "eligible" && (
