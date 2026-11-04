@@ -72,3 +72,10 @@ See `docs/PRODUCTION_DATABASE_MIGRATIONS.md`.
 ## Release lifecycle
 
 Bug → fix → local verify → **commit** → staging verify → deploy → prod verify. **DB migration approval is separate from code approval.**
+
+## Recorded pre-merge decisions (2026-11-04)
+
+**Code review approved for PR merge** — not approval for production deployment.
+
+1. **P25:** Rejected promotion stays rejected this release; no silent reopen. Follow-up: `docs/backlog/SKILLRR-RELEASE-01-promotion-reconsideration.md`.
+2. **P26:** Header/dropdown use fresh profile; JWT-only surfaces deferred.
