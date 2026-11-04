@@ -1,6 +1,6 @@
 # Fix verification — post correction (2026-11-04)
 
-Baseline: pre-correction audit in chat / project context.  
+Baseline: pre-correction audit in chat / project context.
 Branch: `fix/skillrr-audit-corrections`
 
 ## Phase 1 — Database environments

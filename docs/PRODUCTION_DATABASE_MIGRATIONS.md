@@ -13,7 +13,7 @@ ALTER TABLE profile
 
 File: `src/db/sql/add-profile-last-activity-date.sql`
 
-Dry-run locally: `npx tsx scripts/migrate-last-activity-date.ts`  
+Dry-run locally: `npx tsx scripts/migrate-last-activity-date.ts`
 Apply locally: `npx tsx scripts/migrate-last-activity-date.ts --apply`
 
 ## Required for assignment review (P24)

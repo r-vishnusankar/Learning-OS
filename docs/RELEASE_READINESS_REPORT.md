@@ -1,7 +1,7 @@
 # Skillrr release readiness report
 
-**Branch:** `fix/skillrr-audit-corrections`  
-**Baseline:** `de2d068` (`origin/main` before release candidate)  
+**Branch:** `fix/skillrr-audit-corrections`
+**Baseline:** `de2d068` (`origin/main` before release candidate)
 **Issue:** Correction-mode work was completed in the working tree but not committed; production at `de2d068` could not include P25/P26/P2 fixes.
 
 ## Release candidate commit
