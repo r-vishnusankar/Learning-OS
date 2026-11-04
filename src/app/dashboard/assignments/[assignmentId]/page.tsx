@@ -115,7 +115,7 @@ export default function AssignmentDetailPage() {
 
           {feedbackDisplay && (
             <div className="space-y-1">
-              {submission.status === "rejected" && (
+              {submission?.status === "rejected" && (
                 <p className="text-xs font-medium text-muted-foreground">Reviewer comment</p>
               )}
               <pre className="whitespace-pre-wrap rounded-xl bg-muted/50 p-3 font-sans text-sm">
