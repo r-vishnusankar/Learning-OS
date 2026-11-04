@@ -749,20 +749,26 @@ export async function reviewSubmissionAction(input: unknown): Promise<
     return { ok: false, code: "reason_required", message: "A comment is required when rejecting." };
   }
   const db = getDb();
+  const rejectPatch =
+    data.status === "rejected"
+      ? {
+          status: data.status,
+          feedback: reason,
+          score: null,
+          gradedAt: now,
+          reviewedBy: reviewerId,
+          reviewedAt: now,
+        }
+      : {
+          status: data.status,
+          score: data.score ?? submission.score,
+          feedback: reason ?? submission.feedback,
+          gradedAt:
+            data.status === "graded" || data.status === "approved" ? now : submission.gradedAt,
+        };
   await db
     .update(assignmentSubmissions)
-    .set({
-      status: data.status,
-      score: data.score ?? submission.score,
-      feedback: reason ?? submission.feedback,
-      gradedAt:
-        data.status === "graded" || data.status === "approved" || data.status === "rejected"
-          ? now
-          : submission.gradedAt,
-      ...(data.status === "rejected"
-        ? { reviewedBy: reviewerId, reviewedAt: now }
-        : {}),
-    })
+    .set(rejectPatch)
     .where(eq(assignmentSubmissions.id, data.submissionId));
 
   if (data.status === "rejected" && reason) {

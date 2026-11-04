@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CatalogCourse } from "../src/db/catalog/department-courses";
 import { buildDepartmentCourseCatalog } from "../src/db/catalog/department-courses";
@@ -189,12 +189,26 @@ async function runIntegrationTests(): Promise<void> {
   const courseVideoRows = (md.match(/\| Pass \|\n/g) ?? []).length;
   assert(courseVideoRows >= 168, "markdown has Pass rows in video check table");
 
+  const passInVideoTableFromResult =
+    md.split("## Course ↔ video check")[1]?.split("## Full audit")[0] ?? "";
+  const videoPassCountFromResult = (passInVideoTableFromResult.match(/\| Pass \|/g) ?? []).length;
+  assert(
+    videoPassCountFromResult === 168,
+    `generated markdown video pass count 168 (got ${videoPassCountFromResult})`
+  );
+
   const auditPath = join(process.cwd(), "docs", "COURSE_URL_AUDIT.md");
-  const onDisk = readFileSync(auditPath, "utf8");
-  assert(onDisk.includes("## Course ↔ video check"), "COURSE_URL_AUDIT.md has video check section");
-  const passInVideoTable = onDisk.split("## Course ↔ video check")[1]?.split("## Full audit")[0] ?? "";
-  const videoPassCount = (passInVideoTable.match(/\| Pass \|/g) ?? []).length;
-  assert(videoPassCount === 168, `on-disk video pass count 168 (got ${videoPassCount})`);
+  if (existsSync(auditPath)) {
+    const onDisk = readFileSync(auditPath, "utf8");
+    assert(onDisk.includes("## Course ↔ video check"), "COURSE_URL_AUDIT.md has video check section");
+    const passInVideoTable = onDisk.split("## Course ↔ video check")[1]?.split("## Full audit")[0] ?? "";
+    const videoPassCount = (passInVideoTable.match(/\| Pass \|/g) ?? []).length;
+    assert(videoPassCount === 168, `on-disk video pass count 168 (got ${videoPassCount})`);
+  } else {
+    console.log(
+      "  NOTE: docs/COURSE_URL_AUDIT.md not in repo; integration validated live audit markdown only"
+    );
+  }
 }
 
 async function main() {
