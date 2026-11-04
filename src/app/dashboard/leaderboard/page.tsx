@@ -256,7 +256,9 @@ export default function LeaderboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Achievements</CardTitle>
-            <CardDescription>Your badge collection with rarity tiers</CardDescription>
+            <CardDescription>
+              Sample badge gallery (demo data from mock.ts). Live achievement tracking is not wired yet.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

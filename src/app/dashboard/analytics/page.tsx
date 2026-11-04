@@ -139,6 +139,14 @@ export default function AnalyticsPage() {
         </Button>
       </PageHeader>
 
+      <div
+        role="status"
+        className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
+      >
+        Charts on this page use sample datasets from <code className="text-xs">src/data/mock.ts</code>{" "}
+        (department counts, weekly hours, trends). They are not wired to live org analytics yet.
+      </div>
+
       <motion.section
         {...fade}
         transition={{ duration: 0.4 }}

@@ -18,7 +18,7 @@ export function useMyEligibility() {
 
 export function usePromotionConsole(filters?: {
   departmentId?: string;
-  status?: "in_progress" | "eligible" | "blocked" | "max_level" | "all";
+  status?: "in_progress" | "eligible" | "blocked" | "max_level" | "rejected" | "all";
   search?: string;
 }) {
   return useQuery({
@@ -36,6 +36,8 @@ export function useApprovePromotion() {
       void qc.invalidateQueries({ queryKey: ["my-eligibility"] });
       void qc.invalidateQueries({ queryKey: ["admin-users"] });
       void qc.invalidateQueries({ queryKey: ["my-course-assignments"] });
+      void qc.invalidateQueries({ queryKey: ["me"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard-home"] });
     },
   });
 }
@@ -46,6 +48,9 @@ export function useRejectPromotion() {
     mutationFn: rejectPromotionAction,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["promotion-console"] });
+      void qc.invalidateQueries({ queryKey: ["my-eligibility"] });
+      void qc.invalidateQueries({ queryKey: ["me"] });
+      void qc.invalidateQueries({ queryKey: ["dashboard-home"] });
     },
   });
 }

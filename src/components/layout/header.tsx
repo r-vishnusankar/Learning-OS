@@ -29,6 +29,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useUIStore } from "@/store/ui-store";
 import { useUnreadNotificationCount } from "@/hooks/use-operations";
+import { useCurrentUser } from "@/hooks/use-me";
 import { formatNumber, isExamRoute } from "@/lib/utils";
 import { DEPARTMENT_LABELS, LEVEL_LABELS, firstLevelForDepartment, normalizeCareerLevel } from "@/constants/navigation";
 import { levelToBadgeVariant } from "@/lib/status-styles";
@@ -46,23 +47,26 @@ function initials(name: string) {
 export function Header() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { data: me } = useCurrentUser();
   const { setSidebarMobileOpen, setCommandOpen, setNotificationsOpen } = useUIStore();
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
   const { data: unread = 0 } = useUnreadNotificationCount();
 
   const user = session?.user;
-  const designation = user?.designation ?? "Team Member";
-  const department = user?.department ? DEPARTMENT_LABELS[user.department] : "Development";
-  const level = user?.level
-    ? user.department
-      ? normalizeCareerLevel(user.level, user.department)
-      : user.level
-    : user?.department
-      ? firstLevelForDepartment(user.department)
+  const profile = me ?? user;
+  const designation = profile?.designation ?? "Team Member";
+  const departmentKey = profile?.department ?? user?.department;
+  const department = departmentKey ? DEPARTMENT_LABELS[departmentKey] : "Development";
+  const level = profile?.level
+    ? departmentKey
+      ? normalizeCareerLevel(profile.level, departmentKey)
+      : profile.level
+    : departmentKey
+      ? firstLevelForDepartment(departmentKey)
       : "associate";
-  const xp = user?.xp ?? 0;
-  const coins = user?.coins ?? 0;
+  const xp = profile?.xp ?? user?.xp ?? 0;
+  const coins = profile?.coins ?? user?.coins ?? 0;
 
   React.useEffect(() => setMounted(true), []);
 
@@ -164,7 +168,7 @@ export function Header() {
           <DropdownMenuContent align="end" className="w-52 rounded-[length:var(--radius-lg)] border border-border shadow-(--shadow-md)">
             <DropdownMenuLabel>
               <div className="flex flex-col gap-1">
-                <span className="text-sm font-semibold">{user?.name ?? "Signed in user"}</span>
+                <span className="text-sm font-semibold">{me?.name ?? user?.name ?? "Signed in user"}</span>
                 <span className="text-xs font-normal text-muted-foreground">{user?.email}</span>
                 <Badge variant={levelToBadgeVariant(level)} className="mt-0.5 w-fit">
                   {LEVEL_LABELS[level]}
