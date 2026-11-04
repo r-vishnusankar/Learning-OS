@@ -6,7 +6,7 @@
 
 ## Release candidate commit
 
-**SHA:** `5004321` — `fix(release): recover audit corrections P25/P26/P2 and migration docs`
+**SHA:** `94bda8d` — `fix(release): recover audit corrections P25/P26/P2 and migration docs`
 
 Merge to `main`, Vercel deploy, and production Neon migrations are **separate human approvals**.
 
