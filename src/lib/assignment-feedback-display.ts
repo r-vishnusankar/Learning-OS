@@ -22,13 +22,3 @@ export function formatLearnerSubmissionFeedback(params: {
 
   return text;
 }
-
-/** Fields applied when an admin rejects a submission (for tests and server action). */
-export function rejectedSubmissionReviewPatch(reason: string, reviewedAt: Date) {
-  return {
-    status: "rejected" as const,
-    feedback: reason,
-    score: null,
-    gradedAt: reviewedAt,
-  };
-}
