@@ -6,6 +6,65 @@ import { Button } from "@/components/ui/button";
 import { resolveMediaEmbed } from "@/lib/media-embed";
 import { cn } from "@/lib/utils";
 
+/** YouTube IFrame API — minimal typings (no @types/youtube dependency). */
+type YtPlayerInstance = { destroy: () => void };
+
+declare global {
+  interface Window {
+    YT?: {
+      Player: new (
+        el: string | HTMLElement,
+        opts: { events?: { onStateChange?: (e: { data: number }) => void } }
+      ) => YtPlayerInstance;
+    };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+let youtubeIframeApiPromise: Promise<void> | null = null;
+
+function loadYouTubeIframeApi(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.YT?.Player) return Promise.resolve();
+
+  youtubeIframeApiPromise ??= new Promise<void>((resolve, reject) => {
+    const done = () => {
+      if (window.YT?.Player) resolve();
+      else reject(new Error("YouTube IFrame API ready but YT.Player is missing"));
+    };
+
+    if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      tag.async = true;
+      tag.onerror = () => reject(new Error("YouTube iframe API script failed to load"));
+      document.head.appendChild(tag);
+    }
+
+    const prev = window.onYouTubeIframeAPIReady;
+    const timeout = window.setTimeout(() => {
+      reject(new Error("YouTube iframe API load timed out"));
+    }, 20000);
+
+    window.onYouTubeIframeAPIReady = () => {
+      window.clearTimeout(timeout);
+      prev?.();
+      done();
+    };
+
+    if (window.YT?.Player) {
+      window.clearTimeout(timeout);
+      window.onYouTubeIframeAPIReady = prev;
+      done();
+    }
+  }).catch((err) => {
+    youtubeIframeApiPromise = null;
+    throw err;
+  });
+
+  return youtubeIframeApiPromise;
+}
+
 type LessonMediaProps = {
   type: string;
   content: string | null;
@@ -128,18 +187,17 @@ function EmbedPlayer({
 }) {
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const endedRef = React.useRef(onEnded);
-  endedRef.current = onEnded;
 
   React.useEffect(() => {
-    if (!onEnded) return;
-    if (embed.kind !== "youtube" && embed.kind !== "vimeo") return;
+    endedRef.current = onEnded;
+  }, [onEnded]);
+
+  /** Vimeo: postMessage "finish" (unchanged). */
+  React.useEffect(() => {
+    if (!onEnded || embed.kind !== "vimeo") return;
 
     const onMessage = (event: MessageEvent) => {
-      const origin = event.origin.replace(/\/$/, "");
-      const youtube = origin === "https://www.youtube.com" || origin === "https://www.youtube-nocookie.com";
-      const vimeo = origin === "https://player.vimeo.com";
-      if (embed.kind === "youtube" && !youtube) return;
-      if (embed.kind === "vimeo" && !vimeo) return;
+      if (event.origin.replace(/\/$/, "") !== "https://player.vimeo.com") return;
 
       let payload: unknown = event.data;
       if (typeof payload === "string") {
@@ -150,15 +208,12 @@ function EmbedPlayer({
         }
       }
       if (!payload || typeof payload !== "object") return;
-      const data = payload as { event?: string; info?: number; method?: string };
+      const data = payload as { event?: string };
 
-      if (embed.kind === "youtube" && data.event === "onStateChange" && data.info === 0) {
+      if (data.event === "finish") {
         endedRef.current?.();
       }
-      if (embed.kind === "vimeo" && data.event === "finish") {
-        endedRef.current?.();
-      }
-      if (embed.kind === "vimeo" && data.event === "ready") {
+      if (data.event === "ready") {
         iframeRef.current?.contentWindow?.postMessage(
           JSON.stringify({ method: "addEventListener", value: "finish" }),
           "https://player.vimeo.com"
@@ -167,12 +222,59 @@ function EmbedPlayer({
     };
 
     window.addEventListener("message", onMessage);
-    const iframe = iframeRef.current;
-    if (embed.kind === "youtube" && iframe?.contentWindow) {
-      iframe.contentWindow.postMessage(JSON.stringify({ event: "listening", id: 1 }), "https://www.youtube.com");
-    }
     return () => window.removeEventListener("message", onMessage);
   }, [embed.kind, onEnded]);
+
+  /**
+   * YouTube: official IFrame API `onStateChange` → ENDED (0).
+   * Replaces fragile postMessage subscription that often never fired.
+   */
+  React.useEffect(() => {
+    if (!onEnded || embed.kind !== "youtube") return;
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    let cancelled = false;
+    let player: YtPlayerInstance | null = null;
+    let endedFired = false;
+
+    const fireEnded = () => {
+      if (endedFired) return;
+      endedFired = true;
+      endedRef.current?.();
+    };
+
+    void (async () => {
+      try {
+        await loadYouTubeIframeApi();
+        if (cancelled || !iframeRef.current) return;
+        const YT = window.YT;
+        if (!YT?.Player) {
+          onError?.();
+          return;
+        }
+        player = new YT.Player(iframe, {
+          events: {
+            onStateChange: (e: { data: number }) => {
+              if (e.data === 0) fireEnded();
+            },
+          },
+        });
+      } catch {
+        if (!cancelled) onError?.();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      try {
+        player?.destroy();
+      } catch {
+        /* ignore */
+      }
+      player = null;
+    };
+  }, [embed.kind, embed.src, onEnded, onError]);
 
   if (embed.kind === "video") {
     return (

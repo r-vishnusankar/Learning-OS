@@ -46,7 +46,13 @@ import {
   replaceAssignmentAssignees,
 } from "@/db/queries/certification";
 import { requireAdminOrInstructor, requireUserId } from "@/lib/auth-utils";
-import { toPlainTextComment } from "@/lib/plain-text";
+import {
+  buildAssignmentRevisionNotification,
+  buildNonRejectReviewPatch,
+  buildRejectSubmissionPatch,
+  buildSubmitAssignmentPayload,
+  sanitizeRejectFeedback,
+} from "@/lib/assignment-review";
 import { generateCredentialId } from "@/lib/credentials";
 import { getProfileByUserId } from "@/lib/profile";
 import type {
@@ -573,14 +579,13 @@ export async function submitAssignmentAction(input: unknown) {
     }
   }
 
-  const payload = {
+  const payload = buildSubmitAssignmentPayload({
     content,
-    url: data.url || null,
-    status: "submitted" as const,
+    url: data.url ?? "",
     submittedAt: new Date(),
-    ...(score != null ? { score } : {}),
-    ...(feedback != null ? { feedback } : {}),
-  };
+    score,
+    feedback,
+  });
 
   if (existing) {
     const [updated] = await db
@@ -743,38 +748,51 @@ export async function reviewSubmissionAction(input: unknown): Promise<
   }
 
   const now = new Date();
-  const reason =
-    data.status === "rejected" ? toPlainTextComment(data.feedback ?? "") : data.feedback;
-  if (data.status === "rejected" && !reason) {
-    return { ok: false, code: "reason_required", message: "A comment is required when rejecting." };
-  }
   const db = getDb();
-  await db
-    .update(assignmentSubmissions)
-    .set({
-      status: data.status,
-      score: data.score ?? submission.score,
-      feedback: reason ?? submission.feedback,
-      gradedAt:
-        data.status === "graded" || data.status === "approved" || data.status === "rejected"
-          ? now
-          : submission.gradedAt,
-      ...(data.status === "rejected"
-        ? { reviewedBy: reviewerId, reviewedAt: now }
-        : {}),
-    })
-    .where(eq(assignmentSubmissions.id, data.submissionId));
 
-  if (data.status === "rejected" && reason) {
+  if (data.status === "rejected") {
+    const rejectReason = sanitizeRejectFeedback(data.feedback);
+    if (!rejectReason) {
+      return { ok: false, code: "reason_required", message: "A comment is required when rejecting." };
+    }
+    await db
+      .update(assignmentSubmissions)
+      .set(
+        buildRejectSubmissionPatch({
+          reason: rejectReason,
+          reviewerId,
+          reviewedAt: now,
+        })
+      )
+      .where(eq(assignmentSubmissions.id, data.submissionId));
+
     const assignment = await getHomeworkAssignmentById(submission.assignmentId);
+    const notice = buildAssignmentRevisionNotification({
+      assignmentTitle: assignment?.title,
+      assignmentId: submission.assignmentId,
+      reason: rejectReason,
+    });
     await db.insert(notifications).values({
       userId: submission.userId,
-      title: "Assignment needs revision",
-      message: `${assignment?.title ?? "Assignment"}: ${reason}`,
-      type: "warning",
-      href: `/dashboard/assignments/${submission.assignmentId}`,
+      title: notice.title,
+      message: notice.message,
+      type: notice.type,
+      href: notice.href,
       read: 0,
     });
+  } else {
+    await db
+      .update(assignmentSubmissions)
+      .set(
+        buildNonRejectReviewPatch({
+          status: data.status,
+          score: data.score,
+          feedback: data.feedback ?? submission.feedback,
+          submission,
+          reviewedAt: now,
+        })
+      )
+      .where(eq(assignmentSubmissions.id, data.submissionId));
   }
 
   revalidatePath("/dashboard/admin/assignments");

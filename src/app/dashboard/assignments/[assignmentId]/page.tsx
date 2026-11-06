@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAssignmentDetail, useSubmitAssignment } from "@/hooks/use-certification";
+import { formatLearnerSubmissionFeedback } from "@/lib/assignment-feedback-display";
 import { DEFAULT_CODING_CHECKS } from "@/lib/coding-checks";
 import type { CodingLanguage } from "@/types/coding";
 
@@ -51,6 +52,14 @@ export default function AssignmentDetailPage() {
   const locked = submission?.status === "graded" || submission?.status === "approved";
   const isCoding = assignment.submissionType === "coding";
   const coding = assignment.meta?.coding;
+  const feedbackDisplay =
+    submission &&
+    formatLearnerSubmissionFeedback({
+      status: submission.status,
+      feedback: submission.feedback,
+      score: submission.score,
+      maxScore: assignment.maxScore,
+    });
 
   return (
     <div className="space-y-6">
@@ -104,16 +113,13 @@ export default function AssignmentDetailPage() {
             </>
           )}
 
-          {submission?.feedback && (
+          {feedbackDisplay && (
             <div className="space-y-1">
-              {submission.status === "rejected" && (
+              {submission?.status === "rejected" && (
                 <p className="text-xs font-medium text-muted-foreground">Reviewer comment</p>
               )}
               <pre className="whitespace-pre-wrap rounded-xl bg-muted/50 p-3 font-sans text-sm">
-                {submission.feedback}
-                {submission.score != null
-                  ? `\n\nAuto/score: ${submission.score}/${assignment.maxScore}`
-                  : ""}
+                {feedbackDisplay}
               </pre>
             </div>
           )}

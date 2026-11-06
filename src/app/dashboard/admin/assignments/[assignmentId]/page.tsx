@@ -565,6 +565,7 @@ export default function AdminAssignmentDetailPage() {
                   toast.success("Rejected");
                   setRejectingId(null);
                   setRejectComment("");
+                  await refetch();
                 } catch (err) {
                   toast.error(err instanceof Error ? err.message : "Reject failed");
                 }
