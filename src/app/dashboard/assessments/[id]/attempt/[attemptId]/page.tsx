@@ -27,6 +27,7 @@ export default function AssessmentAttemptPage() {
   const submitAttempt = useSubmitAttempt();
   const [answers, setAnswers] = React.useState<Record<string, string | string[]>>({});
   const [index, setIndex] = React.useState(0);
+  const [visited, setVisited] = React.useState<Record<string, true>>({});
   const [secondsLeft, setSecondsLeft] = React.useState<number | null>(null);
   const [saveFailed, setSaveFailed] = React.useState(false);
   const [advanceError, setAdvanceError] = React.useState<string | null>(null);
@@ -37,8 +38,20 @@ export default function AssessmentAttemptPage() {
     if (!data) return;
     if (hydratedRef.current) return;
     setAnswers(data.attempt.answers ?? {});
+    setVisited(
+      Object.fromEntries(
+        Object.keys(data.attempt.answers ?? {}).map((id) => [id, true as const])
+      )
+    );
     hydratedRef.current = true;
   }, [data]);
+
+  React.useEffect(() => {
+    if (!data?.questions?.length) return;
+    const current = data.questions[index];
+    if (!current) return;
+    setVisited((prev) => (prev[current.id] ? prev : { ...prev, [current.id]: true }));
+  }, [data, index]);
 
   React.useEffect(() => {
     if (!data) return;
@@ -129,28 +142,16 @@ export default function AssessmentAttemptPage() {
 
   const currentAnswered = !question || isQuestionAnswered(answers[question.id]);
   const answeredCount = questions.filter((q) => isQuestionAnswered(answers[q.id])).length;
+  const skippedCount = questions.filter(
+    (q) => visited[q.id] && !isQuestionAnswered(answers[q.id])
+  ).length;
 
   const goNext = () => {
-    if (!currentAnswered) {
-      setAdvanceError("Select an answer before going to the next question.");
-      return;
-    }
     setAdvanceError(null);
     setIndex((i) => i + 1);
   };
 
   const onSubmit = async () => {
-    if (!currentAnswered) {
-      setAdvanceError("Select an answer before submitting.");
-      return;
-    }
-    const unanswered = questions
-      .map((q, i) => (isQuestionAnswered(answers[q.id]) ? null : i + 1))
-      .filter((n): n is number => n != null);
-    if (unanswered.length > 0) {
-      setAdvanceError(`Answer question${unanswered.length === 1 ? "" : "s"} ${unanswered.join(", ")} before submitting.`);
-      return;
-    }
     try {
       const result = await submitAttempt.mutateAsync({ attemptId: params.attemptId, answers });
       if (!result.ok) {
@@ -196,19 +197,26 @@ export default function AssessmentAttemptPage() {
 
       <div className="space-y-2">
         <p className="text-xs text-muted-foreground">
-          {answeredCount} of {questions.length} answered
+          {answeredCount} answered · {skippedCount} skipped · {questions.length - answeredCount - skippedCount} not visited
         </p>
         <div className="flex flex-wrap gap-1.5" role="navigation" aria-label="Question list">
           {questions.map((q, i) => {
             const answered = isQuestionAnswered(answers[q.id]);
+            const isSkipped = !answered && !!visited[q.id];
+            const isCurrent = i === index;
+            const label = answered
+              ? "answered"
+              : isSkipped
+                ? "skipped"
+                : "not attempted";
             return (
               <Button
                 key={q.id}
                 type="button"
                 size="icon-sm"
-                variant={i === index ? "default" : answered ? "secondary" : "outline"}
-                aria-current={i === index ? "step" : undefined}
-                aria-label={`Question ${i + 1}${answered ? ", answered" : ", not answered"}`}
+                variant={isCurrent ? "default" : answered ? "secondary" : isSkipped ? "destructive" : "outline"}
+                aria-current={isCurrent ? "step" : undefined}
+                aria-label={`Question ${i + 1}, ${label}`}
                 onClick={() => {
                   setAdvanceError(null);
                   setIndex(i);
@@ -330,11 +338,11 @@ export default function AssessmentAttemptPage() {
         </Button>
         <div className="flex gap-2">
           {index < questions.length - 1 ? (
-            <Button onClick={goNext} disabled={!currentAnswered}>
+            <Button onClick={goNext}>
               Next
             </Button>
           ) : (
-            <Button onClick={onSubmit} disabled={submitAttempt.isPending || !currentAnswered}>
+            <Button onClick={onSubmit} disabled={submitAttempt.isPending}>
               Submit assessment
             </Button>
           )}

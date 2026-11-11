@@ -30,7 +30,7 @@ import {
   HelpCircle,
   UserRoundSearch,
 } from "lucide-react";
-import { signOut, useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { cn, isExamRoute } from "@/lib/utils";
 import {
   ADMIN_NAV_GROUPS,
@@ -302,10 +302,9 @@ function withNotificationBadge(items: NavItem[], unreadCount: number): NavItem[]
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar, sidebarMobileOpen, setSidebarMobileOpen } = useUIStore();
-  const { data: session } = useSession();
   const { data: me } = useCurrentUser();
   const { data: unreadCount = 0 } = useUnreadNotificationCount();
-  const showAdmin = canAccessAdmin(me?.role ?? session?.user?.role);
+  const showAdmin = canAccessAdmin(me?.role);
 
   const learnerGroups = SIDEBAR_NAV_GROUPS.map((group) => ({
     ...group,

@@ -223,22 +223,40 @@ export async function getCourseProgressForUser(userId: string, courseId: string)
     .where(eq(modules.courseId, courseId));
 
   const { lessonProgress } = await import("@/db/schema");
-  const completedRows =
-    lessonRows.length === 0
+  const lessonIds = lessonRows.map((l) => l.id);
+  const progressRows =
+    lessonIds.length === 0
       ? []
       : await db
-          .select({ lessonId: lessonProgress.lessonId })
+          .select({
+            lessonId: lessonProgress.lessonId,
+            completed: lessonProgress.completed,
+            percentage: lessonProgress.percentage,
+            lastViewedAt: lessonProgress.lastViewedAt,
+          })
           .from(lessonProgress)
           .where(
-            and(
-              eq(lessonProgress.userId, userId),
-              inArray(
-                lessonProgress.lessonId,
-                lessonRows.map((l) => l.id)
-              ),
-              eq(lessonProgress.completed, true)
-            )
+            and(eq(lessonProgress.userId, userId), inArray(lessonProgress.lessonId, lessonIds))
           );
+
+  const completedLessonIds = progressRows.filter((r) => r.completed).map((r) => r.lessonId);
+  const startedLessonIds = progressRows
+    .filter(
+      (r) =>
+        !r.completed && ((r.percentage ?? 0) > 0 || r.lastViewedAt != null)
+    )
+    .map((r) => r.lessonId);
+  const resumeLessonId =
+    progressRows
+      .filter(
+        (r) =>
+          !r.completed && ((r.percentage ?? 0) > 0 || r.lastViewedAt != null)
+      )
+      .sort((a, b) => {
+        const aTs = a.lastViewedAt ? new Date(a.lastViewedAt).getTime() : 0;
+        const bTs = b.lastViewedAt ? new Date(b.lastViewedAt).getTime() : 0;
+        return bTs - aTs;
+      })[0]?.lessonId ?? null;
 
   const assessmentByCourse = await getPublishedAssessmentsByCourseIds([courseId]);
   const assessment = assessmentByCourse.get(courseId);
@@ -248,7 +266,9 @@ export async function getCourseProgressForUser(userId: string, courseId: string)
 
   const engine = courseProgress({
     lessons: lessonRows,
-    completedLessonIds: completedRows.map((r) => r.lessonId),
+    completedLessonIds,
+    startedLessonIds,
+    resumeLessonId,
     assessment: assessment
       ? { id: assessment.id, required: true, passed }
       : null,
@@ -375,6 +395,22 @@ export async function getUserCompletedLessonIdSet(userId: string) {
     .from(lessonProgress)
     .where(and(eq(lessonProgress.userId, userId), eq(lessonProgress.completed, true)));
   return new Set(rows.map((r) => r.lessonId));
+}
+
+/** All lesson progress rows for a user (one query). */
+export async function getUserLessonProgressMap(userId: string) {
+  const db = getDb();
+  const { lessonProgress } = await import("@/db/schema");
+  const rows = await db
+    .select({
+      lessonId: lessonProgress.lessonId,
+      completed: lessonProgress.completed,
+      percentage: lessonProgress.percentage,
+      lastViewedAt: lessonProgress.lastViewedAt,
+    })
+    .from(lessonProgress)
+    .where(eq(lessonProgress.userId, userId));
+  return new Map(rows.map((r) => [r.lessonId, r]));
 }
 
 /** Published course ids the user has progress on (recent first). */

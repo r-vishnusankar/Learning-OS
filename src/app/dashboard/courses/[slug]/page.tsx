@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS } from "@/constants/navigation";
 import { useCourseBySlug } from "@/hooks/use-courses";
+import { SHOW_INSTRUCTOR } from "@/lib/feature-flags";
 import { cn, formatHours } from "@/lib/utils";
 import { courseCtaLabel, courseResumePath } from "@/lib/course-progress";
 
@@ -84,10 +85,10 @@ export default function CourseDetailPage() {
             )}
             <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
               <span className="inline-flex items-center gap-1">
-                <Clock className="h-4 w-4" /> {formatHours(course.durationHours)}
+                <Clock className="h-4 w-4" /> Estimated duration: {formatHours(course.durationHours)}
               </span>
               <span>{course.lessonsCount} lessons</span>
-              <span>Instructor: {course.instructor.name}</span>
+              {SHOW_INSTRUCTOR ? <span>Instructor: {course.instructor.name}</span> : null}
             </div>
           </div>
         </div>

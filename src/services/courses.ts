@@ -15,7 +15,7 @@ import {
   getPublishedCourses,
   getPublishedCoursesByIds,
   getUserActiveCourseIds,
-  getUserCompletedLessonIdSet,
+  getUserLessonProgressMap,
   getUserLessonProgress,
 } from "@/db/queries/courses";
 import {
@@ -129,10 +129,10 @@ export async function fetchPublishedCoursesAction() {
   const profile = await (await import("@/lib/profile")).getProfileByUserId(userId);
   const userDepartmentId = profile?.department ?? undefined;
 
-  const [rows, prefs, completedSet, learnerCounts] = await Promise.all([
+  const [rows, prefs, progressByLesson, learnerCounts] = await Promise.all([
     getPublishedCourses(userDepartmentId),
     (await import("@/services/me")).fetchMyPreferencesAction(),
-    getUserCompletedLessonIdSet(userId),
+    getUserLessonProgressMap(userId),
     getActiveLearnerCountsByCourse(),
   ]);
   const saved = new Set(prefs.savedCourseIds ?? []);
@@ -148,7 +148,17 @@ export async function fetchPublishedCoursesAction() {
     const mods = modulesByCourse.get(row.course.id) ?? [];
     const lessonIds = mods.flatMap((m) => m.lessons.map((l) => l.id));
     const progressMap = Object.fromEntries(
-      lessonIds.map((id) => [id, { completed: completedSet.has(id) }])
+      lessonIds.map((id) => {
+        const p = progressByLesson.get(id);
+        return [
+          id,
+          {
+            completed: p?.completed ?? false,
+            percentage: p?.percentage ?? 0,
+            lastViewedAt: p?.lastViewedAt ?? null,
+          },
+        ];
+      })
     );
 
     return {
@@ -168,10 +178,10 @@ export async function fetchPublishedCoursesAction() {
 /** Lean list for dashboard home — only courses the learner has touched. */
 export async function fetchMyActiveCoursesAction(limit = 8) {
   const userId = await requireUserId();
-  const [activeIds, prefs, completedSet, learnerCounts] = await Promise.all([
+  const [activeIds, prefs, progressByLesson, learnerCounts] = await Promise.all([
     getUserActiveCourseIds(userId, limit),
     (await import("@/services/me")).fetchMyPreferencesAction(),
-    getUserCompletedLessonIdSet(userId),
+    getUserLessonProgressMap(userId),
     getActiveLearnerCountsByCourse(),
   ]);
   if (!activeIds.length) return [];
@@ -187,7 +197,17 @@ export async function fetchMyActiveCoursesAction(limit = 8) {
     const mods = modulesByCourse.get(row.course.id) ?? [];
     const lessonIds = mods.flatMap((m) => m.lessons.map((l) => l.id));
     const progressMap = Object.fromEntries(
-      lessonIds.map((id) => [id, { completed: completedSet.has(id) }])
+      lessonIds.map((id) => {
+        const p = progressByLesson.get(id);
+        return [
+          id,
+          {
+            completed: p?.completed ?? false,
+            percentage: p?.percentage ?? 0,
+            lastViewedAt: p?.lastViewedAt ?? null,
+          },
+        ];
+      })
     );
 
     return mapCourseToUi(
@@ -216,7 +236,14 @@ export async function fetchCourseBySlugAction(slug: string) {
     (await import("@/services/me")).fetchMyPreferencesAction(),
   ]);
   const progressMap = Object.fromEntries(
-    progressRows.map((p) => [p.lessonId, { completed: p.completed }])
+    progressRows.map((p) => [
+      p.lessonId,
+      {
+        completed: p.completed,
+        percentage: p.percentage,
+        lastViewedAt: p.lastViewedAt,
+      },
+    ])
   );
   const isSaved = (prefs.savedCourseIds ?? []).includes(row.course.id);
 

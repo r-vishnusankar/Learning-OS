@@ -113,8 +113,14 @@ const authConfig: NextAuthConfig = {
         token.mustChangePassword = cred?.mustChangePassword ?? false;
       } else if (user?.id) {
         token.id = user.id;
-      } else if (token.mustChangePassword === true && token.id && process.env.DATABASE_URL) {
-        // Re-read on every request while flag is set so it clears as soon as the user changes password
+      } else if (token.id && process.env.DATABASE_URL) {
+        const profile = await ensureProfile(token.id as string);
+        token.role = profile.role;
+        token.department = profile.department;
+        token.designation = profile.designation;
+        token.level = profile.level;
+        token.xp = profile.xp;
+        token.coins = profile.coins;
         const [cred] = await getDb()
           .select({ mustChangePassword: userCredentials.mustChangePassword })
           .from(userCredentials)

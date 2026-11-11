@@ -68,6 +68,7 @@ export default function AdminUsersPage() {
     email: "",
     department: "development" as DepartmentId,
     role: "employee" as UserRole,
+    password: "",
   });
   // Temporary password shown exactly once after a successful invite
   const [tempPassword, setTempPassword] = React.useState<string | null>(null);
@@ -94,11 +95,15 @@ export default function AdminUsersPage() {
         email: inviteForm.email,
         department: inviteForm.department,
         role: inviteForm.role,
+        password: inviteForm.password || undefined,
       });
-      setInviteForm({ name: "", email: "", department: "development", role: "employee" });
+      setInviteForm({ name: "", email: "", department: "development", role: "employee", password: "" });
       setInviteOpen(false);
-      // Show the temporary password once — admin must share it with the new user
-      setTempPassword(result.temporaryPassword);
+      // Show generated temporary password once (if admin did not provide one).
+      setTempPassword(result.temporaryPassword ?? null);
+      if (!result.temporaryPassword) {
+        toast.success("User created");
+      }
       setCopied(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Invite failed");
@@ -251,6 +256,12 @@ export default function AdminUsersPage() {
                     ))}
                   </select>
                 </div>
+                <Input
+                  type="password"
+                  value={inviteForm.password}
+                  onChange={(e) => setInviteForm((f) => ({ ...f, password: e.target.value }))}
+                  placeholder="Optional: set first password (min 8 chars)"
+                />
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setInviteOpen(false)}>
                     Cancel

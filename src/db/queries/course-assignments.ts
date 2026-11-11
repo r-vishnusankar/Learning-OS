@@ -229,6 +229,8 @@ export async function getProgressCells(userIds: string[], courseIds: string[]) {
       userId: lessonProgress.userId,
       lessonId: lessonProgress.lessonId,
       completed: lessonProgress.completed,
+      percentage: lessonProgress.percentage,
+      lastViewedAt: lessonProgress.lastViewedAt,
     })
     .from(lessonProgress)
     .where(
@@ -236,11 +238,17 @@ export async function getProgressCells(userIds: string[], courseIds: string[]) {
     );
 
   const completedByUser = new Map<string, Set<string>>();
+  const startedByUser = new Map<string, Set<string>>();
   for (const row of progressRows) {
-    if (!row.completed) continue;
-    const set = completedByUser.get(row.userId) ?? new Set<string>();
-    set.add(row.lessonId);
-    completedByUser.set(row.userId, set);
+    if (row.completed) {
+      const set = completedByUser.get(row.userId) ?? new Set<string>();
+      set.add(row.lessonId);
+      completedByUser.set(row.userId, set);
+    } else if ((row.percentage ?? 0) > 0 || row.lastViewedAt != null) {
+      const set = startedByUser.get(row.userId) ?? new Set<string>();
+      set.add(row.lessonId);
+      startedByUser.set(row.userId, set);
+    }
   }
 
   const assessmentByCourse = await getPublishedAssessmentsByCourseIds(courseIds);
@@ -252,12 +260,14 @@ export async function getProgressCells(userIds: string[], courseIds: string[]) {
   const result = new Map<string, ProgressCell>();
   for (const userId of userIds) {
     const completed = completedByUser.get(userId) ?? new Set<string>();
+    const started = startedByUser.get(userId) ?? new Set<string>();
     for (const courseId of courseIds) {
       const ids = lessonsByCourse.get(courseId) ?? [];
       const published = assessmentByCourse.get(courseId);
       const snap = courseProgress({
         lessons: ids.map((id) => ({ id })),
         completedLessonIds: ids.filter((id) => completed.has(id)),
+        startedLessonIds: ids.filter((id) => started.has(id)),
         assessment: published
           ? {
               id: published.id,

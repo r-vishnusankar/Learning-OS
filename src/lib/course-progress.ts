@@ -27,6 +27,10 @@ export type CourseProgressAssessment = {
 export type CourseProgressInput = {
   lessons: CourseProgressLesson[];
   completedLessonIds: Iterable<string>;
+  /** Any lesson with view/progress but not yet completed (e.g. 10% on open). */
+  startedLessonIds?: Iterable<string>;
+  /** Preferred lesson to resume when still in progress. */
+  resumeLessonId?: string | null;
   assessment?: CourseProgressAssessment | null;
 };
 
@@ -54,7 +58,9 @@ function none(): CourseProgressNextAction {
 export function courseProgress(input: CourseProgressInput): CourseProgressResult {
   const lessons = uniqueLessons(input.lessons ?? []);
   const completed = new Set(input.completedLessonIds ?? []);
+  const started = new Set(input.startedLessonIds ?? []);
   const completedCount = lessons.filter((l) => completed.has(l.id)).length;
+  const startedCount = lessons.filter((l) => started.has(l.id) && !completed.has(l.id)).length;
   const assessment = input.assessment?.required ? input.assessment : null;
   const assessmentItem = assessment ? 1 : 0;
   const assessmentDone = assessment?.passed ? 1 : 0;
@@ -80,15 +86,19 @@ export function courseProgress(input: CourseProgressInput): CourseProgressResult
   }
 
   const nextLesson = lessons.find((l) => !completed.has(l.id));
+  const resumeLessonId =
+    input.resumeLessonId &&
+    lessons.some((l) => l.id === input.resumeLessonId) &&
+    !completed.has(input.resumeLessonId)
+      ? input.resumeLessonId
+      : null;
   const status: CourseProgressStatus =
-    completedCount > 0 || assessmentDone > 0 ? "in_progress" : "not_started";
+    completedCount > 0 || startedCount > 0 || assessmentDone > 0 ? "in_progress" : "not_started";
 
   return {
     percent,
     status,
-    nextAction: nextLesson
-      ? { type: "lesson", id: nextLesson.id }
-      : none(),
+    nextAction: nextLesson ? { type: "lesson", id: resumeLessonId ?? nextLesson.id } : none(),
   };
 }
 

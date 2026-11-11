@@ -76,6 +76,25 @@ function run(): void {
   });
   assert(noneComplete.percent === 0, "none complete = 0");
   assert(noneComplete.status === "not_started", "none complete = not_started");
+
+  const startedOnly = courseProgress({
+    lessons: four,
+    completedLessonIds: [],
+    startedLessonIds: ["l1"],
+    assessment: exam,
+  });
+  assert(startedOnly.percent === 0, "started only = 0%");
+  assert(startedOnly.status === "in_progress", "started only = in_progress");
+  assert(startedOnly.nextAction.id === "l1", "started only next is l1");
+
+  const resumePrefersLastViewed = courseProgress({
+    lessons: four,
+    completedLessonIds: [],
+    startedLessonIds: ["l1", "l3"],
+    resumeLessonId: "l3",
+    assessment: exam,
+  });
+  assert(resumePrefersLastViewed.nextAction.id === "l3", "resume picks last viewed lesson");
   assert(noneComplete.nextAction.type === "lesson", "none complete next is first lesson");
   assert(noneComplete.nextAction.id === "l1", "none complete next is l1");
 

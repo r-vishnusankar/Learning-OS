@@ -21,6 +21,7 @@ export const inviteUserSchema = z.object({
   role: userRole.default("employee"),
   designation: z.string().max(120).optional(),
   managerId: z.string().nullable().optional(),
+  password: z.string().min(8).max(120).optional(),
 });
 
 export const updateUserSchema = z.object({

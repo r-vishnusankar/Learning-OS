@@ -7,7 +7,12 @@ import { resolveMediaEmbed } from "@/lib/media-embed";
 import { cn } from "@/lib/utils";
 
 /** YouTube IFrame API — minimal typings (no @types/youtube dependency). */
-type YtPlayerInstance = { destroy: () => void };
+type YtPlayerInstance = {
+  destroy: () => void;
+  getCurrentTime?: () => number;
+  getDuration?: () => number;
+  getPlayerState?: () => number;
+};
 
 declare global {
   interface Window {
@@ -187,10 +192,47 @@ function EmbedPlayer({
 }) {
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const endedRef = React.useRef(onEnded);
+  const errorRef = React.useRef(onError);
 
   React.useEffect(() => {
     endedRef.current = onEnded;
   }, [onEnded]);
+  React.useEffect(() => {
+    errorRef.current = onError;
+  }, [onError]);
+
+  /** YouTube postMessage fallback when IFrame API misses ENDED (e.g. pre-bound iframe). */
+  React.useEffect(() => {
+    if (!onEnded || embed.kind !== "youtube") return;
+
+    let endedFired = false;
+    const fireEnded = () => {
+      if (endedFired) return;
+      endedFired = true;
+      endedRef.current?.();
+    };
+
+    const onMessage = (event: MessageEvent) => {
+      const origin = event.origin.replace(/\/$/, "");
+      if (!origin.endsWith("youtube.com") && !origin.endsWith("youtube-nocookie.com")) return;
+
+      let payload: unknown = event.data;
+      if (typeof payload === "string") {
+        try {
+          payload = JSON.parse(payload);
+        } catch {
+          return;
+        }
+      }
+      if (!payload || typeof payload !== "object") return;
+      const data = payload as { event?: string; info?: number; playerState?: number };
+      if (data.event === "onStateChange" && data.info === 0) fireEnded();
+      if (typeof data.playerState === "number" && data.playerState === 0) fireEnded();
+    };
+
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [embed.kind]);
 
   /** Vimeo: postMessage "finish" (unchanged). */
   React.useEffect(() => {
@@ -237,6 +279,7 @@ function EmbedPlayer({
     let cancelled = false;
     let player: YtPlayerInstance | null = null;
     let endedFired = false;
+    let pollId: ReturnType<typeof setInterval> | undefined;
 
     const fireEnded = () => {
       if (endedFired) return;
@@ -244,16 +287,12 @@ function EmbedPlayer({
       endedRef.current?.();
     };
 
-    void (async () => {
+    const bindPlayer = () => {
+      if (cancelled || !iframeRef.current || player) return;
+      const YT = window.YT;
+      if (!YT?.Player) return;
       try {
-        await loadYouTubeIframeApi();
-        if (cancelled || !iframeRef.current) return;
-        const YT = window.YT;
-        if (!YT?.Player) {
-          onError?.();
-          return;
-        }
-        player = new YT.Player(iframe, {
+        player = new YT.Player(iframeRef.current, {
           events: {
             onStateChange: (e: { data: number }) => {
               if (e.data === 0) fireEnded();
@@ -261,12 +300,49 @@ function EmbedPlayer({
           },
         });
       } catch {
-        if (!cancelled) onError?.();
+        player = null;
       }
-    })();
+
+      pollId = setInterval(() => {
+        if (endedFired || !player) return;
+        try {
+          const state = player.getPlayerState?.();
+          if (state === 0) {
+            fireEnded();
+            return;
+          }
+          const duration = player.getDuration?.() ?? 0;
+          const current = player.getCurrentTime?.() ?? 0;
+          if (duration > 0 && current >= Math.max(0, duration - 1.5)) {
+            fireEnded();
+          }
+        } catch {
+          /* player not ready */
+        }
+      }, 500);
+    };
+
+    const onIframeLoad = () => {
+      void (async () => {
+        try {
+          await loadYouTubeIframeApi();
+          if (!cancelled) bindPlayer();
+        } catch {
+          if (!cancelled) errorRef.current?.();
+        }
+      })();
+    };
+
+    if (iframe.contentDocument?.readyState === "complete") {
+      onIframeLoad();
+    } else {
+      iframe.addEventListener("load", onIframeLoad);
+    }
 
     return () => {
       cancelled = true;
+      iframe.removeEventListener("load", onIframeLoad);
+      if (pollId) clearInterval(pollId);
       try {
         player?.destroy();
       } catch {
@@ -274,7 +350,7 @@ function EmbedPlayer({
       }
       player = null;
     };
-  }, [embed.kind, embed.src, onEnded, onError]);
+  }, [embed.kind, embed.src]);
 
   if (embed.kind === "video") {
     return (
