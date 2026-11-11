@@ -58,7 +58,10 @@ function mapLessonType(type: LessonContentType): Lesson["type"] {
 export function mapCourseToUi(
   row: DbCourseRow,
   modules: DbModule[] = [],
-  progressMap: Record<string, { completed: boolean }> = {},
+  progressMap: Record<
+    string,
+    { completed: boolean; percentage?: number; lastViewedAt?: Date | null }
+  > = {},
   isSaved = false,
   realLearnerCount?: number,
   assessment?: CourseProgressAssessment | null
@@ -103,9 +106,28 @@ export function mapCourseToUi(
   const completedLessonIds = Object.entries(progressMap)
     .filter(([, value]) => value.completed)
     .map(([id]) => id);
+  const startedLessonIds = Object.entries(progressMap)
+    .filter(
+      ([, value]) =>
+        !value.completed && ((value.percentage ?? 0) > 0 || value.lastViewedAt != null)
+    )
+    .map(([id]) => id);
+  const resumeLessonId =
+    Object.entries(progressMap)
+      .filter(
+        ([, value]) =>
+          !value.completed && ((value.percentage ?? 0) > 0 || value.lastViewedAt != null)
+      )
+      .sort(([, a], [, b]) => {
+        const aTs = a.lastViewedAt ? new Date(a.lastViewedAt).getTime() : 0;
+        const bTs = b.lastViewedAt ? new Date(b.lastViewedAt).getTime() : 0;
+        return bTs - aTs;
+      })[0]?.[0] ?? null;
   const engine = courseProgress({
     lessons: modules.flatMap((m) => m.lessons),
     completedLessonIds,
+    startedLessonIds,
+    resumeLessonId,
     assessment,
   });
 

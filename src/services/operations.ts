@@ -82,9 +82,11 @@ export async function inviteUserAction(input: unknown) {
   const existing = await db.select().from(users).where(eq(users.email, data.email)).limit(1);
   if (existing[0]) throw new Error("User with this email already exists");
 
-  // Generate and hash temporary password BEFORE any DB writes
-  const temporaryPassword = generateTemporaryPassword();
-  const passwordHash = await hashPassword(temporaryPassword);
+  // Admin can provide an explicit first password; otherwise generate one-time temp.
+  const providedPassword = data.password?.trim() || null;
+  const temporaryPassword = providedPassword ? null : generateTemporaryPassword();
+  const firstPassword = providedPassword ?? temporaryPassword!;
+  const passwordHash = await hashPassword(firstPassword);
 
   const [user] = await db
     .insert(users)
@@ -111,7 +113,7 @@ export async function inviteUserAction(input: unknown) {
     await db.insert(userCredentials).values({
       userId: user.id,
       passwordHash,
-      mustChangePassword: true,
+      mustChangePassword: !providedPassword,
     });
   } catch (credErr) {
     // Credential write failed: delete the user row so the email is not orphaned.
@@ -147,8 +149,7 @@ export async function inviteUserAction(input: unknown) {
 
   revalidatePath("/dashboard/admin/users");
 
-  // Return the plaintext password exactly once so the admin can hand it to the user.
-  // It is not stored, logged, or included in the audit entry above.
+  // Return plaintext only for generated temporary credentials.
   return { id: user.id, temporaryPassword };
 }
 
@@ -266,17 +267,34 @@ export async function fetchAuditLogsAction() {
 
 export async function fetchDepartmentsAction() {
   await requireUserId();
+  const { getDepartmentHub } = await import("@/db/queries/department-hub");
   const rows = await listDepartments();
-  return rows.map((d) => ({
-    id: d.id,
-    name: d.name,
-    description: d.description,
-    employeeCount: d.employeeCount,
-    courseCount: d.courseCount,
-    avgCompletion: d.avgCompletion,
-    color: d.color,
-    icon: d.icon,
-  }));
+  const hubs = await Promise.all(rows.map((d) => getDepartmentHub(d.id)));
+  return rows.map((d, index) => {
+    const hub = hubs[index];
+    if (!hub) {
+      return {
+        id: d.id,
+        name: d.name,
+        description: d.description,
+        employeeCount: d.employeeCount,
+        courseCount: d.courseCount,
+        avgCompletion: d.avgCompletion,
+        color: d.color,
+        icon: d.icon,
+      };
+    }
+    return {
+      id: hub.id,
+      name: hub.name,
+      description: hub.description,
+      employeeCount: hub.employeeCount,
+      courseCount: hub.courseCount,
+      avgCompletion: hub.avgCompletion,
+      color: hub.color,
+      icon: hub.icon,
+    };
+  });
 }
 
 export async function fetchDepartmentHubAction(departmentId: string) {

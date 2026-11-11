@@ -48,8 +48,28 @@ export const createCourseSchema = z.object({
   openToAll: z.boolean().default(true),
 });
 
-export const updateCourseSchema = createCourseSchema.partial().extend({
+/**
+ * Do not derive from createCourseSchema.partial() because create defaults can
+ * leak into partial updates (for example publish-only updates).
+ */
+export const updateCourseSchema = z.object({
   id: z.string().uuid(),
+  title: z.string().min(3).max(200).optional(),
+  description: z.string().min(10).max(5000).optional(),
+  departmentId: departmentIdSchema.optional(),
+  learningCategory: learningCategorySchema.optional(),
+  level: learningLevelSchema.optional(),
+  difficulty: difficultySchema.optional(),
+  thumbnailUrl: z.string().url().optional().or(z.literal("")),
+  categoryId: z.string().optional(),
+  instructorId: z.string().optional(),
+  language: z.string().optional(),
+  xpReward: z.number().int().min(0).optional(),
+  tags: z.array(z.string()).optional(),
+  learningObjectives: z.array(z.string()).optional(),
+  prerequisites: z.array(z.string()).optional(),
+  isTrending: z.boolean().optional(),
+  openToAll: z.boolean().optional(),
   publishStatus: publishStatusSchema.optional(),
   durationMinutes: z.number().int().min(0).optional(),
 });
