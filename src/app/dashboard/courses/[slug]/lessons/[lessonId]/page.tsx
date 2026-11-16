@@ -182,6 +182,7 @@ export default function LessonPlayerPage() {
 
         <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-border/80 bg-card p-2">
           <LessonMedia
+            key={lesson.id}
             type={lesson.type}
             content={lesson.content}
             title={lesson.title}

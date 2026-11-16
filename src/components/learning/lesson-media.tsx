@@ -292,6 +292,8 @@ function EmbedPlayer({
       const YT = window.YT;
       if (!YT?.Player) return;
       try {
+        // Re-use: Strict Mode may run cleanup without a second load event; skip if API already bound.
+        if (iframeRef.current.getAttribute("data-yt-bound") === "1") return;
         player = new YT.Player(iframeRef.current, {
           events: {
             onStateChange: (e: { data: number }) => {
@@ -299,6 +301,7 @@ function EmbedPlayer({
             },
           },
         });
+        iframeRef.current.setAttribute("data-yt-bound", "1");
       } catch {
         player = null;
       }
@@ -333,21 +336,20 @@ function EmbedPlayer({
       })();
     };
 
-    if (iframe.contentDocument?.readyState === "complete") {
-      onIframeLoad();
-    } else {
-      iframe.addEventListener("load", onIframeLoad);
-    }
+    iframe.addEventListener("load", onIframeLoad);
+    // Cross-origin iframes never expose contentDocument; after Strict Mode cleanup the
+    // load event will not fire again — schedule a bind attempt for an already-loaded frame.
+    const deferredBind = window.setTimeout(() => {
+      if (!cancelled && !player) onIframeLoad();
+    }, 400);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(deferredBind);
       iframe.removeEventListener("load", onIframeLoad);
       if (pollId) clearInterval(pollId);
-      try {
-        player?.destroy();
-      } catch {
-        /* ignore */
-      }
+      // Do not call player.destroy() — it replaces the iframe DOM and leaves a black box
+      // when the effect re-runs without a second load event (React Strict Mode).
       player = null;
     };
   }, [embed.kind, embed.src]);
