@@ -26,7 +26,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS, levelsForFilter } from "@/constants/navigation";
+import {
+  DEPARTMENT_LABELS,
+  LEARNING_CATEGORY_LABELS,
+  LEVEL_LABELS,
+  levelsForFilter,
+} from "@/constants/navigation";
+import {
+  DepartmentMultiSelect,
+  formatDepartmentList,
+} from "@/components/admin/department-multi-select";
 import {
   useAdminCourses,
   useArchiveCourse,
@@ -70,7 +79,7 @@ export default function AdminCoursesPage() {
   const [form, setForm] = React.useState({
     title: "",
     description: "",
-    departmentId: "development" as DepartmentId,
+    departmentIds: ["development"] as DepartmentId[],
     learningCategory: "role" as LearningCategory,
     openToAll: true,
   });
@@ -113,7 +122,7 @@ export default function AdminCoursesPage() {
       const result = await createCourse.mutateAsync({
         title: form.title,
         description: form.description || "Course description pending.",
-        departmentId: form.departmentId,
+        departmentIds: form.departmentIds,
         learningCategory: form.learningCategory,
         openToAll: form.openToAll,
       });
@@ -126,7 +135,7 @@ export default function AdminCoursesPage() {
       setForm({
         title: "",
         description: "",
-        departmentId: "development",
+        departmentIds: ["development"],
         learningCategory: "role",
         openToAll: true,
       });
@@ -175,19 +184,13 @@ export default function AdminCoursesPage() {
                       <p className="text-xs text-destructive">{fieldErrors.description[0]}</p>
                     ) : null}
                   </div>
-                  <select
-                    className="h-11 w-full rounded-2xl border border-input bg-card px-4 text-sm"
-                    value={form.departmentId}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, departmentId: e.target.value as DepartmentId }))
-                    }
-                  >
-                    {Object.entries(DEPARTMENT_LABELS).map(([id, label]) => (
-                      <option key={id} value={id}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Departments</p>
+                    <DepartmentMultiSelect
+                      value={form.departmentIds}
+                      onChange={(departmentIds) => setForm((f) => ({ ...f, departmentIds }))}
+                    />
+                  </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Learning category</p>
                     <div className="flex gap-2">
@@ -211,7 +214,7 @@ export default function AdminCoursesPage() {
                     <div>
                       <p className="text-sm font-medium">Open to all employees</p>
                       <p className="text-xs text-muted-foreground">
-                        When off, only employees in the selected department can see this course
+                        When off, only employees in the selected departments can see this course
                       </p>
                     </div>
                     <button
@@ -379,7 +382,12 @@ export default function AdminCoursesPage() {
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {DEPARTMENT_LABELS[course.departmentId as DepartmentId]} · {course.lessonsCount}{" "}
+                    {formatDepartmentList(
+                      (course as { departmentIds?: DepartmentId[] }).departmentIds ?? [
+                        course.departmentId as DepartmentId,
+                      ]
+                    )}{" "}
+                    · {course.lessonsCount}{" "}
                     lessons
                     {course.slug ? ` · ${course.slug}` : ""}
                   </p>

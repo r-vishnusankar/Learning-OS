@@ -17,6 +17,10 @@ import { useAdminUsers } from "@/hooks/use-operations";
 import { useAssignCourse } from "@/hooks/use-course-assignments";
 import { levelToBadgeVariant } from "@/lib/status-styles";
 import { cn } from "@/lib/utils";
+import {
+  DepartmentMultiSelect,
+  formatDepartmentList,
+} from "@/components/admin/department-multi-select";
 import type { DepartmentId, LearningCategory, LearningLevel } from "@/types";
 
 type Scope = "org" | "department" | "user";
@@ -34,7 +38,7 @@ export default function AssignCoursesPage() {
   const [selectedCourseIds, setSelectedCourseIds] = React.useState<string[]>([]);
 
   const [scope, setScope] = React.useState<Scope>("department");
-  const [audienceDept, setAudienceDept] = React.useState<DepartmentId | "">("");
+  const [audienceDepts, setAudienceDepts] = React.useState<DepartmentId[]>([]);
   const [userIds, setUserIds] = React.useState<string[]>([]);
   const [userSearch, setUserSearch] = React.useState("");
   const [mandatory, setMandatory] = React.useState(true);
@@ -46,7 +50,10 @@ export default function AssignCoursesPage() {
   const filteredCourses = React.useMemo(() => {
     const q = courseSearch.trim().toLowerCase();
     return courses.filter((c) => {
-      if (filterDept !== "all" && c.departmentId !== filterDept) return false;
+      if (filterDept !== "all") {
+        const ids = c.departmentIds ?? [c.departmentId];
+        if (!ids.includes(filterDept)) return false;
+      }
       if (filterLevel !== "all" && c.level !== filterLevel) return false;
       if (filterCategory !== "all" && c.learningCategory !== filterCategory) return false;
       if (!q) return true;
@@ -89,7 +96,7 @@ export default function AssignCoursesPage() {
   const canSubmit =
     selectedCourseIds.length > 0 &&
     (scope === "org" ||
-      (scope === "department" && Boolean(audienceDept)) ||
+      (scope === "department" && audienceDepts.length > 0) ||
       (scope === "user" && userIds.length > 0));
 
   const onAssign = async () => {
@@ -97,7 +104,7 @@ export default function AssignCoursesPage() {
       const result = await assign.mutateAsync({
         courseIds: selectedCourseIds,
         scope,
-        departmentId: audienceDept || undefined,
+        departmentIds: scope === "department" ? audienceDepts : undefined,
         userIds: scope === "user" ? userIds : undefined,
         mandatory,
         startDate: startDate || null,
@@ -256,7 +263,7 @@ export default function AssignCoursesPage() {
                       </p>
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         <Badge variant="secondary">
-                          {DEPARTMENT_LABELS[course.departmentId] ?? course.departmentId}
+                          {formatDepartmentList(course.departmentIds ?? [course.departmentId])}
                         </Badge>
                         <Badge variant={levelToBadgeVariant(course.level)}>
                           {LEVEL_LABELS[course.level] ?? course.level}
@@ -306,20 +313,9 @@ export default function AssignCoursesPage() {
               </div>
 
               {scope === "department" && (
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium">Target department</label>
-                  <select
-                    className="flex h-12 w-full rounded-2xl bg-card px-4 text-sm shadow-(--shadow-sm) focus:outline-none focus:ring-2 focus:ring-ring"
-                    value={audienceDept}
-                    onChange={(e) => setAudienceDept(e.target.value as DepartmentId)}
-                  >
-                    <option value="">Select department…</option>
-                    {departments.map(([id, label]) => (
-                      <option key={id} value={id}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Target departments</label>
+                  <DepartmentMultiSelect value={audienceDepts} onChange={setAudienceDepts} />
                 </div>
               )}
 
@@ -409,8 +405,8 @@ export default function AssignCoursesPage() {
             {selectedCourseIds.length === 1 ? "" : "s"}
             {scope === "user"
               ? ` · ${userIds.length} employee${userIds.length === 1 ? "" : "s"}`
-              : scope === "department" && audienceDept
-                ? ` · ${DEPARTMENT_LABELS[audienceDept]}`
+              : scope === "department" && audienceDepts.length > 0
+                ? ` · ${formatDepartmentList(audienceDepts)}`
                 : scope === "org"
                   ? " · entire organization"
                   : ""}

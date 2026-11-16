@@ -73,6 +73,8 @@ export interface Course {
   description: string;
   thumbnail: string;
   department: DepartmentId;
+  /** All departments when loaded from join table; otherwise same as department. */
+  departments?: DepartmentId[];
   level: LearningLevel;
   difficulty: Difficulty;
   learningCategory: LearningCategory;

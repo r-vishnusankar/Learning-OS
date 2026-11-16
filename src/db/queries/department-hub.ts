@@ -82,16 +82,19 @@ export async function getDepartmentHub(departmentId: string): Promise<Department
   });
   const userIds = members.map((m) => m.userId);
 
-  const courseRows = await db
-    .select({ id: courses.id })
+  const publishedCourses = await db
+    .select({ id: courses.id, departmentId: courses.departmentId, openToAll: courses.openToAll })
     .from(courses)
-    .where(
-      and(
-        eq(courses.publishStatus, "published"),
-        or(eq(courses.openToAll, true), eq(courses.departmentId, dept.id))
-      )
-    );
-  const courseIds = courseRows.map((c) => c.id);
+    .where(eq(courses.publishStatus, "published"));
+
+  const { listDepartmentIdsByCourseIds } = await import("@/db/queries/course-departments");
+  const { courseVisibleToUser } = await import("@/lib/course-departments");
+  const deptMap = await listDepartmentIdsByCourseIds(publishedCourses.map((c) => c.id));
+  const courseIds = publishedCourses
+    .filter((c) =>
+      courseVisibleToUser(c.openToAll, c.departmentId, deptMap.get(c.id), dept.id)
+    )
+    .map((c) => c.id);
 
   const cells = await getProgressCells(userIds, courseIds);
   const rollup = rollupDepartmentCells([...cells.values()]);

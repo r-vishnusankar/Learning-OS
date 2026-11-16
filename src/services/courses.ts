@@ -46,6 +46,16 @@ import { courses, instructors, lessonResources, lessons, mediaAssets, modules } 
 import type { PublishStatus } from "@/db/schema/courses";
 import { requireAdminOrInstructor, requireCourseAssigner, requireUserId } from "@/lib/auth-utils";
 import { mapCourseToUi } from "@/lib/course-mapper";
+import {
+  courseMatchesDepartmentFilter,
+  effectiveDepartmentIds,
+} from "@/lib/course-departments";
+import {
+  listDepartmentIdsByCourseIds,
+  listDepartmentIdsForCourse,
+  syncCourseDepartments,
+} from "@/db/queries/course-departments";
+import type { DepartmentId } from "@/types";
 import { uniqueSlug } from "@/lib/slug";
 import {
   addLessonResourceSchema,
@@ -70,9 +80,14 @@ export async function fetchAdminCoursesAction(filters?: {
   await requireAdminOrInstructor();
   const rows = await getAdminCourses(filters);
   const lessonCounts = await countLessonsForCourses(rows.map((r) => r.course.id));
+  const deptMap = await listDepartmentIdsByCourseIds(rows.map((r) => r.course.id));
 
   return rows.map((row) => ({
     ...row.course,
+    departmentIds: effectiveDepartmentIds(
+      row.course.departmentId,
+      deptMap.get(row.course.id)
+    ),
     instructorName: row.instructor?.name ?? null,
     lessonsCount: lessonCounts.get(row.course.id) ?? 0,
   }));
@@ -91,13 +106,24 @@ export async function fetchRecommendedCoursesAction(limit = 12) {
   ]);
 
   const busy = new Set(activeIds);
+  const deptMap = await listDepartmentIdsByCourseIds(rows.map((r) => r.course.id));
   const ranked = rows
     .filter((row) => !busy.has(row.course.id))
     .sort((a, b) => {
-      const score = (row: (typeof rows)[number]) =>
-        (row.course.departmentId === userDepartmentId ? 4 : 0) +
-        (row.course.isTrending ? 3 : 0) +
-        (row.course.rating ?? 0);
+      const score = (row: (typeof rows)[number]) => {
+        const deptMatch =
+          userDepartmentId &&
+          courseMatchesDepartmentFilter(
+            row.course.departmentId,
+            deptMap.get(row.course.id),
+            userDepartmentId as DepartmentId
+          );
+        return (
+          (deptMatch ? 4 : 0) +
+          (row.course.isTrending ? 3 : 0) +
+          (row.course.rating ?? 0)
+        );
+      };
       return score(b) - score(a);
     })
     .slice(0, limit);
@@ -111,11 +137,16 @@ export async function fetchRecommendedCoursesAction(limit = 12) {
 export async function fetchAssignableCoursesAction() {
   await requireCourseAssigner();
   const rows = await getAdminCourses({ publishStatus: "published" });
+  const deptMap = await listDepartmentIdsByCourseIds(rows.map((r) => r.course.id));
   return rows.map((row) => ({
     id: row.course.id,
     title: row.course.title,
     description: row.course.description,
     departmentId: row.course.departmentId,
+    departmentIds: effectiveDepartmentIds(
+      row.course.departmentId,
+      deptMap.get(row.course.id)
+    ),
     level: row.course.level,
     difficulty: row.course.difficulty,
     learningCategory: row.course.learningCategory,
@@ -143,6 +174,7 @@ export async function fetchPublishedCoursesAction() {
   ]);
   const { listPublishedPathsByCourseIds } = await import("@/db/queries/certification");
   const pathMap = await listPublishedPathsByCourseIds(courseIds);
+  const deptMap = await listDepartmentIdsByCourseIds(courseIds);
 
   return rows.map((row) => {
     const mods = modulesByCourse.get(row.course.id) ?? [];
@@ -168,7 +200,8 @@ export async function fetchPublishedCoursesAction() {
         progressMap,
         saved.has(row.course.id),
         learnerCounts.get(row.course.id) ?? 0,
-        assessments.get(row.course.id)
+        assessments.get(row.course.id),
+        deptMap.get(row.course.id)
       ),
       paths: pathMap.get(row.course.id) ?? [],
     };
@@ -192,6 +225,7 @@ export async function fetchMyActiveCoursesAction(limit = 8) {
     getModulesWithLessonsForCourses(activeIds),
     assessmentByCourseForUser(userId, activeIds),
   ]);
+  const deptMap = await listDepartmentIdsByCourseIds(activeIds);
 
   return rows.map((row) => {
     const mods = modulesByCourse.get(row.course.id) ?? [];
@@ -216,7 +250,8 @@ export async function fetchMyActiveCoursesAction(limit = 8) {
       progressMap,
       saved.has(row.course.id),
       learnerCounts.get(row.course.id) ?? 0,
-      assessments.get(row.course.id)
+      assessments.get(row.course.id),
+      deptMap.get(row.course.id)
     );
   });
 }
@@ -246,6 +281,7 @@ export async function fetchCourseBySlugAction(slug: string) {
     ])
   );
   const isSaved = (prefs.savedCourseIds ?? []).includes(row.course.id);
+  const extraDeptIds = await listDepartmentIdsForCourse(row.course.id);
 
   const mapped = mapCourseToUi(
     row,
@@ -253,7 +289,8 @@ export async function fetchCourseBySlugAction(slug: string) {
     progressMap,
     isSaved,
     undefined,
-    assessments.get(row.course.id)
+    assessments.get(row.course.id),
+    extraDeptIds
   );
   const { listPublishedPathsByCourseIds } = await import("@/db/queries/certification");
   const pathMap = await listPublishedPathsByCourseIds([row.course.id]);
@@ -266,8 +303,10 @@ export async function fetchCourseBuilderAction(courseId: string) {
   if (!course) return null;
   const mods = await getCourseModulesWithLessons(courseId);
   const knowledgeCheck = await getAssessmentByCourseId(courseId);
+  const extraDeptIds = await listDepartmentIdsForCourse(courseId);
+  const departmentIds = effectiveDepartmentIds(course.course.departmentId, extraDeptIds);
   return {
-    course,
+    course: { ...course, departmentIds },
     modules: mods,
     knowledgeCheck: knowledgeCheck
       ? {
@@ -291,6 +330,10 @@ export async function createCourseAction(
     return { ok: false, fieldErrors: result.error.flatten().fieldErrors };
   }
   const data = result.data;
+  const departmentIds = effectiveDepartmentIds(
+    (data.departmentIds?.[0] ?? data.departmentId)!,
+    data.departmentIds ?? (data.departmentId ? [data.departmentId] : undefined)
+  );
   const db = getDb();
   const slug = await uniqueSlug(data.title, (s) => courseSlugExists(s));
 
@@ -300,7 +343,7 @@ export async function createCourseAction(
       title: data.title,
       description: data.description,
       slug,
-      departmentId: data.departmentId,
+      departmentId: departmentIds[0],
       learningCategory: data.learningCategory,
       level: data.level,
       difficulty: data.difficulty,
@@ -318,6 +361,8 @@ export async function createCourseAction(
     })
     .returning();
 
+  await syncCourseDepartments(created.id, departmentIds);
+
   revalidatePath("/dashboard/admin/courses");
   return { ok: true, data: created };
 }
@@ -327,12 +372,19 @@ export async function updateCourseAction(input: unknown) {
   const data = updateCourseSchema.parse(input);
   const db = getDb();
 
+  let departmentIds: DepartmentId[] | undefined;
+  if (data.departmentIds?.length) {
+    departmentIds = effectiveDepartmentIds(data.departmentIds[0], data.departmentIds);
+  } else if (data.departmentId !== undefined) {
+    departmentIds = [data.departmentId];
+  }
+
   const [updated] = await db
     .update(courses)
     .set({
       ...(data.title !== undefined ? { title: data.title } : {}),
       ...(data.description !== undefined ? { description: data.description } : {}),
-      ...(data.departmentId !== undefined ? { departmentId: data.departmentId } : {}),
+      ...(departmentIds !== undefined ? { departmentId: departmentIds[0] } : {}),
       ...(data.level !== undefined ? { level: data.level } : {}),
       ...(data.difficulty !== undefined ? { difficulty: data.difficulty } : {}),
       ...(data.learningCategory !== undefined
@@ -356,6 +408,10 @@ export async function updateCourseAction(input: unknown) {
     })
     .where(eq(courses.id, data.id))
     .returning();
+
+  if (departmentIds !== undefined) {
+    await syncCourseDepartments(data.id, departmentIds);
+  }
 
   revalidatePath("/dashboard/admin/courses");
   revalidatePath(`/dashboard/admin/courses/${data.id}`);

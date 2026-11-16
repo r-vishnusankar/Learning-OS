@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 import type { DepartmentId, Difficulty, LearningCategory, LearningLevel } from "@/types";
 import { departments, users } from "./auth";
 
@@ -75,6 +75,21 @@ export const courses = pgTable("course", {
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
+
+/** Extra departments beyond {@link courses.departmentId} (primary). */
+export const courseDepartments = pgTable(
+  "course_department",
+  {
+    courseId: text("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    departmentId: text("department_id")
+      .$type<DepartmentId>()
+      .notNull()
+      .references(() => departments.id),
+  },
+  (t) => [primaryKey({ columns: [t.courseId, t.departmentId] })]
+);
 
 export const modules = pgTable("module", {
   id: text("id")

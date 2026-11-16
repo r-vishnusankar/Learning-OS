@@ -19,7 +19,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ClipboardCheck, Edit, GripVertical, Plus, Trash2 } from "lucide-react";
+import Image from "next/image";
+import { ClipboardCheck, Edit, GripVertical, ImagePlus, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DEPARTMENT_LABELS, LEARNING_CATEGORY_LABELS, LEVEL_LABELS, levelsForDepartment } from "@/constants/navigation";
+import {
+  DEPARTMENT_LABELS,
+  LEARNING_CATEGORY_LABELS,
+  LEVEL_LABELS,
+  levelsForDepartment,
+} from "@/constants/navigation";
+import { DepartmentMultiSelect } from "@/components/admin/department-multi-select";
 import { useCourseBuilder } from "@/hooks/use-courses";
 import { useOpenOrCreateKnowledgeCheck } from "@/hooks/use-assessments";
 import {
@@ -91,6 +98,8 @@ export default function CourseBuilderPage() {
   const [moduleTitle, setModuleTitle] = React.useState("");
   const [lessonForms, setLessonForms] = React.useState<Record<string, { title: string; type: string }>>({});
   const [editingLesson, setEditingLesson] = React.useState<(LessonRow & { moduleId: string }) | null>(null);
+  const [thumbnailUploading, setThumbnailUploading] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -108,6 +117,41 @@ export default function CourseBuilderPage() {
 
   const { course, modules, knowledgeCheck } = data;
   const c = course.course;
+  const departmentIds =
+  (course as { departmentIds?: DepartmentId[] }).departmentIds ?? [c.departmentId as DepartmentId];
+
+  const persistThumbnailUrl = async (thumbnailUrl: string) => {
+    try {
+      await updateCourseAction({ id: courseId, thumbnailUrl });
+      refetch();
+      toast.success(thumbnailUrl ? "Thumbnail updated" : "Thumbnail removed");
+    } catch {
+      toast.error("Could not save thumbnail");
+    }
+  };
+
+  const onThumbnailFile = async (file: File | undefined) => {
+    if (!file) return;
+    setThumbnailUploading(true);
+    try {
+      const body = new FormData();
+      body.set("file", file);
+      const res = await fetch("/api/admin/course-thumbnail", { method: "POST", body });
+      const json = (await res.json()) as
+        | { ok: true; url: string }
+        | { ok: false; message?: string };
+      if (!json.ok) {
+        toast.error(json.message ?? "Upload failed");
+        return;
+      }
+      await persistThumbnailUrl(json.url);
+    } catch {
+      toast.error("Upload failed");
+    } finally {
+      setThumbnailUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const goToKnowledgeCheck = async () => {
     if (knowledgeCheck) {
@@ -207,14 +251,69 @@ export default function CourseBuilderPage() {
               refetch();
             }}
           />
-          <Input
-            placeholder="Thumbnail URL"
-            defaultValue={c.thumbnailUrl ?? ""}
-            onBlur={async (e) => {
-              await updateCourseAction({ id: courseId, thumbnailUrl: e.target.value });
-              refetch();
-            }}
-          />
+          <div className="space-y-3 md:col-span-2">
+            <p className="text-sm font-medium">Thumbnail</p>
+            <div className="flex flex-wrap items-start gap-4">
+              <div className="relative h-28 w-48 overflow-hidden rounded-2xl border border-input bg-muted">
+                {c.thumbnailUrl ? (
+                  <Image
+                    src={c.thumbnailUrl}
+                    alt=""
+                    fill
+                    className="object-cover"
+                    sizes="192px"
+                    unoptimized={c.thumbnailUrl.includes("blob.vercel-storage.com")}
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                    No image
+                  </div>
+                )}
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="sr-only"
+                  onChange={(e) => void onThumbnailFile(e.target.files?.[0])}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={thumbnailUploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <ImagePlus className="h-4 w-4" />
+                  {thumbnailUploading ? "Uploading…" : "Attach photo"}
+                </Button>
+                {c.thumbnailUrl ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-fit"
+                    disabled={thumbnailUploading}
+                    onClick={() => void persistThumbnailUrl("")}
+                  >
+                    <X className="h-4 w-4" />
+                    Remove
+                  </Button>
+                ) : null}
+                <Input
+                  key={c.thumbnailUrl ?? "empty"}
+                  placeholder="Or paste image URL"
+                  defaultValue={c.thumbnailUrl ?? ""}
+                  onBlur={async (e) => {
+                    const v = e.target.value.trim();
+                    if (v === (c.thumbnailUrl ?? "")) return;
+                    await persistThumbnailUrl(v);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
           <textarea
             className="min-h-24 rounded-2xl border border-input bg-card px-4 py-3 text-sm md:col-span-2"
             defaultValue={c.description}
@@ -223,20 +322,19 @@ export default function CourseBuilderPage() {
               refetch();
             }}
           />
-          <select
-            className="h-11 rounded-2xl border border-input bg-card px-3 text-sm"
-            defaultValue={c.departmentId}
-            onChange={async (e) => {
-              await updateCourseAction({ id: courseId, departmentId: e.target.value as DepartmentId });
-              refetch();
-            }}
-          >
-            {Object.entries(DEPARTMENT_LABELS).map(([id, label]) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
+          <div className="space-y-2 md:col-span-2">
+            <p className="text-sm font-medium">Departments</p>
+            <DepartmentMultiSelect
+              value={departmentIds}
+              onChange={async (next) => {
+                await updateCourseAction({ id: courseId, departmentIds: next });
+                refetch();
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Primary: {DEPARTMENT_LABELS[departmentIds[0]] ?? departmentIds[0]}
+            </p>
+          </div>
           <select
             className="h-11 rounded-2xl border border-input bg-card px-3 text-sm"
             defaultValue={c.level}
@@ -319,7 +417,7 @@ export default function CourseBuilderPage() {
             <div>
               <p className="text-sm font-medium">Open to all employees</p>
               <p className="text-xs text-muted-foreground">
-                When off, only employees in the selected department can see this course
+                When off, only employees in the selected departments can see this course
               </p>
             </div>
             <button

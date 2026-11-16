@@ -29,10 +29,12 @@ export const learningLevelSchema = z.enum([
 export const difficultySchema = z.enum(["beginner", "intermediate", "advanced", "expert"]);
 export const learningCategorySchema = z.enum(["role", "goal"]);
 
-export const createCourseSchema = z.object({
+export const createCourseSchema = z
+  .object({
   title: z.string().min(3).max(200),
   description: z.string().min(10).max(5000),
-  departmentId: departmentIdSchema,
+  departmentId: departmentIdSchema.optional(),
+  departmentIds: z.array(departmentIdSchema).min(1).optional(),
   learningCategory: learningCategorySchema,
   level: learningLevelSchema.default("intermediate"),
   difficulty: difficultySchema.default("intermediate"),
@@ -46,7 +48,18 @@ export const createCourseSchema = z.object({
   prerequisites: z.array(z.string()).default([]),
   isTrending: z.boolean().default(false),
   openToAll: z.boolean().default(true),
-});
+})
+  .superRefine((data, ctx) => {
+    const hasSingle = Boolean(data.departmentId);
+    const hasMany = Boolean(data.departmentIds && data.departmentIds.length > 0);
+    if (!hasSingle && !hasMany) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Select at least one department",
+        path: ["departmentIds"],
+      });
+    }
+  });
 
 /**
  * Do not derive from createCourseSchema.partial() because create defaults can
@@ -57,6 +70,7 @@ export const updateCourseSchema = z.object({
   title: z.string().min(3).max(200).optional(),
   description: z.string().min(10).max(5000).optional(),
   departmentId: departmentIdSchema.optional(),
+  departmentIds: z.array(departmentIdSchema).min(1).optional(),
   learningCategory: learningCategorySchema.optional(),
   level: learningLevelSchema.optional(),
   difficulty: difficultySchema.optional(),
