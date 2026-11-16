@@ -4,6 +4,8 @@ import {
   courseProgress,
   type CourseProgressAssessment,
 } from "@/lib/course-progress";
+import { effectiveDepartmentIds } from "@/lib/course-departments";
+import type { DepartmentId } from "@/types";
 
 type DbCourseRow = {
   course: {
@@ -64,7 +66,8 @@ export function mapCourseToUi(
   > = {},
   isSaved = false,
   realLearnerCount?: number,
-  assessment?: CourseProgressAssessment | null
+  assessment?: CourseProgressAssessment | null,
+  extraDepartments?: DepartmentId[]
 ): Course {
   let lessonIndex = 0;
 
@@ -147,6 +150,10 @@ export function mapCourseToUi(
     description: row.course.description,
     thumbnail: row.course.thumbnailUrl ?? "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&q=80",
     department: row.course.departmentId as Course["department"],
+    departments: effectiveDepartmentIds(
+      row.course.departmentId as DepartmentId,
+      extraDepartments
+    ),
     level: row.course.level,
     difficulty: row.course.difficulty,
     learningCategory: row.course.learningCategory ?? "role",

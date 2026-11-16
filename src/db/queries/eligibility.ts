@@ -130,14 +130,24 @@ export async function computePromotionEligibility(
       and(
         eq(courseAssignments.userId, userId),
         eq(courseAssignments.mandatory, true),
-        eq(courses.level, currentLevel),
-        eq(courses.departmentId, person.department)
+        eq(courses.level, currentLevel)
       )
     );
 
+  const { listDepartmentIdsByCourseIds } = await import("@/db/queries/course-departments");
+  const { courseMatchesDepartmentFilter } = await import("@/lib/course-departments");
+  const deptMap = await listDepartmentIdsByCourseIds(assignmentRows.map((r) => r.courseId));
+  const scopedAssignments = assignmentRows.filter((row) =>
+    courseMatchesDepartmentFilter(
+      row.courseDept,
+      deptMap.get(row.courseId),
+      person.department
+    )
+  );
+
   const courseRows: CourseEligibilityRow[] = [];
 
-  for (const row of assignmentRows) {
+  for (const row of scopedAssignments) {
     const snap = await getCourseProgressForUser(userId, row.courseId);
     const state = deriveState(snap.status, snap.assessmentPassed);
     courseRows.push({
@@ -256,20 +266,30 @@ export async function assignLevelCoursesForUser(userId: string, assignedBy?: str
   const level = normalizeCareerLevel(profile.level, profile.department);
 
   const matching = await db
-    .select({ id: courses.id, title: courses.title, slug: courses.slug })
+    .select({
+      id: courses.id,
+      title: courses.title,
+      slug: courses.slug,
+      departmentId: courses.departmentId,
+    })
     .from(courses)
-    .where(
-      and(
-        eq(courses.departmentId, profile.department),
-        eq(courses.level, level),
-        eq(courses.publishStatus, "published")
-      )
-    );
+    .where(and(eq(courses.level, level), eq(courses.publishStatus, "published")));
+
+  const { listDepartmentIdsByCourseIds } = await import("@/db/queries/course-departments");
+  const { courseMatchesDepartmentFilter } = await import("@/lib/course-departments");
+  const deptMap = await listDepartmentIdsByCourseIds(matching.map((c) => c.id));
+  const forDepartment = matching.filter((course) =>
+    courseMatchesDepartmentFilter(
+      course.departmentId,
+      deptMap.get(course.id),
+      profile.department
+    )
+  );
 
   let inserted = 0;
   let skipped = 0;
 
-  for (const course of matching) {
+  for (const course of forDepartment) {
     const [existing] = await db
       .select({ id: courseAssignments.id })
       .from(courseAssignments)

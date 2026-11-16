@@ -99,8 +99,16 @@ export async function assignCourseAction(input: unknown) {
     if (data.scope === "org") {
       throw new Error("Department admins cannot assign organization-wide");
     }
-    if (data.scope === "department" && data.departmentId !== actor.department) {
-      throw new Error("You can only assign within your department");
+    if (data.scope === "department") {
+      const scopeDepts =
+        data.departmentIds?.length && data.departmentIds.length > 0
+          ? data.departmentIds
+          : data.departmentId
+            ? [data.departmentId]
+            : [];
+      if (scopeDepts.some((d) => d !== actor.department)) {
+        throw new Error("You can only assign within your department");
+      }
     }
     if (data.scope === "user") {
       const allowed = await listActiveUserIds({ departmentId: actor.department });
@@ -111,19 +119,28 @@ export async function assignCourseAction(input: unknown) {
     }
   }
 
+  const scopeDepartments: DepartmentId[] =
+    data.scope === "department"
+      ? ((data.departmentIds?.length
+          ? data.departmentIds
+          : data.departmentId
+            ? [data.departmentId]
+            : []) as DepartmentId[])
+      : [];
+
   let targetUserIds: string[] = [];
-  let departmentId: DepartmentId | null = null;
 
   if (data.scope === "org") {
     targetUserIds = await listActiveUserIds();
   } else if (data.scope === "department") {
-    departmentId = data.departmentId as DepartmentId;
-    targetUserIds = await listActiveUserIds({ departmentId });
+    if (scopeDepartments.length === 0) {
+      throw new Error("Select at least one department");
+    }
   } else {
     targetUserIds = data.userIds ?? [];
   }
 
-  if (targetUserIds.length === 0) {
+  if (data.scope === "user" && targetUserIds.length === 0) {
     throw new Error("No matching active employees to assign");
   }
 
@@ -132,6 +149,9 @@ export async function assignCourseAction(input: unknown) {
 
   let inserted = 0;
   let skipped = 0;
+  let totalTargets = 0;
+
+  const notifyQueue = new Map<string, { title: string; slug: string; userIds: string[] }>();
 
   for (const courseId of courseIds) {
     const [course] = await db.select().from(courses).where(eq(courses.id, courseId)).limit(1);
@@ -140,11 +160,55 @@ export async function assignCourseAction(input: unknown) {
       throw new Error(`Only published courses can be assigned: ${course.title}`);
     }
 
+    if (data.scope === "department") {
+      for (const deptId of scopeDepartments) {
+        const deptUserIds = await listActiveUserIds({ departmentId: deptId });
+        if (deptUserIds.length === 0) continue;
+        totalTargets += deptUserIds.length;
+
+        const result = await insertAssignmentsForUsers({
+          courseId,
+          userIds: deptUserIds,
+          scope: data.scope,
+          departmentId: deptId,
+          mandatory: data.mandatory,
+          startDate,
+          dueDate,
+          source: data.source ?? "manual",
+          planId: data.planId,
+          cycleId: data.cycleId,
+          assignedBy: actorId,
+        });
+
+        inserted += result.inserted;
+        skipped += result.skipped;
+
+        if (result.insertedUserIds.length > 0) {
+          const prev = notifyQueue.get(courseId);
+          if (prev) {
+            prev.userIds = Array.from(new Set([...prev.userIds, ...result.insertedUserIds]));
+          } else {
+            notifyQueue.set(courseId, {
+              title: course.title,
+              slug: course.slug,
+              userIds: result.insertedUserIds,
+            });
+          }
+        }
+      }
+      continue;
+    }
+
+    if (targetUserIds.length === 0) {
+      throw new Error("No matching active employees to assign");
+    }
+    totalTargets += targetUserIds.length;
+
     const result = await insertAssignmentsForUsers({
       courseId,
       userIds: targetUserIds,
       scope: data.scope,
-      departmentId,
+      departmentId: null,
       mandatory: data.mandatory,
       startDate,
       dueDate,
@@ -158,14 +222,20 @@ export async function assignCourseAction(input: unknown) {
     skipped += result.skipped;
 
     if (result.insertedUserIds.length > 0) {
-      await notifyAssigned(
-        result.insertedUserIds,
-        course.title,
-        course.slug,
-        data.mandatory,
-        dueDate
-      );
+      notifyQueue.set(courseId, {
+        title: course.title,
+        slug: course.slug,
+        userIds: result.insertedUserIds,
+      });
     }
+  }
+
+  for (const entry of notifyQueue.values()) {
+    await notifyAssigned(entry.userIds, entry.title, entry.slug, data.mandatory, dueDate);
+  }
+
+  if (data.scope === "department" && inserted === 0 && skipped === 0) {
+    throw new Error("No matching active employees to assign");
   }
 
   await writeAuditLog({
@@ -176,6 +246,7 @@ export async function assignCourseAction(input: unknown) {
     metadata: {
       scope: data.scope,
       courseIds,
+      departmentIds: scopeDepartments.length > 0 ? scopeDepartments : undefined,
       inserted,
       skipped,
       mandatory: data.mandatory,
@@ -189,7 +260,7 @@ export async function assignCourseAction(input: unknown) {
   return {
     inserted,
     skipped,
-    totalTargets: targetUserIds.length,
+    totalTargets,
     courseCount: courseIds.length,
   };
 }

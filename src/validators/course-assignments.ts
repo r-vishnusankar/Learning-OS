@@ -9,6 +9,7 @@ export const assignCourseSchema = z
     courseIds: z.array(z.string().min(1)).optional(),
     scope: scopeSchema,
     departmentId: z.string().optional(),
+    departmentIds: z.array(z.string().min(1)).optional(),
     userIds: z.array(z.string().min(1)).optional(),
     mandatory: z.boolean().default(false),
     startDate: z.string().optional().nullable(),
@@ -26,11 +27,15 @@ export const assignCourseSchema = z
         path: ["courseIds"],
       });
     }
-    if (data.scope === "department" && !data.departmentId) {
+    if (
+      data.scope === "department" &&
+      !data.departmentId &&
+      !(data.departmentIds && data.departmentIds.length > 0)
+    ) {
       ctx.addIssue({
         code: "custom",
-        message: "departmentId is required for department scope",
-        path: ["departmentId"],
+        message: "Select at least one department",
+        path: ["departmentIds"],
       });
     }
     if (data.scope === "user" && (!data.userIds || data.userIds.length === 0)) {

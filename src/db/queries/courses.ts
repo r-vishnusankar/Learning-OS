@@ -13,6 +13,11 @@ import type { PublishStatus } from "@/db/schema/courses";
 import type { Difficulty, LearningCategory, LearningLevel } from "@/types";
 import { courseProgress } from "@/lib/course-progress";
 import {
+  courseMatchesDepartmentFilter,
+  courseVisibleToUser,
+} from "@/lib/course-departments";
+import { listDepartmentIdsByCourseIds } from "@/db/queries/course-departments";
+import {
   getPassedAssessmentIds,
   getPublishedAssessmentsByCourseIds,
 } from "@/db/queries/assessments";
@@ -65,8 +70,21 @@ export async function getAdminCourses(filters?: {
     .leftJoin(categories, eq(courses.categoryId, categories.id))
     .orderBy(desc(courses.updatedAt));
 
+  const deptMap = filters?.departmentId
+    ? await listDepartmentIdsByCourseIds(rows.map((r) => r.course.id))
+    : null;
+
   return rows.filter((row) => {
-    if (filters?.departmentId && row.course.departmentId !== filters.departmentId) return false;
+    if (
+      filters?.departmentId &&
+      !courseMatchesDepartmentFilter(
+        row.course.departmentId,
+        deptMap?.get(row.course.id),
+        filters.departmentId as import("@/types").DepartmentId
+      )
+    ) {
+      return false;
+    }
     if (filters?.publishStatus && row.course.publishStatus !== filters.publishStatus) return false;
     if (filters?.level && row.course.level !== filters.level) return false;
     if (filters?.difficulty && row.course.difficulty !== filters.difficulty) return false;
@@ -100,9 +118,14 @@ export async function getPublishedCourses(userDepartmentId?: string) {
 
   if (!userDepartmentId) return rows;
 
-  // When a department is known: show openToAll courses + department-specific ones
-  return rows.filter(
-    (r) => r.course.openToAll || r.course.departmentId === userDepartmentId
+  const deptMap = await listDepartmentIdsByCourseIds(rows.map((r) => r.course.id));
+  return rows.filter((r) =>
+    courseVisibleToUser(
+      r.course.openToAll,
+      r.course.departmentId,
+      deptMap.get(r.course.id),
+      userDepartmentId
+    )
   );
 }
 
